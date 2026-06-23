@@ -415,7 +415,12 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const passwordHash = await bcrypt.hash(newPassword, bcryptRounds);
 
     await query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, userId]);
-    await query('UPDATE otp_verifications SET is_used = true WHERE otp_code = $1', [hashSecret(token)]);
+    await query(
+      `UPDATE otp_verifications
+       SET is_used = true
+       WHERE user_id = $1 AND purpose = 'password_reset' AND is_used = false`,
+      [userId]
+    );
 
     res.json({
       status: 'success',
