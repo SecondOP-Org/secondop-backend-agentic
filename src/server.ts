@@ -12,6 +12,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { errorHandler } from './middleware/errorHandler';
 import { notFoundHandler } from './middleware/notFoundHandler';
 import { rateLimiter } from './middleware/rateLimiter';
+import { requestIdMiddleware } from './middleware/requestId';
 import logger from './utils/logger';
 import { closePool, initializeDatabase } from './database/connection';
 import { query } from './database/connection';
@@ -120,11 +121,20 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
   credentials: true,
 }));
+app.use(requestIdMiddleware);
+morgan.token('request-id', (req) => (req as express.Request).requestId || '-');
+app.use(
+  morgan(
+    ':remote-addr - :remote-user [:date[clf]] ":method :url HTTP/:http-version" :status :res[content-length] ":referrer" ":user-agent" requestId=:request-id',
+    {
+      stream: { write: (message) => logger.info(message.trim()) },
+    }
+  )
+);
 app.use(compression()); // Compress responses
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
-app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 
 // Rate limiting
 app.use('/api', rateLimiter);
