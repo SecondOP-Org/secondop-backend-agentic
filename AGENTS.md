@@ -25,8 +25,9 @@
 8. Avoid unrelated cleanup or broad refactors.
 9. Add or update tests when touching logic, permissions, API behavior, AI behavior, persistence, or reusable services.
 10. Run the appropriate checks and explain any environment/config blockers.
-11. Prepare a PR-ready summary.
-12. Open a draft PR only when the user asks.
+11. Update the agent run ledger in `docs/AGENT_RUN_LEDGER.md`.
+12. Prepare a PR-ready summary.
+13. Open a draft PR only when the user asks.
 
 ## Project Structure
 - `src/server.ts`: Express and Socket.IO application entry point.
@@ -50,6 +51,14 @@
 - Reuse current validation, logging, API, test, and styling conventions.
 - Make the smallest correct change.
 - Add tests when touching logic, API behavior, permissions, AI behavior, persistence, or reusable services.
+
+## Agent Run Ledger
+- `docs/AGENT_RUN_LEDGER.md` is the durable audit trail for agent work in this repository.
+- Add or update a ledger entry for every task run that touches this backend repo.
+- Keep entries concise and factual: Linear issue, branch/worktree, files changed, checks, PRs, deploys, approvals, blockers, and follow-ups.
+- Never record secrets, raw tokens, private auth URLs, credentials, OTPs, environment values, patient data, or full sensitive logs.
+- If a run is blocked before code changes, still add the blocker and next action when the branch includes documentation/workflow updates.
+- If the task spans multiple repositories, reference the other repo and its issue/PR/deploy identifiers rather than duplicating private details.
 
 ## Run Locally
 ```bash
