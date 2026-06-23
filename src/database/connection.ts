@@ -1,6 +1,7 @@
 import { Pool, PoolClient } from 'pg';
 import dotenv from 'dotenv';
 import logger from '../utils/logger';
+import { buildDbSslConfig } from './sslConfig';
 
 dotenv.config();
 
@@ -10,7 +11,7 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'secondop_db',
   user: process.env.DB_USER || 'postgres',
   password: process.env.DB_PASSWORD,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+  ssl: buildDbSslConfig(),
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -73,4 +74,3 @@ export const closePool = async (): Promise<void> => {
 };
 
 export default pool;
-
