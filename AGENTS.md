@@ -41,6 +41,16 @@
 - `migrations/`: PostgreSQL schema migrations.
 - `scripts/`: database, smoke, and evaluation scripts.
 
+## Coding Discipline
+- Inspect existing code before editing.
+- Keep changes scoped to the Linear issue.
+- Do not modify unrelated files or clean up code outside the task.
+- Prefer existing patterns, helpers, services, middleware, and architecture.
+- Do not add new dependencies or create new libraries unless clearly justified and approved.
+- Reuse current validation, logging, API, test, and styling conventions.
+- Make the smallest correct change.
+- Add tests when touching logic, API behavior, permissions, AI behavior, persistence, or reusable services.
+
 ## Run Locally
 ```bash
 npm ci
