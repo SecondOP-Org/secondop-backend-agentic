@@ -20,16 +20,20 @@ export const errorHandler = (
   res: Response,
   _next: NextFunction
 ) => {
+  const requestId = req.requestId;
+
   if (err instanceof AppError) {
     logger.error(`AppError: ${err.message}`, {
       statusCode: err.statusCode,
       path: req.path,
       method: req.method,
+      requestId,
     });
 
     return res.status(err.statusCode).json({
       status: 'error',
       message: err.message,
+      requestId,
     });
   }
 
@@ -39,6 +43,7 @@ export const errorHandler = (
     stack: err.stack,
     path: req.path,
     method: req.method,
+    requestId,
   });
 
   return res.status(500).json({
@@ -46,6 +51,6 @@ export const errorHandler = (
     message: process.env.NODE_ENV === 'production' 
       ? 'Internal server error' 
       : err.message,
+    requestId,
   });
 };
-
