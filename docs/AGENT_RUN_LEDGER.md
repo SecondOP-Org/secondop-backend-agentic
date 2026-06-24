@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-24 - SEC-36 - Add PR review agent checklist and review output template
+
+- Status: In progress.
+- Human approval: User asked to work on the next three Linear items after SEC-38.
+- Branch/worktree: `sec-36-add-pr-review-agent-checklist-and-review-output-template`, `.worktrees/sec-36-backend`.
+- Files changed: `docs/PR_REVIEW_AGENT.md`, `AGENTS.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `rg` conflict-marker scan passed; secret-pattern scan passed; `git diff --check` passed; dry-run metadata inspection completed for docs-only PR #11 and code PR #9.
+- Deployment: None; documentation/workflow-only backend change.
+- Verification: Added the PR review agent checklist, severity scale, findings-first output template, GitHub/Linear reflection rules, and AGENTS.md pointer; confirmed the template can be applied to recent docs-only and code PR metadata.
+- Blockers: None.
+- Follow-ups: Open PR and update Linear after validation.
+
 ## 2026-06-24 - SEC-20 - Add checked-in backend ESLint configuration
 
 - Status: In progress.
