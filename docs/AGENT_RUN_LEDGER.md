@@ -28,16 +28,16 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
-## 2026-06-24 - SEC-39 - Design backend command-center API with admin authorization
+## 2026-06-24 - SEC-39 - Functional backend command-center API with admin authorization
 
 - Status: In progress.
 - Human approval: User asked to work on the next three Linear items after SEC-38.
 - Branch/worktree: `sec-39-design-backend-command-center-api-with-admin-authorization`, `.worktrees/sec-39-backend`.
-- Files changed: `docs/COMMAND_CENTER_API_DESIGN.md`, `docs/AGENT_RUN_LEDGER.md`.
+- Files changed: `.env.example`, `docs/COMMAND_CENTER_API_DESIGN.md`, `docs/AGENT_RUN_LEDGER.md`, `src/controllers/commandCenter.controller.ts`, `src/middleware/commandCenterAuth.ts`, `src/routes/commandCenter.routes.ts`, `src/services/commandCenter.service.ts`, `src/server.ts`, `src/__tests__/command-center.routes.test.ts`.
 - PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/11.
-- Checks: `rg` conflict-marker scan passed; secret-pattern scan passed; `git diff --check` passed.
-- Deployment: None; design-only backend change.
-- Verification: Reviewed current backend auth model and documented the admin/operator role gap, endpoint contract, provider integration approach, sanitization rules, audit expectations, partial-data behavior, and implementation test plan.
+- Checks: `npm test -- --runInBand --silent src/__tests__/command-center.routes.test.ts` passed; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed; `git diff --check` passed; conflict-marker scan passed; secret-pattern scan passed.
+- Deployment: None; backend API implementation only.
+- Verification: Added authenticated command-center routes, operator allowlist authorization, sanitized ledger-backed service responses, provider status placeholders, env guidance, and tests for auth required, non-operator denial, operator success, latest ledger output, and redaction.
 - Blockers: None.
 - Follow-ups: Wait for human review/approval before merge.
 

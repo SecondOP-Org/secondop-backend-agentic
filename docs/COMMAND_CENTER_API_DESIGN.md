@@ -1,6 +1,16 @@
 # Command-Center API Design
 
-SEC-39 defines the backend API shape and authorization requirements for a future command-center UI. It is a design contract, not an implementation.
+SEC-39 defines the backend API shape and ships the first functional command-center API slice for a future protected UI.
+
+Implemented in this slice:
+
+- authenticated routes under `/api/v1/admin/command-center`
+- operator allowlist authorization using `COMMAND_CENTER_OPERATOR_USER_IDS` and `COMMAND_CENTER_OPERATOR_EMAILS`
+- sanitized ledger-backed responses
+- provider status placeholders that make unavailable integrations explicit
+- tests for unauthenticated access, non-operator denial, operator success, and redaction
+
+Live Linear, GitHub, Vercel, and Railway provider adapters remain future work and must stay server-side.
 
 ## Goals
 
@@ -16,27 +26,34 @@ SEC-39 defines the backend API shape and authorization requirements for a future
 - No direct browser calls to Linear, GitHub, Vercel, Railway, or local ledgers.
 - No patient, medical, payment, or production-user data in command-center responses.
 
-## Current Auth Gap
+## Current Auth Model
 
-The current backend auth middleware identifies users as `patient` or `doctor` only. A command-center API needs an explicit admin/operator authorization model before implementation.
+The current backend auth middleware identifies users as `patient` or `doctor` only. This slice adds a least-privilege operator allowlist on top of authenticated users without changing the user schema.
 
-Required future change:
+Current behavior:
+
+- `authenticate` must succeed first.
+- `authorizeCommandCenterOperator` checks the authenticated user ID and email against server-side comma-separated allowlists.
+- If no allowlist is configured, every command-center request is denied with `403`.
+- Regular patients/doctors are denied unless explicitly allowlisted.
+
+Future hardening:
 
 - Add an admin/operator role or permission claim that is separate from `patient` and `doctor`.
-- Enforce command-center access with `authenticate` plus a new server-side authorization guard such as `authorizeOperator`.
+- Replace or supplement env allowlists with persisted role/permission checks.
 - Do not rely on hidden frontend routes, URL obscurity, or client-side role checks.
 - Keep `DEV_SKIP_AUTH` disabled in production and never allow it to grant operator access in hosted environments.
 
-## Proposed Endpoints
+## Endpoints
 
 All endpoints live under `/api/v1/admin/command-center` and require admin/operator authorization.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/summary` | Status cards plus active/recent work items for the command-center dashboard. |
-| `GET` | `/issues` | Normalized Linear issue queue with repo scope, phase, PR, checks, deploys, ledger, and human action. |
-| `GET` | `/issues/:issueKey` | Detailed status for one Linear issue, including linked PR/deploy/ledger summaries. |
-| `GET` | `/deployments` | Sanitized Vercel/Railway deployment status for configured projects/services. |
+| `GET` | `/summary` | Status cards plus active/recent ledger-backed work items for the command-center dashboard. |
+| `GET` | `/issues` | Normalized ledger-backed issue rows with repo scope, phase, checks, deploys, ledger, and human action. |
+| `GET` | `/issues/:issueKey` | Detailed status for one ledger-backed issue. |
+| `GET` | `/deployments` | Sanitized deployment summaries parsed from allowlisted run ledgers. |
 | `GET` | `/ledgers/latest` | Latest sanitized run ledger entries from allowed frontend/backend ledger sources. |
 
 Future mutating operations, such as triggering a deploy or resolving a blocker, must be separate tickets and require explicit human approval.
