@@ -44,6 +44,11 @@
 - `In Review`: PR created and needs human review/merge approval.
 - `Done`: merged and closed; deployed only when deployment is explicitly in scope.
 
+## Multi-Agent Workflow
+- `docs/MULTI_AGENT_WORKFLOW.md` defines the shared Product/spec, Coding, PR review, QA/smoke-test, Release/deploy, and Command-center/status agent roles.
+- Use that contract for handoffs between agents, especially when a task spans frontend, backend, PR review, QA, release, or command-center reporting.
+- The human approval gates in this `AGENTS.md` remain authoritative for this repo: agents may prepare work through PR readiness, but must not merge, deploy, change production config, rotate secrets, take destructive actions, or sign off security-sensitive decisions without explicit human approval.
+
 ## Project Structure
 - `src/server.ts`: Express and Socket.IO application entry point.
 - `src/routes/`: API route definitions.

@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-24 - SEC-34 - Define multi-agent engineering workflow and handoff contract
+
+- Status: In progress.
+- Human approval: User asked to start SEC-34 after SEC-27 was approved and merged.
+- Branch/worktree: `sec-34-define-multi-agent-engineering-workflow-and-handoff-contract`, `.worktrees/sec-34-backend`.
+- Files changed: `AGENTS.md`, `docs/MULTI_AGENT_WORKFLOW.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `rg` conflict-marker scan passed; `git diff --check` passed.
+- Deployment: None; documentation/workflow-only backend change.
+- Verification: Confirmed root workspace is not a git repo, so durable workflow updates are being made in repo-specific docs.
+- Blockers: None.
+- Follow-ups: Pair with frontend SEC-34 PR and use SEC-35 for command-center design.
+
 ## 2026-06-23 - SEC-27 - Update agent workflow approval gate and Linear status mapping
 
 - Status: In progress.
