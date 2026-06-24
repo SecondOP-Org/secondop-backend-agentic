@@ -10,24 +10,39 @@
 
 ## Required Task Workflow
 1. Read the Linear issue provided by the user.
-2. Inspect the repository before editing.
-3. Summarize:
+2. If the issue is not implementation-ready, create or refine the Linear spec before coding:
    - Problem
    - Acceptance criteria
-   - Relevant files
+   - Relevant files or areas
    - Proposed implementation plan
    - Test plan
    - Risks or unknowns
-4. Stop and wait for user approval before making code changes unless the user explicitly says `proceed`.
-5. After approval, create a dedicated branch/worktree named from the Linear issue key and short title.
-6. Implement the smallest correct change.
+3. Mark the Linear issue as ready for code before starting implementation.
+   - Current Linear mapping: use `Todo` for ready-for-code work.
+4. Inspect the repository before editing.
+5. Create a dedicated branch/worktree named from the Linear issue key and short title.
+6. Implement the smallest correct change end to end.
 7. Follow existing architecture, naming, patterns, and coding style.
 8. Avoid unrelated cleanup or broad refactors.
 9. Add or update tests when touching logic, permissions, API behavior, AI behavior, persistence, or reusable services.
-10. Run the appropriate checks and explain any environment/config blockers.
-11. Update the agent run ledger in `docs/AGENT_RUN_LEDGER.md`.
-12. Prepare a PR-ready summary.
-13. Open a draft PR only when the user asks.
+10. Review the change against the broader architecture before opening a PR.
+11. Mark the Linear issue as ready for test when coding is complete.
+12. Run the appropriate checks and explain any environment/config blockers.
+13. If checks fail, fix only relevant failures caused by the change and rerun checks.
+14. Update the agent run ledger in `docs/AGENT_RUN_LEDGER.md`.
+15. Open a draft PR when checks are complete and update Linear with the PR link.
+16. Mark the Linear issue as PR created / needs merge approval.
+   - Current Linear mapping: use `In Review` for PR-created work that needs human approval.
+17. Prepare a PR-ready summary.
+18. Stop and wait for human approval before merging, deploying, changing production config, rotating secrets, or taking destructive actions.
+19. After human approval, merge according to repo policy, update Linear, and mark the issue `Done`.
+
+## Linear Status Mapping
+- `Backlog`: spec needed, blocked, or not yet selected.
+- `Todo`: spec complete and ready for code.
+- `In Progress`: actively coding or locally testing.
+- `In Review`: PR created and needs human review/merge approval.
+- `Done`: merged and closed; deployed only when deployment is explicitly in scope.
 
 ## Project Structure
 - `src/server.ts`: Express and Socket.IO application entry point.

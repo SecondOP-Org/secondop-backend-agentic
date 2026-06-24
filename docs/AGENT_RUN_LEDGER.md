@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-23 - SEC-27 - Update agent workflow approval gate and Linear status mapping
+
+- Status: In progress.
+- Human approval: User requested moving the human approval gate to PR merge/deploy approval after Linear spec is recorded.
+- Branch/worktree: `vinodhpeddi/sec-27-update-agent-workflow-approval-gate-and-linear-status`, `.worktrees/sec-27-backend`.
+- Files changed: `AGENTS.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/5.
+- Checks: Pending rerun after conflict resolution.
+- Deployment: None; documentation/workflow-only backend change.
+- Verification: Merged current `origin/main` into the SEC-27 branch to preserve the backend run ledger from SEC-33.
+- Blockers: Branch was stale and conflicted with the newer ledger guidance; resolved by keeping both the new approval workflow and ledger requirement.
+- Follow-ups: Keep Linear issue in `In Review` after checks/PR refresh; wait for human merge approval.
+
 ## 2026-06-23 - SEC-33 - Add backend agent run ledger
 
 - Status: In progress.
