@@ -34,12 +34,12 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User approved SEC-35 merge flow and asked to start SEC-20.
 - Branch/worktree: `sec-20-add-checked-in-backend-eslint-configuration`, `.worktrees/sec-20-backend`.
 - Files changed: `.eslintrc.cjs`, `src/controllers/auth.controller.ts`, `src/services/reportExtraction.service.ts`, `docs/AGENT_RUN_LEDGER.md`.
-- PR: Pending.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/9.
 - Checks: `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
 - Deployment: None.
 - Verification: Added backend ESLint config, fixed the initial narrow lint findings, and verified checks from the isolated worktree using the existing backend dependency tree.
 - Blockers: None.
-- Follow-ups: Open PR and update Linear.
+- Follow-ups: Wait for human review/approval before merge.
 
 ## 2026-06-24 - SEC-35 - Design command-center view for Linear, PR, checks, deploys, and run ledger
 
