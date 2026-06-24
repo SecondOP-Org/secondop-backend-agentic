@@ -70,7 +70,7 @@ const recoverTextFromRawPdf = (buffer: Buffer): string => {
   }
 
   // ASCII "strings" extraction as a second fallback.
-  const asciiMatches = latin.match(/[A-Za-z0-9,.;:\-()\/%\s]{30,}/g) || [];
+  const asciiMatches = latin.match(/[A-Za-z0-9,.;:\-()/%\s]{30,}/g) || [];
   for (const match of asciiMatches) {
     const cleaned = cleanTextCandidate(match);
     if (cleaned.length >= 30 && /[A-Za-z]{5,}/.test(cleaned)) {

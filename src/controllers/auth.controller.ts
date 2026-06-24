@@ -195,7 +195,7 @@ export const loginWithPhone = async (req: Request, res: Response, next: NextFunc
     }
 
     // Find or create user
-    let result = await query(
+    const result = await query(
       'SELECT id, email, user_type, is_verified FROM users WHERE phone = $1',
       [phone]
     );
