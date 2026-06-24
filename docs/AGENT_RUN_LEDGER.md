@@ -34,12 +34,12 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked to work on the next three Linear items after SEC-38.
 - Branch/worktree: `sec-39-design-backend-command-center-api-with-admin-authorization`, `.worktrees/sec-39-backend`.
 - Files changed: `docs/COMMAND_CENTER_API_DESIGN.md`, `docs/AGENT_RUN_LEDGER.md`.
-- PR: Pending.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/11.
 - Checks: `rg` conflict-marker scan passed; secret-pattern scan passed; `git diff --check` passed.
 - Deployment: None; design-only backend change.
 - Verification: Reviewed current backend auth model and documented the admin/operator role gap, endpoint contract, provider integration approach, sanitization rules, audit expectations, partial-data behavior, and implementation test plan.
 - Blockers: None.
-- Follow-ups: Open PR and update Linear after validation.
+- Follow-ups: Wait for human review/approval before merge.
 
 ## 2026-06-24 - SEC-20 - Add checked-in backend ESLint configuration
 
