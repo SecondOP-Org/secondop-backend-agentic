@@ -31,6 +31,7 @@ import labResultsRoutes from './routes/labResults.routes';
 import billingRoutes from './routes/billing.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import doctorRoutes from './routes/doctor.routes';
+import commandCenterRoutes from './routes/commandCenter.routes';
 
 // Load environment variables
 dotenv.config();
@@ -157,6 +158,7 @@ app.use(`/api/${API_VERSION}/lab-results`, labResultsRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 app.use(`/api/${API_VERSION}/appointments`, appointmentRoutes);
 app.use(`/api/${API_VERSION}/doctors`, doctorRoutes);
+app.use(`/api/${API_VERSION}/admin/command-center`, commandCenterRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {

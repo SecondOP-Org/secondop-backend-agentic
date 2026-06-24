@@ -41,6 +41,32 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Blockers: None.
 - Follow-ups: Pair with frontend PR and wait for human review/approval before merge.
 
+## 2026-06-24 - SEC-39 - Functional backend command-center API with admin authorization
+
+- Status: In progress.
+- Human approval: User asked to work on the next three Linear items after SEC-38.
+- Branch/worktree: `sec-39-design-backend-command-center-api-with-admin-authorization`, `.worktrees/sec-39-backend`.
+- Files changed: `.env.example`, `docs/COMMAND_CENTER_API_DESIGN.md`, `docs/AGENT_RUN_LEDGER.md`, `src/controllers/commandCenter.controller.ts`, `src/middleware/commandCenterAuth.ts`, `src/routes/commandCenter.routes.ts`, `src/services/commandCenter.service.ts`, `src/server.ts`, `src/__tests__/command-center.routes.test.ts`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/11.
+- Checks: `npm test -- --runInBand --silent src/__tests__/command-center.routes.test.ts` passed; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed; `git diff --check` passed; conflict-marker scan passed; secret-pattern scan passed.
+- Deployment: None; backend API implementation only.
+- Verification: Added authenticated command-center routes, operator allowlist authorization, sanitized ledger-backed service responses, provider status placeholders, env guidance, and tests for auth required, non-operator denial, operator success, latest ledger output, and redaction.
+- Blockers: None.
+- Follow-ups: Wait for human review/approval before merge.
+
+## 2026-06-24 - SEC-38 - Build local command-center report generator
+
+- Status: In progress.
+- Human approval: User approved starting SEC-38 after SEC-20 production deployment.
+- Branch/worktree: `sec-38-build-local-command-center-report-generator`, `.worktrees/sec-38-backend`.
+- Files changed: `scripts/command-center-report.mjs`, `docs/COMMAND_CENTER_REPORT.md`, `package.json`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/10.
+- Checks: `node --check scripts/command-center-report.mjs` passed; `npm run command-center:report` passed; `npm run command-center:report -- --linear-snapshot temp/command-center/linear-sec-queue.json` passed; `npm run command-center:report -- --linear-snapshot temp/command-center/linear-sec-queue.json --live-deploys` passed with provider data unavailable as a reported blocker; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
+- Deployment: None; local workflow tooling only.
+- Verification: Generated ignored Markdown and JSON reports under `temp/command-center/`, verified missing Linear/provider data is reported as blockers instead of crashes, and scanned generated output for common secret/token patterns.
+- Blockers: None.
+- Follow-ups: Wait for human review/approval before merge.
+
 ## 2026-06-24 - SEC-20 - Add checked-in backend ESLint configuration
 
 - Status: In progress.
