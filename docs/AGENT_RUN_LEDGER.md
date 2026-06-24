@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-24 - SEC-38 - Build local command-center report generator
+
+- Status: In progress.
+- Human approval: User approved starting SEC-38 after SEC-20 production deployment.
+- Branch/worktree: `sec-38-build-local-command-center-report-generator`, `.worktrees/sec-38-backend`.
+- Files changed: `scripts/command-center-report.mjs`, `docs/COMMAND_CENTER_REPORT.md`, `package.json`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `node --check scripts/command-center-report.mjs` passed; `npm run command-center:report` passed; `npm run command-center:report -- --linear-snapshot temp/command-center/linear-sec-queue.json` passed; `npm run command-center:report -- --linear-snapshot temp/command-center/linear-sec-queue.json --live-deploys` passed with provider data unavailable as a reported blocker; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
+- Deployment: None; local workflow tooling only.
+- Verification: Generated ignored Markdown and JSON reports under `temp/command-center/`, verified missing Linear/provider data is reported as blockers instead of crashes, and scanned generated output for common secret/token patterns.
+- Blockers: None.
+- Follow-ups: Open PR and update Linear after validation.
+
 ## 2026-06-24 - SEC-20 - Add checked-in backend ESLint configuration
 
 - Status: In progress.
