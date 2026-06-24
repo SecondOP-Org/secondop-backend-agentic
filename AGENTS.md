@@ -47,6 +47,7 @@
 ## Multi-Agent Workflow
 - `docs/MULTI_AGENT_WORKFLOW.md` defines the shared Product/spec, Coding, PR review, QA/smoke-test, Release/deploy, and Command-center/status agent roles.
 - `docs/COMMAND_CENTER_DESIGN.md` defines the command-center MVP, data sources, security boundaries, and future UI/API path.
+- `docs/PR_REVIEW_AGENT.md` defines when the PR review agent runs, the review checklist, severity scale, output format, and GitHub/Linear reflection rules.
 - Use that contract for handoffs between agents, especially when a task spans frontend, backend, PR review, QA, release, or command-center reporting.
 - The human approval gates in this `AGENTS.md` remain authoritative for this repo: agents may prepare work through PR readiness, but must not merge, deploy, change production config, rotate secrets, take destructive actions, or sign off security-sensitive decisions without explicit human approval.
 
