@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-24 - SEC-35 - Design command-center view for Linear, PR, checks, deploys, and run ledger
+
+- Status: In progress.
+- Human approval: User asked to start SEC-35 after SEC-34 was approved and merged.
+- Branch/worktree: `sec-35-design-command-center-view`, `.worktrees/sec-35-backend`.
+- Files changed: `AGENTS.md`, `docs/COMMAND_CENTER_DESIGN.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/8.
+- Checks: `rg` conflict-marker scan passed; `git diff --check` passed.
+- Deployment: None; documentation/design-only backend change.
+- Verification: Confirmed command-center design should start as a local generated report, not a hidden static frontend route.
+- Blockers: None.
+- Follow-ups: SEC-38 for local report generator; SEC-39 for backend command-center API; SEC-40 for protected frontend admin UI.
+
 ## 2026-06-24 - SEC-34 - Define multi-agent engineering workflow and handoff contract
 
 - Status: In progress.
