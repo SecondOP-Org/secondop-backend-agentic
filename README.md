@@ -94,6 +94,10 @@ See `.env.example` for all required variables:
 - **Email**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
 - **SMS**: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
 
+## Release Versioning
+
+SecondOp uses one product release version plus separate frontend/backend build metadata. See `docs/RELEASE_VERSIONING.md` for the policy and follow-up implementation path.
+
 ## 📡 API Endpoints
 
 ### Authentication (`/api/v1/auth`)
