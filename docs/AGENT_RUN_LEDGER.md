@@ -41,6 +41,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Blockers: None.
 - Follow-ups: Configure hosted Railway metadata values during deployment after merge.
 
+## 2026-06-25 - SEC-21 - Define release versioning and build metadata policy
+
+- Status: In progress.
+- Human approval: User asked to work on the next item and proceed without pausing for non-critical approvals.
+- Branch/worktree: `sec-21-define-release-versioning-and-build-metadata-policy`, `.worktrees/sec-21-backend`.
+- Files changed: `docs/RELEASE_VERSIONING.md`, `README.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `git diff --check` passed; conflict-marker scan passed; release/version terminology scan completed.
+- Deployment: None; documentation/policy-only backend change.
+- Verification: Defined one product release version, separate backend/frontend build metadata, separate API versioning, package-version treatment, environment sources, deployment record fields, and follow-up mapping to SEC-22/SEC-23.
+- Blockers: None.
+- Follow-ups: Pair with frontend SEC-21 PR; implement backend metadata exposure under SEC-22.
+
 ## 2026-06-24 - SEC-36 - Add PR review agent checklist and review output template
 
 - Status: In progress.
