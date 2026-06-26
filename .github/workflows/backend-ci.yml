@@ -5,6 +5,7 @@ name: Backend CI
   push:
     branches:
       - main
+      - sec-41-investigate-backend-github-actions-zero-job-workflow
 
 permissions:
   contents: read
