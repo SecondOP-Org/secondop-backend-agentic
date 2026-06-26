@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked to work on SEC-41 under the established autonomous workflow.
 - Branch/worktree: `sec-41-investigate-backend-github-actions-zero-job-workflow`, `.worktrees/sec-41-backend`.
 - Files changed: `.github/workflows/backend-ci.yml`, `.github/workflows/ci.yml`, `.npmrc`, temporary `.github/workflows/actions-smoke.yml` diagnostic, `docs/AGENT_RUN_LEDGER.md`.
-- PR: Pending.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/20.
 - Checks: `git diff --check` passed; Ruby YAML parse passed for diagnostic and final workflow shapes; GitHub Actions run `28268569899` passed install, lint, tests, and build on `.github/workflows/ci.yml`.
 - Deployment: None; workflow investigation only.
 - Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs. Pushed a temporary quoted-`on` smoke workflow; it created a real `Smoke` job and passed, while the existing unquoted backend CI workflow failed again on the same push with zero jobs. A minimal same-name `Backend CI / Lint, test, and build` workflow scheduled successfully; restoring real steps converted the failure from zero-job to a normal `npm install` failure caused by checked-in absolute `.npmrc` cache/log paths. After making `.npmrc` portable, GitHub CI passed install, lint, tests, and build on run `28268493937`.
