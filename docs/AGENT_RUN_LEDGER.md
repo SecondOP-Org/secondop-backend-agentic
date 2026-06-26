@@ -39,7 +39,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Deployment: None; workflow investigation only.
 - Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs. Pushed a temporary quoted-`on` smoke workflow; it created a real `Smoke` job and passed, while the existing unquoted backend CI workflow failed again on the same push with zero jobs. Quoting `on` in the already-registered `.github/workflows/ci.yml` was not enough while the default-branch workflow metadata still showed the file path as its name, so this run moves the real CI job back to a freshly registered `.github/workflows/backend-ci.yml`.
 - Blockers: None currently.
-- Follow-ups: Push the freshly registered backend CI workflow, verify the SEC-41 branch creates a real `Backend CI / Lint, test, and build` job, then remove the temporary SEC-41 branch trigger before PR readiness if branch-push validation succeeds.
+- Follow-ups: Bisect the backend CI workflow content with a same-name minimal job, then restore lint/test/build once the scheduling blocker is isolated.
 
 ## 2026-06-26 - SEC-19 - Fix backend CI main trigger after production merge
 
