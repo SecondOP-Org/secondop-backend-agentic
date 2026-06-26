@@ -98,7 +98,25 @@ See `.env.example` for all required variables:
 
 SecondOp uses one product release version plus separate frontend/backend build metadata. See `docs/RELEASE_VERSIONING.md` for the policy and follow-up implementation path.
 
+## 🏷️ Release Metadata
+
+The backend exposes safe release/build metadata at:
+
+- `GET /health` - health status with compact `version` metadata.
+- `GET /version` - release/build metadata only.
+
+Set these public metadata variables in hosted environments when available:
+
+- `SECONDOP_RELEASE_VERSION`
+- `BACKEND_GIT_SHA`
+- `BACKEND_BUILD_TIME`
+- `BACKEND_DEPLOYMENT_ID`
+
 ## 📡 API Endpoints
+
+### Runtime
+- `GET /health` - Health check plus safe version metadata
+- `GET /version` - Safe backend release/build metadata
 
 ### Authentication (`/api/v1/auth`)
 - `POST /register` - Register new user (patient/doctor)

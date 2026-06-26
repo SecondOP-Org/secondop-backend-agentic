@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-25 - SEC-22 - Expose backend version and build metadata
+
+- Status: In progress.
+- Human approval: User asked to work on the next item and proceed without pausing for non-critical approvals.
+- Branch/worktree: `sec-22-expose-backend-version-and-build-metadata`, `.worktrees/sec-22-backend`.
+- Files changed: `.env.example`, `README.md`, `docs/AGENT_RUN_LEDGER.md`, `src/config/releaseMetadata.ts`, `src/controllers/version.controller.ts`, `src/server.ts`, `src/__tests__/release-metadata.test.ts`.
+- PR: Pending.
+- Checks: `npm test -- --runInBand --silent src/__tests__/release-metadata.test.ts` passed; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
+- Deployment: None; backend endpoint implementation only.
+- Verification: Added safe release metadata builder, `/version` endpoint, `/health.version` metadata, env guidance, and tests for shape and unsafe value fallback.
+- Blockers: None.
+- Follow-ups: Configure hosted Railway metadata values during deployment after merge.
+
 ## 2026-06-25 - SEC-21 - Define release versioning and build metadata policy
 
 - Status: In progress.
