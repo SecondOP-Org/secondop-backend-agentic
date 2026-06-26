@@ -41,6 +41,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Blockers: None.
 - Follow-ups: Merge and verify backend CI creates a real job on `main`.
 
+## 2026-06-26 - SEC-19 - Rename backend CI workflow file after zero-job runs
+
+- Status: In progress.
+- Human approval: User asked to resume and push to production.
+- Branch/worktree: `sec-19-fix-backend-ci-workflow-file`, `.worktrees/deploy-backend-prod-20260626`.
+- Files changed: `.github/workflows/backend-ci.yml`, `.github/workflows/ci.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: Pending.
+- Deployment: No backend app redeploy required unless Railway auto-deploys main after merge; workflow-only change.
+- Verification: Backend Actions are enabled and allowed, but both original and main-trigger hotfix workflow records failed in 0s with no jobs/logs. This follow-up renames the workflow file to force a fresh workflow registration and uses a conventional trigger shape.
+- Blockers: None.
+- Follow-ups: Merge and verify `.github/workflows/ci.yml` creates a real job on `main`.
+
 ## 2026-06-25 - SEC-19 - Add backend GitHub CI for lint, tests, and build
 
 - Status: In review.
