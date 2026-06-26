@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-25 - SEC-19 - Add backend GitHub CI for lint, tests, and build
+
+- Status: In review.
+- Human approval: User asked to work on the next Linear item autonomously through PR readiness.
+- Branch/worktree: `sec-19-add-backend-github-ci`, `.worktrees/sec-19-backend`.
+- Files changed: `.github/workflows/backend-ci.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/16.
+- Checks: `PATH=/opt/homebrew/bin:$PATH npm run lint` passed; `PATH=/opt/homebrew/bin:$PATH npm test -- --runInBand` passed (9 suites, 35 tests; Node emitted an existing `punycode` deprecation warning); `PATH=/opt/homebrew/bin:$PATH npm run build` passed; `ruby -e "require 'yaml'; p YAML.load_file('.github/workflows/backend-ci.yml').keys"` parsed the workflow with Ruby's YAML 1.1 `on` key display quirk; GitHub registered `.github/workflows/backend-ci.yml` as active, but new-workflow branch runs completed in 0s with no jobs because the workflow is not on default `main` yet.
+- Deployment: None; CI workflow-only backend change.
+- Verification: Confirmed backend exposes `npm run lint`, `npm test`, and `npm run build`; package engines allow Node `>=18.0.0`; current `origin/main` has no checked-in `package-lock.json`, so workflow uses `npm install` rather than `npm ci`; local checks used Homebrew Node `v23.6.1`; temporary validation PR #17 was opened against the SEC-19 branch and closed after confirming GitHub still produced no PR check while the workflow is absent from default `main`.
+- Blockers: GitHub Actions cannot fully prove this first backend workflow on PR #16 until the workflow exists on default `main`; after merge, future backend PRs should show the `Backend CI / Lint, test, and build` check.
+- Follow-ups: After human approval/merge, confirm the first post-merge backend branch or PR gets a real GitHub Actions job on Node 20; consider a separate ticket to commit a backend package lock and switch CI/local docs to `npm ci`.
+
 ## 2026-06-24 - SEC-36 - Add PR review agent checklist and review output template
 
 - Status: In progress.
