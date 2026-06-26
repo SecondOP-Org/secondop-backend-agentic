@@ -33,11 +33,11 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Status: In progress.
 - Human approval: User asked to work on SEC-41 under the established autonomous workflow.
 - Branch/worktree: `sec-41-investigate-backend-github-actions-zero-job-workflow`, `.worktrees/sec-41-backend`.
-- Files changed: `.github/workflows/backend-ci.yml`, `.github/workflows/ci.yml`, temporary `.github/workflows/actions-smoke.yml` diagnostic, `docs/AGENT_RUN_LEDGER.md`.
+- Files changed: `.github/workflows/backend-ci.yml`, `.github/workflows/ci.yml`, `.npmrc`, temporary `.github/workflows/actions-smoke.yml` diagnostic, `docs/AGENT_RUN_LEDGER.md`.
 - PR: Pending.
 - Checks: `git diff --check` passed before the diagnostic push; Ruby YAML parse passed for the temporary smoke workflow.
 - Deployment: None; workflow investigation only.
-- Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs. Pushed a temporary quoted-`on` smoke workflow; it created a real `Smoke` job and passed, while the existing unquoted backend CI workflow failed again on the same push with zero jobs. Quoting `on` in the already-registered `.github/workflows/ci.yml` was not enough while the default-branch workflow metadata still showed the file path as its name, so this run moves the real CI job back to a freshly registered `.github/workflows/backend-ci.yml`.
+- Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs. Pushed a temporary quoted-`on` smoke workflow; it created a real `Smoke` job and passed, while the existing unquoted backend CI workflow failed again on the same push with zero jobs. A minimal same-name `Backend CI / Lint, test, and build` workflow scheduled successfully; restoring real steps converted the failure from zero-job to a normal `npm install` failure caused by checked-in absolute `.npmrc` cache/log paths.
 - Blockers: None currently.
 - Follow-ups: Bisect the backend CI workflow content with a same-name minimal job, then restore lint/test/build once the scheduling blocker is isolated.
 
