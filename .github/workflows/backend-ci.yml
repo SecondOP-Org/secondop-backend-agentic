@@ -1,0 +1,43 @@
+name: Backend CI
+
+on:
+  pull_request: {}
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test-build:
+    name: Lint, test, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      CI: true
+      NODE_ENV: test
+      npm_config_cache: ${{ runner.temp }}/npm-cache
+      npm_config_logs_dir: ${{ runner.temp }}/npm-logs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test -- --runInBand
+
+      - name: Run build
+        run: npm run build
