@@ -1,6 +1,6 @@
 name: Backend CI
 
-on:
+"on":
   pull_request:
   push:
     branches:
@@ -13,13 +13,6 @@ jobs:
   lint-test-build:
     name: Lint, test, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    env:
-      CI: true
-      NODE_ENV: test
-      npm_config_cache: ${{ runner.temp }}/npm-cache
-      npm_config_logs_dir: ${{ runner.temp }}/npm-logs
 
     steps:
       - name: Checkout
