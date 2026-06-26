@@ -33,13 +33,13 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Status: In progress.
 - Human approval: User asked to work on SEC-41 under the established autonomous workflow.
 - Branch/worktree: `sec-41-investigate-backend-github-actions-zero-job-workflow`, `.worktrees/sec-41-backend`.
-- Files changed: `.github/workflows/actions-smoke.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- Files changed: `.github/workflows/ci.yml`, temporary `.github/workflows/actions-smoke.yml` diagnostic, `docs/AGENT_RUN_LEDGER.md`.
 - PR: Pending.
-- Checks: Pending.
+- Checks: `git diff --check` passed before the diagnostic push; Ruby YAML parse passed for the temporary smoke workflow.
 - Deployment: None; workflow investigation only.
-- Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs.
-- Blockers: Backend root cause still under investigation.
-- Follow-ups: Push the SEC-41 branch and verify whether the minimal smoke workflow schedules a real job.
+- Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs. Pushed a temporary quoted-`on` smoke workflow; it created a real `Smoke` job and passed, while the existing unquoted backend CI workflow failed again on the same push with zero jobs. This isolates the CI failure to workflow parsing/registration rather than runner availability or repo-wide Actions settings.
+- Blockers: None currently.
+- Follow-ups: Push the quoted backend CI fix, open a PR, and verify the PR creates a real `Backend CI / Lint, test, and build` job.
 
 ## 2026-06-26 - SEC-19 - Fix backend CI main trigger after production merge
 
