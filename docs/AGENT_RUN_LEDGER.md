@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-26 - SEC-41 - Investigate backend GitHub Actions zero-job workflow failures
+
+- Status: In progress.
+- Human approval: User asked to work on SEC-41 under the established autonomous workflow.
+- Branch/worktree: `sec-41-investigate-backend-github-actions-zero-job-workflow`, `.worktrees/sec-41-backend`.
+- Files changed: `.github/workflows/actions-smoke.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: Pending.
+- Deployment: None; workflow investigation only.
+- Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs.
+- Blockers: Backend root cause still under investigation.
+- Follow-ups: Push the SEC-41 branch and verify whether the minimal smoke workflow schedules a real job.
+
 ## 2026-06-26 - SEC-19 - Fix backend CI main trigger after production merge
 
 - Status: In progress.
