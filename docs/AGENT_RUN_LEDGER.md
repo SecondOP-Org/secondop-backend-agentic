@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-26 - SEC-19 - Fix backend CI main trigger after production merge
+
+- Status: In progress.
+- Human approval: User asked to resume and push to production.
+- Branch/worktree: `sec-19-fix-backend-ci-main-trigger`, `.worktrees/deploy-backend-prod-20260626`.
+- Files changed: `.github/workflows/backend-ci.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: Pending.
+- Deployment: Backend application was already deployed to Railway production before this CI hotfix; no app redeploy required for this workflow-only change.
+- Verification: Main push run for the original SEC-19 workflow failed in 0s with no jobs/logs; this hotfix narrows triggers to `main`, quotes the `on` key, and quotes Node version for cleaner parser behavior.
+- Blockers: None.
+- Follow-ups: Merge and verify backend CI creates a real job on `main`.
+
 ## 2026-06-25 - SEC-19 - Add backend GitHub CI for lint, tests, and build
 
 - Status: In review.
