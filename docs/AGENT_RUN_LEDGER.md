@@ -35,11 +35,11 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Branch/worktree: `sec-41-investigate-backend-github-actions-zero-job-workflow`, `.worktrees/sec-41-backend`.
 - Files changed: `.github/workflows/backend-ci.yml`, `.github/workflows/ci.yml`, `.npmrc`, temporary `.github/workflows/actions-smoke.yml` diagnostic, `docs/AGENT_RUN_LEDGER.md`.
 - PR: Pending.
-- Checks: `git diff --check` passed before the diagnostic push; Ruby YAML parse passed for the temporary smoke workflow.
+- Checks: `git diff --check` passed; Ruby YAML parse passed for diagnostic and final workflow shapes; GitHub Actions run `28268569899` passed install, lint, tests, and build on `.github/workflows/ci.yml`.
 - Deployment: None; workflow investigation only.
 - Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs. Pushed a temporary quoted-`on` smoke workflow; it created a real `Smoke` job and passed, while the existing unquoted backend CI workflow failed again on the same push with zero jobs. A minimal same-name `Backend CI / Lint, test, and build` workflow scheduled successfully; restoring real steps converted the failure from zero-job to a normal `npm install` failure caused by checked-in absolute `.npmrc` cache/log paths. After making `.npmrc` portable, GitHub CI passed install, lint, tests, and build on run `28268493937`.
 - Blockers: None currently.
-- Follow-ups: Bisect the backend CI workflow content with a same-name minimal job, then restore lint/test/build once the scheduling blocker is isolated.
+- Follow-ups: Open the SEC-41 PR and verify the pull request creates the real `Backend CI / Lint, test, and build` check.
 
 ## 2026-06-26 - SEC-19 - Fix backend CI main trigger after production merge
 

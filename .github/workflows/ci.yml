@@ -1,9 +1,10 @@
 name: Backend CI
 
 "on":
+  pull_request:
   push:
     branches:
-      - sec-41-investigate-backend-github-actions-zero-job-workflow
+      - main
 
 permissions:
   contents: read
