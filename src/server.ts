@@ -32,6 +32,7 @@ import billingRoutes from './routes/billing.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import doctorRoutes from './routes/doctor.routes';
 import commandCenterRoutes from './routes/commandCenter.routes';
+import { buildHealthResponse, getVersion } from './controllers/version.controller';
 
 // Load environment variables
 dotenv.config();
@@ -142,8 +143,10 @@ app.use('/api', rateLimiter);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.status(200).json(buildHealthResponse());
 });
+
+app.get('/version', getVersion);
 
 // API Routes
 const API_VERSION = process.env.API_VERSION || 'v1';

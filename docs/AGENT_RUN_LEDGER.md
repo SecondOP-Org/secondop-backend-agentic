@@ -41,6 +41,32 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Blockers: GitHub Actions cannot fully prove this first backend workflow on PR #16 until the workflow exists on default `main`; after merge, future backend PRs should show the `Backend CI / Lint, test, and build` check.
 - Follow-ups: After human approval/merge, confirm the first post-merge backend branch or PR gets a real GitHub Actions job on Node 20; consider a separate ticket to commit a backend package lock and switch CI/local docs to `npm ci`.
 
+## 2026-06-25 - SEC-22 - Expose backend version and build metadata
+
+- Status: In progress.
+- Human approval: User asked to work on the next item and proceed without pausing for non-critical approvals.
+- Branch/worktree: `sec-22-expose-backend-version-and-build-metadata`, `.worktrees/sec-22-backend`.
+- Files changed: `.env.example`, `README.md`, `docs/AGENT_RUN_LEDGER.md`, `src/config/releaseMetadata.ts`, `src/controllers/version.controller.ts`, `src/server.ts`, `src/__tests__/release-metadata.test.ts`.
+- PR: Pending.
+- Checks: `npm test -- --runInBand --silent src/__tests__/release-metadata.test.ts` passed; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
+- Deployment: None; backend endpoint implementation only.
+- Verification: Added safe release metadata builder, `/version` endpoint, `/health.version` metadata, env guidance, and tests for shape and unsafe value fallback.
+- Blockers: None.
+- Follow-ups: Configure hosted Railway metadata values during deployment after merge.
+
+## 2026-06-25 - SEC-21 - Define release versioning and build metadata policy
+
+- Status: In progress.
+- Human approval: User asked to work on the next item and proceed without pausing for non-critical approvals.
+- Branch/worktree: `sec-21-define-release-versioning-and-build-metadata-policy`, `.worktrees/sec-21-backend`.
+- Files changed: `docs/RELEASE_VERSIONING.md`, `README.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `git diff --check` passed; conflict-marker scan passed; release/version terminology scan completed.
+- Deployment: None; documentation/policy-only backend change.
+- Verification: Defined one product release version, separate backend/frontend build metadata, separate API versioning, package-version treatment, environment sources, deployment record fields, and follow-up mapping to SEC-22/SEC-23.
+- Blockers: None.
+- Follow-ups: Pair with frontend SEC-21 PR; implement backend metadata exposure under SEC-22.
+
 ## 2026-06-24 - SEC-36 - Add PR review agent checklist and review output template
 
 - Status: In progress.
