@@ -18,6 +18,7 @@ import { closePool, initializeDatabase } from './database/connection';
 import { query } from './database/connection';
 import { analysisWorker } from './services/analysisWorker.service';
 import { initializePhoenixObservability } from './observability/phoenix.service';
+import { parseCorsOrigins } from './config/cors';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
@@ -41,11 +42,12 @@ initializePhoenixObservability();
 const app: Application = express();
 const httpServer = createServer(app);
 app.set('trust proxy', 1);
+const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
 
 // Initialize Socket.IO
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
+    origin: corsOrigins,
     credentials: true,
   },
 });
@@ -120,7 +122,7 @@ io.use(async (socket, next) => {
 // Middleware
 app.use(helmet()); // Security headers
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:8080',
+  origin: corsOrigins,
   credentials: true,
 }));
 app.use(requestIdMiddleware);

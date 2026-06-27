@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-24 - SEC-18 - Provision staging environments for backend and frontend
+
+- Status: In progress.
+- Human approval: User asked to proceed without pausing for non-critical approvals.
+- Branch/worktree: `sec-18-provision-staging-environments-for-backend-and-frontend`, `.worktrees/sec-18-backend`.
+- Files changed: `src/config/cors.ts`, `src/server.ts`, `src/__tests__/cors-config.test.ts`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/13.
+- Checks: `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
+- Deployment: Railway staging environment `staging`; service `secondop-backend-staging`; isolated staging Postgres `Postgres-k0Us`; backend URL `https://secondop-backend-staging-staging.up.railway.app`; latest SEC-18 staging deployment `e7107828-1fd7-4a61-8765-c183895cdccf` succeeded.
+- Verification: Staging DB migrations `001` through `009` were applied; `GET /health` returned HTTP 200 with `{"status":"ok"}`; CORS reflected the exact Vercel preview origin `https://secondop-frontend-kins2bi6w-vinodhs-projects-0f6d26b0.vercel.app`.
+- Blockers: Vercel preview URL is protected by Vercel SSO, so unauthenticated `curl` returns 302; deployment readiness was verified via Vercel CLI metadata and backend CORS smoke checks.
+- Follow-ups: Keep staging Railway deploy source aligned after the CORS parser PR merges so future variable changes do not redeploy old `main` code.
+
 ## 2026-06-26 - SEC-41 - Investigate backend GitHub Actions zero-job workflow failures
 
 - Status: In progress.
