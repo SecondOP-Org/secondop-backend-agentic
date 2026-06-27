@@ -34,12 +34,90 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked to proceed without pausing for non-critical approvals.
 - Branch/worktree: `sec-18-provision-staging-environments-for-backend-and-frontend`, `.worktrees/sec-18-backend`.
 - Files changed: `src/config/cors.ts`, `src/server.ts`, `src/__tests__/cors-config.test.ts`, `docs/AGENT_RUN_LEDGER.md`.
-- PR: Pending.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/13.
 - Checks: `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
 - Deployment: Railway staging environment `staging`; service `secondop-backend-staging`; isolated staging Postgres `Postgres-k0Us`; backend URL `https://secondop-backend-staging-staging.up.railway.app`; latest SEC-18 staging deployment `e7107828-1fd7-4a61-8765-c183895cdccf` succeeded.
 - Verification: Staging DB migrations `001` through `009` were applied; `GET /health` returned HTTP 200 with `{"status":"ok"}`; CORS reflected the exact Vercel preview origin `https://secondop-frontend-kins2bi6w-vinodhs-projects-0f6d26b0.vercel.app`.
 - Blockers: Vercel preview URL is protected by Vercel SSO, so unauthenticated `curl` returns 302; deployment readiness was verified via Vercel CLI metadata and backend CORS smoke checks.
 - Follow-ups: Keep staging Railway deploy source aligned after the CORS parser PR merges so future variable changes do not redeploy old `main` code.
+
+## 2026-06-26 - SEC-41 - Investigate backend GitHub Actions zero-job workflow failures
+
+- Status: In progress.
+- Human approval: User asked to work on SEC-41 under the established autonomous workflow.
+- Branch/worktree: `sec-41-investigate-backend-github-actions-zero-job-workflow`, `.worktrees/sec-41-backend`.
+- Files changed: `.github/workflows/backend-ci.yml`, `.github/workflows/ci.yml`, `.npmrc`, temporary `.github/workflows/actions-smoke.yml` diagnostic, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/20.
+- Checks: `git diff --check` passed; Ruby YAML parse passed for diagnostic and final workflow shapes; GitHub Actions run `28268569899` passed install, lint, tests, and build on `.github/workflows/ci.yml`.
+- Deployment: None; workflow investigation only.
+- Verification: Confirmed backend and frontend repository Actions permissions both report enabled/all with read workflow permissions, while frontend workflows schedule jobs successfully and backend workflows fail in 0s with no jobs/logs. Pushed a temporary quoted-`on` smoke workflow; it created a real `Smoke` job and passed, while the existing unquoted backend CI workflow failed again on the same push with zero jobs. A minimal same-name `Backend CI / Lint, test, and build` workflow scheduled successfully; restoring real steps converted the failure from zero-job to a normal `npm install` failure caused by checked-in absolute `.npmrc` cache/log paths. After making `.npmrc` portable, GitHub CI passed install, lint, tests, and build on run `28268493937`.
+- Blockers: None currently.
+- Follow-ups: Open the SEC-41 PR and verify the pull request creates the real `Backend CI / Lint, test, and build` check.
+
+## 2026-06-26 - SEC-19 - Fix backend CI main trigger after production merge
+
+- Status: In progress.
+- Human approval: User asked to resume and push to production.
+- Branch/worktree: `sec-19-fix-backend-ci-main-trigger`, `.worktrees/deploy-backend-prod-20260626`.
+- Files changed: `.github/workflows/backend-ci.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: Pending.
+- Deployment: Backend application was already deployed to Railway production before this CI hotfix; no app redeploy required for this workflow-only change.
+- Verification: Main push run for the original SEC-19 workflow failed in 0s with no jobs/logs; this hotfix narrows triggers to `main`, quotes the `on` key, and quotes Node version for cleaner parser behavior.
+- Blockers: None.
+- Follow-ups: Merge and verify backend CI creates a real job on `main`.
+
+## 2026-06-26 - SEC-19 - Rename backend CI workflow file after zero-job runs
+
+- Status: In progress.
+- Human approval: User asked to resume and push to production.
+- Branch/worktree: `sec-19-fix-backend-ci-workflow-file`, `.worktrees/deploy-backend-prod-20260626`.
+- Files changed: `.github/workflows/backend-ci.yml`, `.github/workflows/ci.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: Pending.
+- Deployment: No backend app redeploy required unless Railway auto-deploys main after merge; workflow-only change.
+- Verification: Backend Actions are enabled and allowed, but both original and main-trigger hotfix workflow records failed in 0s with no jobs/logs. This follow-up renames the workflow file to force a fresh workflow registration and uses a conventional trigger shape.
+- Blockers: None.
+- Follow-ups: Merge and verify `.github/workflows/ci.yml` creates a real job on `main`.
+
+## 2026-06-25 - SEC-19 - Add backend GitHub CI for lint, tests, and build
+
+- Status: In review.
+- Human approval: User asked to work on the next Linear item autonomously through PR readiness.
+- Branch/worktree: `sec-19-add-backend-github-ci`, `.worktrees/sec-19-backend`.
+- Files changed: `.github/workflows/backend-ci.yml`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/16.
+- Checks: `PATH=/opt/homebrew/bin:$PATH npm run lint` passed; `PATH=/opt/homebrew/bin:$PATH npm test -- --runInBand` passed (9 suites, 35 tests; Node emitted an existing `punycode` deprecation warning); `PATH=/opt/homebrew/bin:$PATH npm run build` passed; `ruby -e "require 'yaml'; p YAML.load_file('.github/workflows/backend-ci.yml').keys"` parsed the workflow with Ruby's YAML 1.1 `on` key display quirk; GitHub registered `.github/workflows/backend-ci.yml` as active, but new-workflow branch runs completed in 0s with no jobs because the workflow is not on default `main` yet.
+- Deployment: None; CI workflow-only backend change.
+- Verification: Confirmed backend exposes `npm run lint`, `npm test`, and `npm run build`; package engines allow Node `>=18.0.0`; current `origin/main` has no checked-in `package-lock.json`, so workflow uses `npm install` rather than `npm ci`; local checks used Homebrew Node `v23.6.1`; temporary validation PR #17 was opened against the SEC-19 branch and closed after confirming GitHub still produced no PR check while the workflow is absent from default `main`.
+- Blockers: GitHub Actions cannot fully prove this first backend workflow on PR #16 until the workflow exists on default `main`; after merge, future backend PRs should show the `Backend CI / Lint, test, and build` check.
+- Follow-ups: After human approval/merge, confirm the first post-merge backend branch or PR gets a real GitHub Actions job on Node 20; consider a separate ticket to commit a backend package lock and switch CI/local docs to `npm ci`.
+
+## 2026-06-25 - SEC-22 - Expose backend version and build metadata
+
+- Status: In progress.
+- Human approval: User asked to work on the next item and proceed without pausing for non-critical approvals.
+- Branch/worktree: `sec-22-expose-backend-version-and-build-metadata`, `.worktrees/sec-22-backend`.
+- Files changed: `.env.example`, `README.md`, `docs/AGENT_RUN_LEDGER.md`, `src/config/releaseMetadata.ts`, `src/controllers/version.controller.ts`, `src/server.ts`, `src/__tests__/release-metadata.test.ts`.
+- PR: Pending.
+- Checks: `npm test -- --runInBand --silent src/__tests__/release-metadata.test.ts` passed; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
+- Deployment: None; backend endpoint implementation only.
+- Verification: Added safe release metadata builder, `/version` endpoint, `/health.version` metadata, env guidance, and tests for shape and unsafe value fallback.
+- Blockers: None.
+- Follow-ups: Configure hosted Railway metadata values during deployment after merge.
+
+## 2026-06-25 - SEC-21 - Define release versioning and build metadata policy
+
+- Status: In progress.
+- Human approval: User asked to work on the next item and proceed without pausing for non-critical approvals.
+- Branch/worktree: `sec-21-define-release-versioning-and-build-metadata-policy`, `.worktrees/sec-21-backend`.
+- Files changed: `docs/RELEASE_VERSIONING.md`, `README.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `git diff --check` passed; conflict-marker scan passed; release/version terminology scan completed.
+- Deployment: None; documentation/policy-only backend change.
+- Verification: Defined one product release version, separate backend/frontend build metadata, separate API versioning, package-version treatment, environment sources, deployment record fields, and follow-up mapping to SEC-22/SEC-23.
+- Blockers: None.
+- Follow-ups: Pair with frontend SEC-21 PR; implement backend metadata exposure under SEC-22.
 
 ## 2026-06-24 - SEC-36 - Add PR review agent checklist and review output template
 
