@@ -1,7 +1,9 @@
 import fs from 'fs';
 import path from 'path';
+import { query } from '../database/connection';
+import { LANGGRAPH_CASE_ANALYSIS_THREAD_PREFIX } from '../agentic/langchain/threadId';
 
-type ProviderName = 'linear' | 'github' | 'vercel' | 'railway' | 'ledger';
+type ProviderName = 'linear' | 'github' | 'vercel' | 'railway' | 'ledger' | 'langgraph_checkpoints';
 type ProviderState = 'available' | 'partial' | 'unavailable' | 'skipped';
 
 export interface ProviderStatus {
@@ -36,6 +38,16 @@ export interface LedgerSummary {
   deployment: string;
   blockers: string;
   followUps: string;
+}
+
+export interface LangGraphCheckpointReadModel {
+  status: ProviderState;
+  schema: string;
+  threadPrefix: string;
+  threadCount: number;
+  checkpointCount: number;
+  latestCheckpointId?: string;
+  message: string;
 }
 
 export interface CommandCenterItem {
@@ -106,6 +118,7 @@ export interface CommandCenterSummary {
   };
   items: CommandCenterItem[];
   agents: CommandCenterAgentLane[];
+  langGraphCheckpoints: LangGraphCheckpointReadModel;
   providerStatus: ProviderStatus[];
   audit: {
     requestId?: string;
@@ -130,13 +143,14 @@ export const sanitizeCommandCenterText = (value: unknown): string => {
     .replace(/postgres(?:ql)?:\/\/[^\s)]+/gi, '[REDACTED_DATABASE_URL]');
 };
 
-export const getCommandCenterSummary = (params: {
+export const getCommandCenterSummary = async (params: {
   requestId?: string;
   userId: string;
-}): CommandCenterSummary => {
+}): Promise<CommandCenterSummary> => {
   const ledgers = getLatestLedgerEntries();
   const items = ledgers.map(buildItemFromLedger);
-  const providerStatus = buildProviderStatus(ledgers);
+  const langGraphCheckpoints = await getLangGraphCheckpointReadModel();
+  const providerStatus = buildProviderStatus(ledgers, langGraphCheckpoints);
   const agents = buildAgentLanes(items, ledgers);
 
   return {
@@ -151,6 +165,7 @@ export const getCommandCenterSummary = (params: {
     },
     items,
     agents,
+    langGraphCheckpoints,
     providerStatus,
     audit: {
       requestId: params.requestId,
@@ -176,6 +191,50 @@ export const getCommandCenterDeployments = (): DeploymentStatus[] => {
   return getLatestLedgerEntries()
     .map((ledger) => parseDeploymentStatus(ledger.deployment))
     .filter((deployment) => deployment.provider !== 'none');
+};
+
+export const getLangGraphCheckpointReadModel = async (): Promise<LangGraphCheckpointReadModel> => {
+  const schema = resolveLangGraphCheckpointSchema();
+  const threadPrefix = `${LANGGRAPH_CASE_ANALYSIS_THREAD_PREFIX}:%`;
+
+  try {
+    const result = await query(
+      `SELECT
+        COUNT(DISTINCT thread_id)::int AS thread_count,
+        COUNT(*)::int AS checkpoint_count,
+        MAX(checkpoint_id) AS latest_checkpoint_id
+      FROM "${schema}".checkpoints
+      WHERE thread_id LIKE $1`,
+      [threadPrefix]
+    );
+    const row = result.rows[0] || {};
+    const threadCount = Number(row.thread_count || 0);
+    const checkpointCount = Number(row.checkpoint_count || 0);
+
+    return {
+      status: 'available',
+      schema,
+      threadPrefix,
+      threadCount,
+      checkpointCount,
+      latestCheckpointId: row.latest_checkpoint_id || undefined,
+      message:
+        checkpointCount > 0
+          ? `Read ${checkpointCount} LangGraph checkpoint(s) across ${threadCount} case-analysis thread(s).`
+          : 'LangGraph checkpoint tables are ready; no case-analysis checkpoints recorded yet.',
+    };
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      schema,
+      threadPrefix,
+      threadCount: 0,
+      checkpointCount: 0,
+      message: sanitizeCommandCenterText(
+        `LangGraph checkpoint read model unavailable: ${error instanceof Error ? error.message : 'Unknown error'}`
+      ),
+    };
+  }
 };
 
 const resolveEnvironment = (): 'local' | 'staging' | 'production' => {
@@ -262,13 +321,27 @@ const buildItemFromLedger = (ledger: LedgerSummary): CommandCenterItem => {
   };
 };
 
-const buildProviderStatus = (ledgers: LedgerSummary[]): ProviderStatus[] => {
+const resolveLangGraphCheckpointSchema = (): string => {
+  const schema = process.env.LANGGRAPH_CHECKPOINT_SCHEMA || 'public';
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(schema) ? schema : 'public';
+};
+
+const buildProviderStatus = (
+  ledgers: LedgerSummary[],
+  langGraphCheckpoints: LangGraphCheckpointReadModel
+): ProviderStatus[] => {
   const now = new Date().toISOString();
   return [
     {
       provider: 'ledger',
       status: ledgers.length > 0 ? 'available' : 'unavailable',
       message: ledgers.length > 0 ? 'Read sanitized run ledger entries.' : 'No ledger entries were found from allowlisted paths.',
+      lastUpdatedAt: now,
+    },
+    {
+      provider: 'langgraph_checkpoints',
+      status: langGraphCheckpoints.status,
+      message: langGraphCheckpoints.message,
       lastUpdatedAt: now,
     },
     {

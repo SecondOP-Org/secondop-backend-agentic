@@ -1,4 +1,4 @@
-import { Annotation, END, MemorySaver, START, StateGraph } from '@langchain/langgraph';
+import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
 import { assertRefinementBudget, assertStepBudget } from '../core/policy';
 import {
   AgenticAction,
@@ -14,6 +14,8 @@ import { extractReportsTool } from '../tools/extract.tool';
 import { guardQuestionsTool } from '../tools/question_guard.tool';
 import { validateIntakeTool } from '../tools/intake.tool';
 import { synthesizeSummaryTool } from '../tools/synthesize.tool';
+import { getLangGraphCheckpointer } from './checkpointer';
+import { buildLangGraphThreadId } from './threadId';
 import { LangChainAgentAdapter, LangChainRunResult } from './types';
 
 export const isLangChainRuntimeEnabled = (): boolean => {
@@ -163,8 +165,10 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
         refine: 'synthesize_summary',
       });
 
+    const checkpointer = await getLangGraphCheckpointer();
+    const threadId = buildLangGraphThreadId(context.runId);
     const graph = workflow.compile({
-      checkpointer: new MemorySaver(),
+      checkpointer,
       name: 'secondop-case-analysis-langgraph',
     });
 
@@ -176,7 +180,7 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
       },
       {
         configurable: {
-          thread_id: context.runId,
+          thread_id: threadId,
         },
         recursionLimit: context.policy.maxSteps + context.policy.maxRefinements + 4,
       }

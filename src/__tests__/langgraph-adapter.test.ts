@@ -19,7 +19,10 @@ jest.mock('../services/analysis.service', () => {
 });
 
 import { runAgenticViaLangChain } from '../agentic/langchain/adapter';
+import { MemorySaver } from '@langchain/langgraph';
 import { AgenticLoopState, AgenticRuntimeContext } from '../agentic/core/types';
+import { configureLangGraphCheckpointerFactory } from '../agentic/langchain/checkpointer';
+import { buildLangGraphThreadId } from '../agentic/langchain/threadId';
 import { emitAgenticStepEvent } from '../agentic/observability/eventEmitter';
 import { query } from '../database/connection';
 import { generateCaseAnalysis } from '../services/analysis.service';
@@ -63,6 +66,7 @@ describe('LangGraph agentic adapter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    configureLangGraphCheckpointerFactory(() => new MemorySaver());
     mockedEmitAgenticStepEvent.mockResolvedValue(undefined);
     mockedQuery.mockResolvedValue({
       rows: [
@@ -112,6 +116,10 @@ describe('LangGraph agentic adapter', () => {
     });
   });
 
+  afterEach(() => {
+    configureLangGraphCheckpointerFactory(null);
+  });
+
   it('runs the case-analysis flow as a LangGraph state graph', async () => {
     const result = await runAgenticViaLangChain(context, initialState);
 
@@ -135,5 +143,9 @@ describe('LangGraph agentic adapter', () => {
         }),
       })
     );
+  });
+
+  it('uses a stable case-analysis workflow thread_id derived from the run id', () => {
+    expect(buildLangGraphThreadId('run-1')).toBe('case-analysis:run-1');
   });
 });
