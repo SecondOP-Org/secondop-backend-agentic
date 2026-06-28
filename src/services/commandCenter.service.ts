@@ -76,6 +76,24 @@ export interface CommandCenterItem {
   humanAction: string;
 }
 
+export interface CommandCenterAgentLane {
+  role:
+    | 'product_spec'
+    | 'coding'
+    | 'pr_review'
+    | 'qa_smoke'
+    | 'release_deploy'
+    | 'command_center';
+  label: string;
+  status: 'active' | 'waiting_for_human' | 'blocked' | 'idle';
+  currentFocus: string;
+  lastActivityAt?: string;
+  evidence: string[];
+  humanGate: string;
+  repoScopes: Array<CommandCenterItem['repoScope']>;
+  itemCount: number;
+}
+
 export interface CommandCenterSummary {
   generatedAt: string;
   environment: 'local' | 'staging' | 'production';
@@ -87,6 +105,7 @@ export interface CommandCenterSummary {
     missingGuardrails: number;
   };
   items: CommandCenterItem[];
+  agents: CommandCenterAgentLane[];
   providerStatus: ProviderStatus[];
   audit: {
     requestId?: string;
@@ -118,6 +137,7 @@ export const getCommandCenterSummary = (params: {
   const ledgers = getLatestLedgerEntries();
   const items = ledgers.map(buildItemFromLedger);
   const providerStatus = buildProviderStatus(ledgers);
+  const agents = buildAgentLanes(items, ledgers);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -130,6 +150,7 @@ export const getCommandCenterSummary = (params: {
       missingGuardrails: providerStatus.filter((status) => status.status !== 'available').length,
     },
     items,
+    agents,
     providerStatus,
     audit: {
       requestId: params.requestId,
@@ -271,6 +292,116 @@ const buildProviderStatus = (ledgers: LedgerSummary[]): ProviderStatus[] => {
       message: 'Live Railway API integration is not configured in this backend slice.',
     },
   ];
+};
+
+const buildAgentLanes = (
+  items: CommandCenterItem[],
+  ledgers: LedgerSummary[]
+): CommandCenterAgentLane[] => {
+  const latestLedger = [...ledgers].sort((left, right) => right.date.localeCompare(left.date))[0];
+  const codingItems = items.filter((item) => item.phase === 'coding' || item.phase === 'checks');
+  const reviewItems = items.filter((item) => item.phase === 'pr_review' || Boolean(item.pr));
+  const blockedItems = items.filter((item) => item.risks.length > 0 || item.phase === 'blocked');
+  const deployedItems = items.filter((item) => item.phase === 'deployed' || item.deployment?.status === 'success');
+  const readyItems = items.filter((item) => item.phase === 'ready_for_code' || item.phase === 'spec_needed');
+  const checkedItems = items.filter((item) => item.checks.some((check) => check.status === 'passed' || check.status === 'failed'));
+
+  return [
+    createAgentLane({
+      role: 'product_spec',
+      label: 'Product/spec agent',
+      items: readyItems,
+      fallbackLedger: latestLedger,
+      idleFocus: 'No spec work is currently inferred from the run ledger.',
+      humanGate: 'Human owns requirement priority and acceptance criteria approval.',
+      activeStatus: readyItems.length > 0 ? 'active' : 'idle',
+    }),
+    createAgentLane({
+      role: 'coding',
+      label: 'Coding agent',
+      items: codingItems,
+      fallbackLedger: latestLedger,
+      idleFocus: 'No active coding or local-check work is inferred.',
+      humanGate: 'May implement through PR readiness; merge and deploy stay human-gated.',
+      activeStatus: blockedItems.length > 0 ? 'blocked' : codingItems.length > 0 ? 'active' : 'idle',
+    }),
+    createAgentLane({
+      role: 'pr_review',
+      label: 'PR review agent',
+      items: reviewItems,
+      fallbackLedger: latestLedger,
+      idleFocus: 'No PR review queue is inferred.',
+      humanGate: 'Human decides merge approval after review signals are ready.',
+      activeStatus: reviewItems.length > 0 ? 'waiting_for_human' : 'idle',
+    }),
+    createAgentLane({
+      role: 'qa_smoke',
+      label: 'QA/smoke-test agent',
+      items: checkedItems,
+      fallbackLedger: latestLedger,
+      idleFocus: 'No recent smoke-test or check evidence is inferred.',
+      humanGate: 'Human reviews failed or missing smoke evidence before release.',
+      activeStatus: checkedItems.some((item) => item.checks.some((check) => check.status === 'failed')) ? 'blocked' : checkedItems.length > 0 ? 'active' : 'idle',
+    }),
+    createAgentLane({
+      role: 'release_deploy',
+      label: 'Release/deploy agent',
+      items: deployedItems,
+      fallbackLedger: latestLedger,
+      idleFocus: 'No recent deployment lane activity is inferred.',
+      humanGate: 'Human approval is required before production deploys or rollback actions.',
+      activeStatus: deployedItems.length > 0 ? 'waiting_for_human' : 'idle',
+    }),
+    createAgentLane({
+      role: 'command_center',
+      label: 'Command-center/status agent',
+      items,
+      fallbackLedger: latestLedger,
+      idleFocus: 'No command-center source data is available.',
+      humanGate: 'Human resolves ambiguous status, stale ledgers, and provider-access gaps.',
+      activeStatus: ledgers.length > 0 ? 'active' : 'blocked',
+    }),
+  ];
+};
+
+const createAgentLane = (params: {
+  role: CommandCenterAgentLane['role'];
+  label: string;
+  items: CommandCenterItem[];
+  fallbackLedger?: LedgerSummary;
+  idleFocus: string;
+  humanGate: string;
+  activeStatus: CommandCenterAgentLane['status'];
+}): CommandCenterAgentLane => {
+  const focusItem = params.items[0];
+  const focusLedger = focusItem?.ledger || params.fallbackLedger;
+  const evidence = params.items
+    .slice(0, 3)
+    .map((item) => `${item.issue.key}: ${item.humanAction || item.issue.status}`)
+    .filter(Boolean);
+
+  if (evidence.length === 0 && focusLedger) {
+    evidence.push(`${focusLedger.issueKey}: ${focusLedger.summary || focusLedger.title}`);
+  }
+
+  return {
+    role: params.role,
+    label: params.label,
+    status: params.activeStatus,
+    currentFocus: focusItem
+      ? `${focusItem.issue.key} - ${focusItem.issue.title}`
+      : params.idleFocus,
+    lastActivityAt: focusLedger?.date,
+    evidence,
+    humanGate: params.humanGate,
+    repoScopes: uniqueRepoScopes(params.items),
+    itemCount: params.items.length,
+  };
+};
+
+const uniqueRepoScopes = (items: CommandCenterItem[]): Array<CommandCenterItem['repoScope']> => {
+  const scopes = [...new Set(items.map((item) => item.repoScope))];
+  return scopes.length > 0 ? scopes : ['unknown'];
 };
 
 const readBullet = (entry: string, label: string): string => {

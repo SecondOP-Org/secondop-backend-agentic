@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-27 - SEC-42 - Expose multi-agent lanes in command center
+
+- Status: In progress.
+- Human approval: User asked to start on multi agents and proceed under the established workflow.
+- Branch/worktree: `sec-42-expose-multi-agent-lanes`, `.worktrees/sec-42-backend`.
+- Files changed: `src/services/commandCenter.service.ts`, `src/__tests__/command-center.routes.test.ts`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/21.
+- Checks: `npm test -- --runInBand --silent src/__tests__/command-center.routes.test.ts` passed; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent` passed.
+- Deployment: None.
+- Verification: Added structured command-center agent lanes for Product/spec, Coding, PR review, QA/smoke-test, Release/deploy, and Command-center/status agents; statuses are inferred from sanitized ledger-backed work items and tested through the summary controller response.
+- Blockers: None.
+- Follow-ups: Pair with frontend SEC-42 command-center UI changes.
+
 ## 2026-06-24 - SEC-18 - Provision staging environments for backend and frontend
 
 - Status: In progress.
