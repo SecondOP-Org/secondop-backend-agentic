@@ -17,7 +17,7 @@
     "start:test": "bash scripts/with-env.sh .env.test node dist/server.js",
     "start:production": "bash scripts/with-env.sh .env.production node dist/server.js",
     "db:setup": "bash scripts/setup-db.sh",
-    "db:migrate": "psql -d $DB_NAME -f migrations/001_initial_schema.sql && psql -d $DB_NAME -f migrations/002_cases_and_messages.sql && psql -d $DB_NAME -f migrations/003_prescriptions_and_labs.sql && psql -d $DB_NAME -f migrations/004_billing_and_payments.sql && psql -d $DB_NAME -f migrations/005_case_analysis_and_intake.sql && psql -d $DB_NAME -f migrations/006_agent_analysis_runs.sql && psql -d $DB_NAME -f migrations/007_agentic_shadow_results.sql && psql -d $DB_NAME -f migrations/008_case_analysis_artifacts.sql && psql -d $DB_NAME -f migrations/009_dicom_imaging_and_annotations.sql",
+    "db:migrate": "psql -d $DB_NAME -f migrations/001_initial_schema.sql && psql -d $DB_NAME -f migrations/002_cases_and_messages.sql && psql -d $DB_NAME -f migrations/003_prescriptions_and_labs.sql && psql -d $DB_NAME -f migrations/004_billing_and_payments.sql && psql -d $DB_NAME -f migrations/005_case_analysis_and_intake.sql && psql -d $DB_NAME -f migrations/006_agent_analysis_runs.sql && psql -d $DB_NAME -f migrations/007_agentic_shadow_results.sql && psql -d $DB_NAME -f migrations/008_case_analysis_artifacts.sql && psql -d $DB_NAME -f migrations/009_dicom_imaging_and_annotations.sql && psql -d $DB_NAME -f migrations/010_langgraph_checkpoints.sql",
     "db:setup:development": "bash scripts/with-env.sh .env.development bash scripts/setup-db.sh",
     "db:setup:test": "bash scripts/with-env.sh .env.test bash scripts/setup-db.sh",
     "db:setup:production": "bash scripts/with-env.sh .env.production bash scripts/setup-db.sh",
@@ -46,6 +46,7 @@
   "license": "MIT",
   "dependencies": {
     "@langchain/langgraph": "^1.4.7",
+    "@langchain/langgraph-checkpoint-postgres": "^1.0.4",
     "aws-sdk": "^2.1498.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",

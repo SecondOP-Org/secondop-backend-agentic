@@ -5,6 +5,7 @@ import { getLatestLedgers, getSummary } from '../controllers/commandCenter.contr
 import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import { query } from '../database/connection';
 
 jest.mock('../utils/logger', () => ({
   info: jest.fn(),
@@ -13,7 +14,12 @@ jest.mock('../utils/logger', () => ({
   debug: jest.fn(),
 }));
 
+jest.mock('../database/connection', () => ({
+  query: jest.fn(),
+}));
+
 const originalEnv = process.env;
+const mockedQuery = query as jest.MockedFunction<typeof query>;
 
 const createResponse = () => {
   const res = {
@@ -46,6 +52,15 @@ const writeLedger = (content: string): string => {
 describe('command-center operator authorization', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedQuery.mockResolvedValue({
+      rows: [
+        {
+          thread_count: 1,
+          checkpoint_count: 3,
+          latest_checkpoint_id: 'checkpoint-3',
+        },
+      ],
+    } as any);
     process.env = {
       ...originalEnv,
       NODE_ENV: 'test',
@@ -96,7 +111,7 @@ describe('command-center controllers', () => {
     process.env = originalEnv;
   });
 
-  it('returns a sanitized summary for configured operators', () => {
+  it('returns a sanitized summary for configured operators', async () => {
     const ledgerPath = writeLedger(`# Agent Run Ledger
 
 ## 2026-06-24 - SEC-99 - Test command center
@@ -117,7 +132,7 @@ describe('command-center controllers', () => {
     const res = createResponse();
     const next = jest.fn();
 
-    getSummary(createOperatorRequest(), res as never, next);
+    await getSummary(createOperatorRequest(), res as never, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({
@@ -151,6 +166,19 @@ describe('command-center controllers', () => {
             role: 'command_center',
             label: 'Command-center/status agent',
             status: 'active',
+          }),
+        ]),
+        langGraphCheckpoints: expect.objectContaining({
+          status: 'available',
+          threadPrefix: 'case-analysis:%',
+          threadCount: 1,
+          checkpointCount: 3,
+          latestCheckpointId: 'checkpoint-3',
+        }),
+        providerStatus: expect.arrayContaining([
+          expect.objectContaining({
+            provider: 'langgraph_checkpoints',
+            status: 'available',
           }),
         ]),
       }),
@@ -190,14 +218,14 @@ describe('command-center controllers', () => {
     });
   });
 
-  it('passes unexpected controller errors to next', () => {
+  it('passes unexpected controller errors to next', async () => {
     const next = jest.fn();
     const badRequest = {
       ...createOperatorRequest(),
       user: undefined,
     } as unknown as AuthRequest;
 
-    getSummary(badRequest, createResponse() as never, next);
+    await getSummary(badRequest, createResponse() as never, next);
 
     expect(next.mock.calls[0][0]).not.toBeInstanceOf(AppError);
   });

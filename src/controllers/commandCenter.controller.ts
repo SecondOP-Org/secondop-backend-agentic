@@ -10,9 +10,9 @@ import {
 } from '../services/commandCenter.service';
 import logger from '../utils/logger';
 
-export const getSummary = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const getSummary = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const summary = getCommandCenterSummary({
+    const summary = await getCommandCenterSummary({
       requestId: req.requestId,
       userId: req.user!.id,
     });

@@ -68,6 +68,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/008_case_anal
 echo "  → Running 009_dicom_imaging_and_annotations.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/009_dicom_imaging_and_annotations.sql
 
+echo "  → Running 010_langgraph_checkpoints.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/010_langgraph_checkpoints.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
