@@ -138,6 +138,21 @@ describe('command-center controllers', () => {
             humanAction: 'Wait for human review/approval before merge.',
           }),
         ]),
+        agents: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'pr_review',
+            label: 'PR review agent',
+            status: 'waiting_for_human',
+            evidence: expect.arrayContaining([
+              expect.stringContaining('SEC-99'),
+            ]),
+          }),
+          expect.objectContaining({
+            role: 'command_center',
+            label: 'Command-center/status agent',
+            status: 'active',
+          }),
+        ]),
       }),
     });
     expect(JSON.stringify(res.json.mock.calls[0][0])).not.toContain('super-secret-value');
