@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-06-28 - SEC-43 - Introduce LangGraph runtime for agentic case analysis
+
+- Status: In progress.
+- Human approval: User asked to use LangGraph/LangChain for the agentic workflow and learn the basics.
+- Branch/worktree: `sec-43-langgraph-runtime`, `.worktrees/sec-43-backend`.
+- Files changed: `package.json`, `src/agentic/langchain/adapter.ts`, `src/agentic/langchain/types.ts`, `src/__tests__/langgraph-adapter.test.ts`, `docs/LANGGRAPH_RUNTIME.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `npm test -- --runInBand --silent src/__tests__/langgraph-adapter.test.ts` passed; `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent src/__tests__/agentic-runtime.test.ts src/__tests__/langgraph-adapter.test.ts` passed; `npm test -- --runInBand --silent` passed (12 suites, 43 tests; existing `punycode` warning and expected test logs).
+- Deployment: None.
+- Verification: Added a real LangGraph-backed adapter behind `AGENTIC_RUNTIME=langchain`, kept native runtime as the default/fallback path, mapped current case-analysis steps to graph nodes, added in-memory LangGraph checkpoint usage, and documented the basics in `docs/LANGGRAPH_RUNTIME.md`.
+- Blockers: Local default shell reported Node 16 during dependency install; checks should use the repo-supported Node 18+ runtime.
+- Follow-ups: DB-backed LangGraph checkpoints and human interrupts should be separate follow-up work after the first graph runtime lands.
+
 ## 2026-06-27 - SEC-42 - Expose multi-agent lanes in command center
 
 - Status: In progress.
