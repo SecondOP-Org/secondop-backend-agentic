@@ -19,5 +19,5 @@ export interface LangChainRunResult {
 }
 
 export interface LangChainAgentAdapter {
-  run(context: AgenticRuntimeContext): Promise<LangChainRunResult>;
+  run(context: AgenticRuntimeContext, initialState: AgenticLoopState): Promise<LangChainRunResult>;
 }
