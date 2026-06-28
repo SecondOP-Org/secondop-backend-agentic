@@ -34,12 +34,12 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked to proceed with the recommended SEC-44 plan and specifically cover replacing `MemorySaver` with LangGraph JS `PostgresSaver`, stable workflow `thread_id`, and restart/resume testing.
 - Branch/worktree: `sec-44-langgraph-postgres-saver`, `.worktrees/sec-44-backend`.
 - Files changed: `package.json`, `migrations/010_langgraph_checkpoints.sql`, `scripts/setup-db.sh`, `.github/workflows/ci.yml`, `.env.example`, `jest.config.js`, `src/agentic/langchain/adapter.ts`, `src/agentic/langchain/checkpointer.ts`, `src/agentic/langchain/threadId.ts`, `src/services/commandCenter.service.ts`, `src/controllers/commandCenter.controller.ts`, `src/__tests__/setup.ts`, `src/__tests__/langgraph-adapter.test.ts`, `src/__tests__/langgraph-postgres-checkpointer.integration.test.ts`, `src/__tests__/command-center.routes.test.ts`, `docs/LANGGRAPH_RUNTIME.md`, `docs/AGENT_RUN_LEDGER.md`.
-- PR: Pending.
-- Checks: `npm run build` passed; `npm run lint` passed; `npm test -- --runInBand` passed locally with the Postgres integration test skipped because no local `LANGGRAPH_POSTGRES_TEST_DATABASE_URL` was configured.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/23.
+- Checks: `npm run build` passed; `npm run lint` passed; `npm test -- --runInBand` passed locally with the Postgres integration test skipped because no local `LANGGRAPH_POSTGRES_TEST_DATABASE_URL` was configured; GitHub Actions `Backend CI / Lint, test, and build` passed with Postgres service enabled.
 - Deployment: None.
 - Verification: Swapped the LangGraph case-analysis adapter to the official JS `PostgresSaver`, added stable `case-analysis:<runId>` workflow thread IDs, added checkpoint migration/setup wiring, added a Command Center checkpoint read model, and added an interrupt/resume integration test that runs against Postgres in CI.
 - Blockers: Docker daemon and local Postgres were unavailable on this machine, so the DB-backed integration test could not be run locally; GitHub Actions now provisions Postgres for that test.
-- Follow-ups: Open PR and verify CI executes the Postgres restart/resume test.
+- Follow-ups: Wait for human review/merge approval.
 
 ## 2026-06-28 - SEC-43 - Introduce LangGraph runtime for agentic case analysis
 
