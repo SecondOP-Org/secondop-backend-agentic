@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-01 - SEC-46 - Deploy LiteLLM gateway to Railway staging
+
+- Status: In progress.
+- Human approval: User approved merging SEC-45 and starting the LiteLLM gateway rollout with staging first.
+- Branch/worktree: `sec-46-deploy-litellm-gateway-to-railway-staging`, `.worktrees/sec-46-backend`.
+- Files changed: `litellm/Dockerfile`, `litellm/README.md`, `docs/ai-gateway-litellm.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: Pending.
+- Deployment: Staging-only Railway work in progress; production explicitly out of scope.
+- Verification: Railway CLI re-authenticated; staging environment contains `secondop-backend-staging` and app `Postgres-k0Us`; LiteLLM must use a separate staging database/service.
+- Blockers: None yet.
+- Follow-ups: Create staging LiteLLM resources, configure secrets through Railway variables only, verify safe gateway status, and open PR.
+
 ## 2026-07-01 - SEC-45 - Introduce LiteLLM gateway for backend LLM calls
 
 - Status: In progress.
