@@ -1,4 +1,6 @@
 import OpenAI from 'openai';
+import { getOpenAIClient, isLiteLlmMode, validateLiteLlmModelAlias } from '../ai/llmGateway';
+import { buildLlmRequestMetadata } from '../ai/llmRequestMetadata';
 import {
   buildCaseAnalysisArtifact,
   CaseAnalysisArtifact,
@@ -27,24 +29,8 @@ export interface CaseAnalysisResult {
   usage?: TokenUsageMetrics;
 }
 
-const modelName = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 const timeoutMs = parseInt(process.env.OPENAI_TIMEOUT_MS || '60000', 10);
-
-let cachedClient: OpenAI | null = null;
-
-const getOpenAIClient = (): OpenAI => {
-  if (cachedClient) {
-    return cachedClient;
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not configured.');
-  }
-
-  cachedClient = new OpenAI({ apiKey });
-  return cachedClient;
-};
+const getModelName = (): string => process.env.OPENAI_MODEL || 'gpt-4.1-mini';
 
 const withTimeout = async <T>(promise: Promise<T>, ms: number): Promise<T> => {
   let timeoutId: NodeJS.Timeout | undefined;
@@ -216,9 +202,16 @@ export const generateCaseAnalysis = async (
   overrideModel?: string
 ): Promise<CaseAnalysisResult> => {
   const client = getOpenAIClient();
-  const selectedModel = overrideModel || modelName;
+  if (!client) {
+    throw new Error('OPENAI_API_KEY is not configured.');
+  }
 
-  const completionPromise = client.chat.completions.create({
+  const selectedModel = overrideModel || getModelName();
+  validateLiteLlmModelAlias(selectedModel);
+
+  const completionRequest: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming & {
+    metadata?: Record<string, string>;
+  } = {
     model: selectedModel,
     temperature: 0.2,
     messages: [
@@ -285,7 +278,16 @@ export const generateCaseAnalysis = async (
         },
       },
     },
-  });
+  };
+
+  if (isLiteLlmMode()) {
+    completionRequest.metadata = buildLlmRequestMetadata({
+      workflow: 'case_analysis',
+      modelAlias: selectedModel,
+    });
+  }
+
+  const completionPromise = client.chat.completions.create(completionRequest);
 
   const completion = (await withTimeout(completionPromise, timeoutMs)) as any;
   const rawContent = completion.choices[0]?.message?.content;

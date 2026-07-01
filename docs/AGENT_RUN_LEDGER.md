@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-01 - SEC-45 - Introduce LiteLLM gateway for backend LLM calls
+
+- Status: In progress.
+- Human approval: User approved implementing the LiteLLM gateway plan for backend-only, opt-in, behavior-preserving model routing.
+- Branch/worktree: `sec-45-litellm-gateway`, `.worktrees/sec-45-backend`.
+- Files changed: Backend AI gateway config/client/status code, analysis and planner OpenAI client wiring, command-center provider status, LiteLLM local Docker profile/config example, environment example, tests, and docs.
+- PR: Pending.
+- Checks: `npm run build` passed; `npm run lint` passed; `npm test -- --runInBand src/__tests__/llm-gateway.test.ts src/__tests__/llm-gateway-services.test.ts` passed with local test server permission; `npm test -- --runInBand` passed with local test server permission.
+- Deployment: None; production remains direct OpenAI mode by default.
+- Verification: Confirmed direct OpenAI construction is centralized in the shared gateway factory, LiteLLM mode uses a virtual key/base URL, alias validation is opt-in to LiteLLM mode, and no prompts, schemas, AI contract, LangGraph flow, or frontend behavior were changed.
+- Blockers: The sandbox blocks local fake HTTP server binding without escalation, so gateway routing tests require local network permission in this environment.
+- Follow-ups: Open PR, update Linear with PR link, and wait for human merge approval.
+
 ## 2026-06-28 - SEC-44 - Add DB-backed LangGraph checkpoints for agentic runs
 
 - Status: In progress.

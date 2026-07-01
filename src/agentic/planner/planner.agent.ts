@@ -1,4 +1,6 @@
 import OpenAI from 'openai';
+import { getOpenAIClient, isLiteLlmMode, validateLiteLlmModelAlias } from '../../ai/llmGateway';
+import { buildLlmRequestMetadata } from '../../ai/llmRequestMetadata';
 import {
   AgenticAction,
   AgenticActionHistoryItem,
@@ -28,8 +30,6 @@ const fallbackAction = (state: AgenticLoopState): AgenticAction => {
   return 'FINALIZE';
 };
 
-let cachedClient: OpenAI | null = null;
-
 const mapUsage = (usage: unknown): AgenticTokenUsage => {
   const safe = (usage || {}) as {
     prompt_tokens?: unknown;
@@ -44,26 +44,13 @@ const mapUsage = (usage: unknown): AgenticTokenUsage => {
   };
 };
 
-const getClient = (): OpenAI | null => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-
-  if (!cachedClient) {
-    cachedClient = new OpenAI({ apiKey });
-  }
-
-  return cachedClient;
-};
-
 export class PlannerAgent {
   public async planNextAction(
     context: AgenticRuntimeContext,
     state: AgenticLoopState,
     history: AgenticActionHistoryItem[]
   ): Promise<AgenticPlannerDecision> {
-    const client = getClient();
+    const client = getOpenAIClient({ optional: true });
     const fallback = fallbackAction(state);
 
     if (!client) {
@@ -74,12 +61,15 @@ export class PlannerAgent {
     }
 
     const plannerModel = process.env.AGENTIC_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+    validateLiteLlmModelAlias(plannerModel);
     const historyLines = history
       .slice(-5)
       .map((item) => `${item.step}. ${item.action} (${item.timestamp})`)
       .join('\n');
 
-    const completion = await client.chat.completions.create({
+    const completionRequest: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming & {
+      metadata?: Record<string, string>;
+    } = {
       model: plannerModel,
       temperature: 0,
       messages: [
@@ -127,7 +117,18 @@ export class PlannerAgent {
           },
         },
       },
-    });
+    };
+
+    if (isLiteLlmMode()) {
+      completionRequest.metadata = buildLlmRequestMetadata({
+        workflow: 'agentic_planner',
+        modelAlias: plannerModel,
+        caseId: context.caseId,
+        runId: context.runId,
+      });
+    }
+
+    const completion = await client.chat.completions.create(completionRequest);
 
     const raw = completion.choices[0]?.message?.content;
     if (!raw) {
