@@ -33,6 +33,44 @@ services:
     volumes:
       - secondop_pgadmin_data:/var/lib/pgadmin
 
+  litellm-postgres:
+    image: postgres:16-alpine
+    container_name: secondop-litellm-postgres
+    profiles: ["ai-gateway"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${LITELLM_POSTGRES_PASSWORD:-litellm}
+    ports:
+      - "${LITELLM_DB_PORT:-5433}:5432"
+    volumes:
+      - secondop_litellm_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  litellm:
+    image: docker.litellm.ai/berriai/litellm:latest
+    container_name: secondop-litellm
+    profiles: ["ai-gateway"]
+    restart: unless-stopped
+    depends_on:
+      litellm-postgres:
+        condition: service_healthy
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-local-master-key}
+      LITELLM_DATABASE_URL: postgresql://litellm:${LITELLM_POSTGRES_PASSWORD:-litellm}@litellm-postgres:5432/litellm
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    volumes:
+      - ./litellm/config.example.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+
 volumes:
   secondop_postgres_data:
   secondop_pgadmin_data:
+  secondop_litellm_postgres_data:

@@ -2,8 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import { query } from '../database/connection';
 import { LANGGRAPH_CASE_ANALYSIS_THREAD_PREFIX } from '../agentic/langchain/threadId';
+import { getLlmGatewayStatus } from '../ai/llmGateway';
 
-type ProviderName = 'linear' | 'github' | 'vercel' | 'railway' | 'ledger' | 'langgraph_checkpoints';
+type ProviderName = 'linear' | 'github' | 'vercel' | 'railway' | 'ledger' | 'langgraph_checkpoints' | 'llm_gateway';
 type ProviderState = 'available' | 'partial' | 'unavailable' | 'skipped';
 
 export interface ProviderStatus {
@@ -331,6 +332,7 @@ const buildProviderStatus = (
   langGraphCheckpoints: LangGraphCheckpointReadModel
 ): ProviderStatus[] => {
   const now = new Date().toISOString();
+  const gatewayStatus = getLlmGatewayStatus();
   return [
     {
       provider: 'ledger',
@@ -342,6 +344,14 @@ const buildProviderStatus = (
       provider: 'langgraph_checkpoints',
       status: langGraphCheckpoints.status,
       message: langGraphCheckpoints.message,
+      lastUpdatedAt: now,
+    },
+    {
+      provider: 'llm_gateway',
+      status: gatewayStatus.configured ? 'available' : gatewayStatus.mode === 'direct' ? 'partial' : 'unavailable',
+      message: gatewayStatus.configured
+        ? `LLM gateway mode ${gatewayStatus.mode} is configured.`
+        : `LLM gateway mode ${gatewayStatus.mode} is not fully configured.`,
       lastUpdatedAt: now,
     },
     {
