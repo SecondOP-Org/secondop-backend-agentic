@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-02 - SEC-47 - Implement Phase 0 AI eval harness and contract checks
+
+- Status: Ready for test.
+- Human approval: User approved creating SEC-47 and implementing Phase 0 eval harness work.
+- Branch/worktree: `sec-47-eval-phase0-contract-checks`, `.worktrees/sec-46-backend`.
+- Files changed: `src/evals/contractChecks.ts`, `src/evals/contractEvalHarness.ts`, `src/evals/criticEvalHarness.ts`, `scripts/run-evals.ts`, `src/agentic/critic/critic.agent.ts`, `src/__tests__/contract-checks.test.ts`, `src/__tests__/langgraph-adapter.test.ts`, `.github/workflows/ci.yml`, `package.json`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: Pending.
+- Checks: `npm run lint` passed; `npm test -- --runInBand` passed (15 suites, 58 tests); `npm run eval:harness` passed (5 contract + 3 critic fixtures); `npm run build` passed.
+- Deployment: None.
+- Verification: Shared contract validators cover schema, disclaimer, forbidden claims, question count, low-confidence uncertainty signals, and evidence grounding. Critic agent now reuses shared eval helpers. CI runs `npm run eval:harness` on PRs and `main`.
+- Blockers: None.
+- Follow-ups: Phase 1 golden JSONL dataset and optional offline RAGAS scoring.
+
 ## 2026-07-01 - SEC-46 - Deploy LiteLLM gateway to Railway staging
 
 - Status: Ready for test.

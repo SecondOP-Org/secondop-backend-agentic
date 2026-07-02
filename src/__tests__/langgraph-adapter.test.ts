@@ -86,10 +86,18 @@ describe('LangGraph agentic adapter', () => {
       {
         fileId: 'file-1',
         fileName: 'report.pdf',
-        text: 'Clinical report text',
-        charCount: 20,
+        text: 'Clinical report text. possible cardiac chest pressure. Persistent chest pain. Serial biomarkers. Requires clinician review.',
+        charCount: 120,
       },
     ]);
+    const reports = [
+      {
+        fileId: 'file-1',
+        fileName: 'report.pdf',
+        text: 'Clinical report text. possible cardiac chest pressure. Persistent chest pain. Serial biomarkers. Requires clinician review.',
+        charCount: 120,
+      },
+    ];
     mockedGenerateCaseAnalysis.mockResolvedValue({
       summary: 'Chief Concern\nPossible cardiac chest pressure with uncertain etiology.\nRed Flags To Discuss\nPersistent chest pain.',
       topQuestions: [
@@ -111,6 +119,7 @@ describe('LangGraph agentic adapter', () => {
           'Which follow-up timeline is most appropriate now?',
         ],
         model: 'gpt-4.1-mini',
+        reports,
       }),
       model: 'gpt-4.1-mini',
     });
