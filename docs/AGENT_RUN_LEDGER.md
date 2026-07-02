@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-01 - SEC-46 - Deploy LiteLLM gateway to Railway staging
+
+- Status: Ready for test.
+- Human approval: User approved staging LiteLLM rollout, Railway variable updates, and gateway verification.
+- Branch/worktree: `sec-46-deploy-litellm-gateway-to-railway-staging`, `.worktrees/sec-46-backend`.
+- Files changed: `litellm/Dockerfile`, `litellm/README.md`, `docs/ai-gateway-litellm.md`, `docs/AGENT_RUN_LEDGER.md`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/25.
+- Checks: `npm run lint` passed; `npm run build` passed; `npm test -- --runInBand --silent src/__tests__/llm-gateway.test.ts src/__tests__/llm-gateway-services.test.ts` passed.
+- Deployment: Staging only. Railway services `secondop-litellm-staging` and `secondop-backend-staging` are online in environment `staging`. LiteLLM uses separate Postgres `Postgres-uF7z`; app DB remains `Postgres-k0Us`. Production services and variables were not changed.
+- Verification: Staging backend health returns HTTP 200 with git SHA `8f5b44b` (SEC-45 gateway code). LiteLLM `/models` probe returns HTTP 200 with the backend virtual key. Gateway status service reports `mode=litellm`, `configured=true`, redacted host `secondop-litellm-staging-staging.up.railway.app`, approved aliases configured, and probe `available` without exposing keys or clinical data. Protected `/api/v1/ai-gateway/status` route exists on staging (doctor-auth required).
+- Blockers: Staging demo doctor login was not available for live authenticated HTTP status check; status was verified through the gateway status service using Railway-injected staging variables.
+- Follow-ups: Human review/merge approval for PR #25; optional browser/Command Center check with a staging doctor account.
+
 ## 2026-07-01 - SEC-45 - Introduce LiteLLM gateway for backend LLM calls
 
 - Status: In progress.

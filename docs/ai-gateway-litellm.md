@@ -46,6 +46,30 @@ docker compose --profile ai-gateway up litellm litellm-postgres
 
 3. Open the LiteLLM UI at `http://localhost:4000/ui` and log in with the master key.
 
+## Railway Staging
+
+Use `litellm/` as the service build context for the staging LiteLLM Proxy service. It contains a minimal Dockerfile that packages `config.example.yaml` into the database-enabled LiteLLM Proxy image and starts the proxy on Railway's `PORT`.
+
+Configure only the staging LiteLLM service with:
+
+- `OPENAI_API_KEY`: provider key used by LiteLLM.
+- `LITELLM_MASTER_KEY`: admin/master key for LiteLLM UI and virtual key creation.
+- `LITELLM_DATABASE_URL`: separate LiteLLM Postgres connection string.
+
+Configure only the staging backend service with:
+
+```bash
+LLM_GATEWAY_MODE=litellm
+LLM_GATEWAY_BASE_URL=<staging LiteLLM service URL>
+LLM_GATEWAY_API_KEY=<LiteLLM virtual key>
+OPENAI_MODEL=secondop-case-analysis-primary
+OPENAI_FALLBACK_MODEL=secondop-case-analysis-fallback
+AGENTIC_MODEL=secondop-agentic-planner
+AGENTIC_PLANNER_FALLBACK_MODEL=secondop-agentic-planner
+```
+
+Do not use the LiteLLM master key as `LLM_GATEWAY_API_KEY`.
+
 ## Virtual Key And Spend Tracking
 
 Create a virtual key in the LiteLLM UI or via `/key/generate`, then set:
