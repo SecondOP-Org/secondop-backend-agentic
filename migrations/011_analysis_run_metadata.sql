@@ -1,5 +1,30 @@
 -- SEC-49: normalize execution modes and enrich case_analysis_runs metadata
 
+-- Drop legacy mode constraints before normalizing values.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'case_analysis_runs_execution_mode_check'
+  ) THEN
+    ALTER TABLE case_analysis_runs
+      DROP CONSTRAINT case_analysis_runs_execution_mode_check;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'case_analysis_shadow_results_mode_check'
+  ) THEN
+    ALTER TABLE case_analysis_shadow_results
+      DROP CONSTRAINT case_analysis_shadow_results_mode_check;
+  END IF;
+END $$;
+
 UPDATE case_analysis_runs
 SET execution_mode = CASE execution_mode
   WHEN 'off' THEN 'baseline'
@@ -32,33 +57,9 @@ SET error_message = error
 WHERE error_message IS NULL
   AND error IS NOT NULL;
 
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'case_analysis_runs_execution_mode_check'
-  ) THEN
-    ALTER TABLE case_analysis_runs
-      DROP CONSTRAINT case_analysis_runs_execution_mode_check;
-  END IF;
-END $$;
-
 ALTER TABLE case_analysis_runs
   ADD CONSTRAINT case_analysis_runs_execution_mode_check
   CHECK (execution_mode IN ('baseline', 'shadow', 'agentic', 'off', 'direct'));
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'case_analysis_shadow_results_mode_check'
-  ) THEN
-    ALTER TABLE case_analysis_shadow_results
-      DROP CONSTRAINT case_analysis_shadow_results_mode_check;
-  END IF;
-END $$;
 
 ALTER TABLE case_analysis_shadow_results
   ADD CONSTRAINT case_analysis_shadow_results_mode_check
