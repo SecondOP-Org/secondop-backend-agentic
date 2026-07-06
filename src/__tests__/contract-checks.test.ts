@@ -23,6 +23,8 @@ describe('contractChecks', () => {
         'ECG remains normal. Serial biomarkers are recommended.',
       ].join('. '),
       charCount: 180,
+      extractionMethod: 'pdf-parse' as const,
+      reused: false,
     },
   ];
 
