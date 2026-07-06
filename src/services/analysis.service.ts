@@ -9,6 +9,10 @@ import {
   defaultMedicalDisclaimer,
 } from './analysisArtifact.service';
 import { ExtractedReport } from './reportExtraction.service';
+import {
+  enforceCaseAnalysisContract,
+  LOW_CONFIDENCE_THRESHOLD,
+} from '../evals/contractChecks';
 
 export interface CaseIntakeData {
   age: number;
@@ -58,6 +62,7 @@ const buildSystemPrompt = (): string => {
     'Use cautious language when source material is incomplete or uncertain.',
     'The disclaimer must clearly state that a licensed clinician must review the source records.',
     'Confidence score must be between 0 and 1.',
+    'Include uncertainty_flags as explicit short statements when confidence is low or evidence is sparse.',
     'Questionnaire items must be actionable specialist-facing questions.',
     'Do not output markdown code fences.',
   ].join('\n');
@@ -84,7 +89,7 @@ const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport[], gui
     '',
     `Allowed report file names: ${reports.map((report) => report.fileName).join(', ')}`,
     guidance ? `Agentic Guidance: ${guidance}` : '',
-    'Generate a structured_summary, questionnaire with exactly 3 specialist_questions, confidence_score, and disclaimer.',
+    'Generate a structured_summary, questionnaire with exactly 3 specialist_questions, confidence_score, uncertainty_flags, and disclaimer.',
   ]
     .filter((line) => line !== '')
     .join('\n');
@@ -112,6 +117,7 @@ const parseAndValidateOutput = (
   const questionnaire = (parsed as { questionnaire?: unknown }).questionnaire;
   const confidenceScore = (parsed as { confidence_score?: unknown }).confidence_score;
   const disclaimer = (parsed as { disclaimer?: unknown }).disclaimer;
+  const uncertaintyFlagsRaw = (parsed as { uncertainty_flags?: unknown }).uncertainty_flags;
 
   if (!structuredSummary || typeof structuredSummary !== 'object') {
     throw new Error('Analysis structured_summary is missing.');
@@ -163,15 +169,38 @@ const parseAndValidateOutput = (
     throw new Error('Analysis must return exactly 3 questions.');
   }
 
+  const parsedUncertaintyFlags = Array.isArray(uncertaintyFlagsRaw)
+    ? uncertaintyFlagsRaw
+        .filter((flag): flag is string => typeof flag === 'string')
+        .map((flag) => flag.trim())
+        .filter(Boolean)
+    : [];
+
+  const resolvedConfidence = typeof confidenceScore === 'number' ? confidenceScore : 0.5;
+  const resolvedUncertaintyFlags =
+    parsedUncertaintyFlags.length > 0
+      ? parsedUncertaintyFlags
+      : resolvedConfidence < LOW_CONFIDENCE_THRESHOLD &&
+          (normalizedStructuredSummary.limitations_caveats ||
+            normalizedStructuredSummary.red_flags_to_discuss)
+        ? [
+            normalizedStructuredSummary.limitations_caveats ||
+              normalizedStructuredSummary.red_flags_to_discuss,
+          ]
+        : [];
+
   const artifact = buildCaseAnalysisArtifact({
     structuredSummary: normalizedStructuredSummary,
     specialistQuestions,
-    confidenceScore: typeof confidenceScore === 'number' ? confidenceScore : 0.5,
+    confidenceScore: resolvedConfidence,
+    uncertaintyFlags: resolvedUncertaintyFlags,
     disclaimer: typeof disclaimer === 'string' ? disclaimer : defaultMedicalDisclaimer,
     reports,
     model,
     tokenUsage: usage,
   });
+
+  enforceCaseAnalysisContract(artifact, { reports });
 
   return {
     summary: [
@@ -272,9 +301,13 @@ export const generateCaseAnalysis = async (
               required: ['specialist_questions'],
             },
             confidence_score: { type: 'number' },
+            uncertainty_flags: {
+              type: 'array',
+              items: { type: 'string' },
+            },
             disclaimer: { type: 'string' },
           },
-          required: ['structured_summary', 'questionnaire', 'confidence_score', 'disclaimer'],
+          required: ['structured_summary', 'questionnaire', 'confidence_score', 'uncertainty_flags', 'disclaimer'],
         },
       },
     },

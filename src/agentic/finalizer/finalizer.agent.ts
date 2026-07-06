@@ -1,4 +1,5 @@
 import { AgenticError, AgenticFinalArtifact, AgenticLoopState } from '../core/types';
+import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 
 export class FinalizerAgent {
   public finalize(state: AgenticLoopState): AgenticFinalArtifact {
@@ -12,6 +13,15 @@ export class FinalizerAgent {
 
     if (state.analysis.topQuestions.length !== 3) {
       throw new AgenticError('validation_error', 'Finalization requires exactly 3 specialist questions.');
+    }
+
+    try {
+      enforceCaseAnalysisContract(state.analysis.artifact, { reports: state.reports });
+    } catch (error) {
+      if (error instanceof CaseAnalysisContractError) {
+        throw new AgenticError('validation_error', error.message);
+      }
+      throw error;
     }
 
     return {

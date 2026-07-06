@@ -30,6 +30,8 @@ const buildReports = (): ExtractedReport[] => [
       'Patient reports intermittent chest pain. ECG remains normal. Serial biomarkers and close clinician review are recommended.',
     ].join('. '),
     charCount: 320,
+    extractionMethod: 'pdf-parse',
+    reused: false,
   },
 ];
 
@@ -48,6 +50,7 @@ const buildValidArtifact = (reports: ExtractedReport[]) =>
       'What follow-up timeline is safest for clinician review?',
     ],
     confidenceScore: 0.61,
+    uncertaintyFlags: ['Findings remain limited and require clinician review'],
     disclaimer: AI_CONTRACT_DISCLAIMER,
     reports,
     model: 'gpt-4.1-mini',

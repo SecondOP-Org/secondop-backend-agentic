@@ -1,5 +1,6 @@
 import { query } from '../../database/connection';
 import { markAnalysisRunSucceeded } from '../../services/analysisRun.service';
+import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
@@ -12,6 +13,10 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
     }
 
     try {
+      if (input.analysis.artifact) {
+        enforceCaseAnalysisContract(input.analysis.artifact, { reports: input.reports });
+      }
+
       await query(
         `UPDATE cases
          SET analysis_status = 'succeeded',
@@ -42,6 +47,10 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
 
       return input;
     } catch (error) {
+      if (error instanceof CaseAnalysisContractError) {
+        throw new AgentError('validation_error', error.message);
+      }
+
       if (error instanceof Error) {
         throw new AgentError('persistence_error', error.message);
       }

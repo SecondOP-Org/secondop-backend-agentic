@@ -32,6 +32,8 @@ const buildReports = (): ExtractedReport[] => [
       'Patient reports intermittent chest pain. ECG remains normal. Serial biomarkers and close clinician review are recommended. Persistent chest pain cannot exclude ischemia.',
     ].join('. '),
     charCount: 380,
+    extractionMethod: 'pdf-parse',
+    reused: false,
   },
 ];
 
@@ -76,6 +78,7 @@ export const buildCriticEvalFixtures = (): CriticEvalFixture[] => {
       'What follow-up timeline is safest for clinician review?',
     ],
     confidenceScore: 0.61,
+    uncertaintyFlags: ['Findings remain limited and require clinician review'],
     disclaimer: AI_CONTRACT_DISCLAIMER,
     model: 'gpt-4.1-mini',
     reports,
@@ -95,6 +98,7 @@ export const buildCriticEvalFixtures = (): CriticEvalFixture[] => {
     artifact: {
       ...groundedArtifact.artifact,
       confidence_score: 0.4,
+      uncertainty_flags: [],
       structured_summary: {
         ...groundedArtifact.artifact.structured_summary,
         limitations_caveats: '',

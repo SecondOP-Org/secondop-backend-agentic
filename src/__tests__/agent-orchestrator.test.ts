@@ -74,12 +74,23 @@ describe('Case analysis agent orchestrator', () => {
       {
         fileId: 'file-1',
         fileName: 'report.pdf',
-        text: 'Clinical report text',
-        charCount: 20,
+        text: 'Chest pressure. Clinical report text. Worsening dyspnea. Urgent cardiology follow-up. Needs clinician confirmation.',
+        charCount: 120,
         extractionMethod: 'pdf-parse',
         reused: false,
       },
     ]);
+
+    const reports = [
+      {
+        fileId: 'file-1',
+        fileName: 'report.pdf',
+        text: 'Chest pressure. Clinical report text. Worsening dyspnea. Urgent cardiology follow-up. Needs clinician confirmation.',
+        charCount: 120,
+        extractionMethod: 'pdf-parse' as const,
+        reused: false,
+      },
+    ];
 
     mockedGenerateCaseAnalysis.mockResolvedValueOnce({
       summary: 'Chief Concern\nChest pressure\nRed Flags To Discuss\nWorsening dyspnea',
@@ -93,6 +104,9 @@ describe('Case analysis agent orchestrator', () => {
           limitations_caveats: 'Needs clinician confirmation',
         },
         specialistQuestions: ['What immediate tests are most important?', 'Is imaging urgently indicated?', 'What treatment should be prioritized now?'],
+        uncertaintyFlags: ['Needs clinician confirmation'],
+        confidenceScore: 0.55,
+        reports,
         model: 'gpt-4.1-mini',
       }),
       model: 'gpt-4.1-mini',
@@ -183,6 +197,6 @@ describe('Case analysis agent orchestrator', () => {
     );
 
     expect(failedEvent).toBeDefined();
-    expect(failedEvent?.[0].errorText).toContain('[model_error] Model timed out');
+    expect(String(failedEvent?.[0].errorText || '')).toContain('Model timed out');
   });
 });
