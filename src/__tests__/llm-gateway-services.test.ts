@@ -93,6 +93,7 @@ describe('LLM gateway service integration', () => {
         ],
       },
       confidence_score: 0.7,
+      uncertainty_flags: [],
       disclaimer: 'A licensed clinician must review the source records.',
     });
 
@@ -114,8 +115,8 @@ describe('LLM gateway service integration', () => {
           {
             fileId: 'file-1',
             fileName: 'report.pdf',
-            text: 'Report text reviewed',
-            charCount: 20,
+            text: 'Chest pressure noted. Report text reviewed. Worsening symptoms reported. Discuss diagnostics with specialist. Requires clinician review.',
+            charCount: 120,
             extractionMethod: 'pdf-parse',
             reused: false,
           },

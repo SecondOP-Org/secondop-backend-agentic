@@ -42,6 +42,7 @@ describe('contractChecks', () => {
       'What follow-up timeline is safest for clinician review?',
     ],
     confidenceScore: 0.61,
+    uncertaintyFlags: ['Findings remain limited'],
     disclaimer: AI_CONTRACT_DISCLAIMER,
     reports,
     model: 'gpt-4.1-mini',

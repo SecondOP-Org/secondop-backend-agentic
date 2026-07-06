@@ -1,5 +1,6 @@
 import { AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
+import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 
 const normalizeQuestion = (question: string): string => {
   return question.replace(/\s+/g, ' ').trim();
@@ -27,6 +28,17 @@ export class QuestionGuardAgent implements AgentStep<CaseAnalysisPipelineState, 
     const tooShort = normalizedQuestions.find((question) => question.length < 12);
     if (tooShort) {
       throw new AgentError('validation_error', 'All analysis questions must be meaningful specialist-facing prompts.');
+    }
+
+    if (input.analysis.artifact) {
+      try {
+        enforceCaseAnalysisContract(input.analysis.artifact, { reports: input.reports });
+      } catch (error) {
+        if (error instanceof CaseAnalysisContractError) {
+          throw new AgentError('validation_error', error.message);
+        }
+        throw error;
+      }
     }
 
     return {

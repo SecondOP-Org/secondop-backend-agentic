@@ -32,6 +32,7 @@ export interface CaseAnalysisArtifact {
     specialist_questions: QuestionnaireItem[];
   };
   confidence_score: number;
+  uncertainty_flags: string[];
   disclaimer: string;
   evidence_refs: EvidenceRef[];
   model: string;
@@ -105,6 +106,72 @@ export const extractObservationsFromArtifact = (artifact: CaseAnalysisArtifact |
     .filter((value): value is string => Boolean(value));
 };
 
+const normalizeForMatch = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
+
+const tokenizeForOverlap = (value: string): string[] =>
+  normalizeForMatch(value)
+    .split(' ')
+    .filter((word) => word.length > 3);
+
+export const findGroundedEvidenceSnippet = (
+  sectionText: string,
+  reports: ExtractedReport[]
+): { fileId: string; fileName: string; snippet: string } | null => {
+  const normalizedSection = normalizeForMatch(sectionText);
+  if (!normalizedSection || reports.length === 0) {
+    return null;
+  }
+
+  const sectionWords = tokenizeForOverlap(sectionText);
+  const minOverlap = Math.min(2, Math.max(1, sectionWords.length));
+  let bestMatch: { fileId: string; fileName: string; snippet: string; score: number } | null = null;
+
+  for (const report of reports) {
+    const normalizedReport = normalizeForMatch(report.text);
+    if (normalizedSection.length >= 12 && normalizedReport.includes(normalizedSection.slice(0, 120))) {
+      const startIndex = normalizedReport.indexOf(normalizedSection.slice(0, 120));
+      const rawSnippet = report.text.slice(startIndex, startIndex + 220).trim();
+      return {
+        fileId: report.fileId,
+        fileName: report.fileName,
+        snippet: rawSnippet || sectionText.slice(0, 220),
+      };
+    }
+
+    const chunks = report.text
+      .split(/[.!?\n]+/)
+      .map((chunk) => chunk.trim())
+      .filter((chunk) => chunk.length >= 12);
+
+    for (const chunk of chunks) {
+      const normalizedChunk = normalizeForMatch(chunk);
+      const overlap = sectionWords.filter((word) => normalizedChunk.includes(word)).length;
+      if (overlap < minOverlap) {
+        continue;
+      }
+
+      if (!bestMatch || overlap > bestMatch.score) {
+        bestMatch = {
+          fileId: report.fileId,
+          fileName: report.fileName,
+          snippet: chunk.slice(0, 220),
+          score: overlap,
+        };
+      }
+    }
+  }
+
+  if (!bestMatch) {
+    return null;
+  }
+
+  return {
+    fileId: bestMatch.fileId,
+    fileName: bestMatch.fileName,
+    snippet: bestMatch.snippet,
+  };
+};
+
 const buildEvidenceRefs = (
   structuredSummary: StructuredSummary,
   reports: ExtractedReport[] | undefined
@@ -114,27 +181,35 @@ const buildEvidenceRefs = (
   }
 
   return sectionOrder
-    .map((sectionKey, index) => {
+    .map((sectionKey) => {
       const content = normalizeText(structuredSummary[sectionKey]);
       if (!content) {
         return null;
       }
 
-      const report = reports[index % reports.length];
+      const grounded = findGroundedEvidenceSnippet(content, reports);
+      if (!grounded) {
+        return null;
+      }
+
       return {
-        file_id: report.fileId,
-        file_name: report.fileName,
+        file_id: grounded.fileId,
+        file_name: grounded.fileName,
         section: sectionKey,
-        snippet: content.slice(0, 220),
+        snippet: grounded.snippet,
       };
     })
     .filter((value): value is NonNullable<typeof value> => value !== null);
 };
 
+const normalizeUncertaintyFlags = (flags: string[] | undefined): string[] =>
+  (flags || []).map((flag) => normalizeText(flag)).filter(Boolean);
+
 export const buildCaseAnalysisArtifact = (input: {
   structuredSummary: StructuredSummary;
   specialistQuestions: string[];
   confidenceScore?: number;
+  uncertaintyFlags?: string[];
   disclaimer?: string;
   reports?: ExtractedReport[];
   model: string;
@@ -159,6 +234,7 @@ export const buildCaseAnalysisArtifact = (input: {
       specialist_questions: questions,
     },
     confidence_score: clampConfidenceScore(input.confidenceScore),
+    uncertainty_flags: normalizeUncertaintyFlags(input.uncertaintyFlags),
     disclaimer: normalizeText(input.disclaimer) || defaultMedicalDisclaimer,
     evidence_refs: buildEvidenceRefs(structuredSummary, input.reports),
     model: input.model,
@@ -228,10 +304,13 @@ const isCaseAnalysisArtifact = (value: unknown): value is CaseAnalysisArtifact =
       ? (candidate.questionnaire as { specialist_questions: unknown[] }).specialist_questions
       : null;
 
+  const uncertaintyFlags = Array.isArray(candidate.uncertainty_flags) ? candidate.uncertainty_flags : [];
+
   return (
     isStructuredSummary(candidate.structured_summary) &&
     specialistQuestions !== null &&
     typeof candidate.confidence_score === 'number' &&
+    uncertaintyFlags.every((flag) => typeof flag === 'string') &&
     typeof candidate.disclaimer === 'string' &&
     typeof candidate.model === 'string'
   );
@@ -244,7 +323,12 @@ export const hydrateCaseAnalysisArtifact = (input: {
   model: string | null;
 }): CaseAnalysisArtifact | null => {
   if (isCaseAnalysisArtifact(input.artifact)) {
-    return input.artifact;
+    const artifact = input.artifact as CaseAnalysisArtifact;
+    return {
+      ...artifact,
+      uncertainty_flags: Array.isArray(artifact.uncertainty_flags) ? artifact.uncertainty_flags : [],
+      evidence_refs: Array.isArray(artifact.evidence_refs) ? artifact.evidence_refs : [],
+    };
   }
 
   const summary = typeof input.summary === 'string' ? input.summary.trim() : '';
@@ -261,6 +345,7 @@ export const hydrateCaseAnalysisArtifact = (input: {
     specialistQuestions: questions.slice(0, 3),
     model: input.model || 'unknown',
     confidenceScore: 0.5,
+    uncertaintyFlags: [],
   });
 };
 

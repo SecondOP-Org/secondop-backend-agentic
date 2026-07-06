@@ -61,6 +61,8 @@ export const isValidCaseAnalysisArtifactShape = (value: unknown): value is CaseA
       ? (candidate.questionnaire as { specialist_questions: unknown[] }).specialist_questions
       : null;
 
+  const uncertaintyFlags = Array.isArray(candidate.uncertainty_flags) ? candidate.uncertainty_flags : null;
+
   return (
     isStructuredSummary(candidate.structured_summary) &&
     specialistQuestions !== null &&
@@ -68,6 +70,8 @@ export const isValidCaseAnalysisArtifactShape = (value: unknown): value is CaseA
     Number.isFinite(candidate.confidence_score) &&
     candidate.confidence_score >= 0 &&
     candidate.confidence_score <= 1 &&
+    uncertaintyFlags !== null &&
+    uncertaintyFlags.every((flag) => typeof flag === 'string') &&
     typeof candidate.disclaimer === 'string' &&
     typeof candidate.model === 'string'
   );
@@ -124,6 +128,10 @@ export const validateQuestionContract = (questions: string[]): string[] => {
 };
 
 export const collectUncertaintySignals = (artifact: CaseAnalysisArtifact): string[] => {
+  if (Array.isArray(artifact.uncertainty_flags) && artifact.uncertainty_flags.length > 0) {
+    return artifact.uncertainty_flags.filter((flag) => flag.trim().length > 0);
+  }
+
   return [
     artifact.structured_summary.limitations_caveats,
     artifact.structured_summary.red_flags_to_discuss,
@@ -239,4 +247,24 @@ export const validateCaseAnalysisContract = (
       lowConfidenceHasUncertaintyFlags,
     },
   };
+};
+
+export class CaseAnalysisContractError extends Error {
+  public readonly violations: string[];
+
+  constructor(violations: string[]) {
+    super(`Analysis contract validation failed: ${violations.join(' ')}`);
+    this.name = 'CaseAnalysisContractError';
+    this.violations = violations;
+  }
+}
+
+export const enforceCaseAnalysisContract = (
+  artifact: CaseAnalysisArtifact,
+  options: { reports?: ExtractedReport[] } = {}
+): void => {
+  const result = validateCaseAnalysisContract(artifact, options);
+  if (!result.passed) {
+    throw new CaseAnalysisContractError(result.violations);
+  }
 };
