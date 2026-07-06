@@ -1,4 +1,5 @@
 import { emitAgenticStepEvent } from '../observability/eventEmitter';
+import { persistAgenticStageArtifact } from '../observability/artifactPersistence';
 import { assertActionAllowed, assertRefinementBudget, assertStepBudget } from './policy';
 import {
   AgenticAction,
@@ -82,6 +83,8 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
           },
         });
 
+        await persistAgenticStageArtifact('FINALIZE', input.context, state);
+
         history.push({
           step: state.stepCount,
           action,
@@ -131,6 +134,8 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
           plannerTokenUsage: decision.usage || null,
         },
       });
+
+      await persistAgenticStageArtifact(action, input.context, state);
 
       history.push({
         step: state.stepCount,

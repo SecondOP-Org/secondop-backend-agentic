@@ -116,6 +116,8 @@ describe('LLM gateway service integration', () => {
             fileName: 'report.pdf',
             text: 'Report text reviewed',
             charCount: 20,
+            extractionMethod: 'pdf-parse',
+            reused: false,
           },
         ]
       );

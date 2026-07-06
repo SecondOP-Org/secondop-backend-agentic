@@ -3,12 +3,17 @@ import { query } from '../database/connection';
 import logger from '../utils/logger';
 import { AgentError } from '../agents/core/agent.types';
 import { AgenticError } from '../agentic/core/types';
-import type { AgenticMode } from '../agentic/core/types';
 import { runCaseAnalysis } from '../agents/case-analysis/runCaseAnalysis';
-import { resolveAgenticMode } from '../agentic/core/policy';
+import {
+  isAgenticPrimaryMode,
+  resolveExecutionMode,
+  shouldRunShadowAgentic,
+} from '../agentic/core/policy';
+import type { AnalysisExecutionMode } from '../agentic/core/executionMode';
 import { runAgenticCaseAnalysis } from '../agentic/orchestration/runAgenticCaseAnalysis';
 import { startPhoenixSpan } from '../observability/phoenix.service';
 import {
+  AnalysisRunCompletionMetadata,
   createAnalysisRun,
   getLatestActiveAnalysisRun,
   markAnalysisRunFailed,
@@ -17,6 +22,10 @@ import {
   markAnalysisRunSucceeded,
 } from './analysisRun.service';
 import type { AnalysisRunEngine } from './analysisRun.service';
+import {
+  buildShadowComparisonMetrics,
+  insertCaseAnalysisArtifact,
+} from './caseAnalysisRunArtifact.service';
 
 const maxCharsPerFile = parseInt(process.env.ANALYSIS_MAX_CHARS_PER_FILE || '12000', 10);
 const maxTotalChars = parseInt(process.env.ANALYSIS_MAX_TOTAL_CHARS || '30000', 10);
@@ -32,7 +41,25 @@ interface QueueCaseResult {
   analysisStatus: 'queued' | 'processing';
 }
 
-const getPrimaryRunEngine = (mode: AgenticMode): AnalysisRunEngine => (mode === 'direct' ? 'agentic' : 'baseline');
+const getPrimaryRunEngine = (mode: AnalysisExecutionMode): AnalysisRunEngine =>
+  isAgenticPrimaryMode(mode) ? 'agentic' : 'baseline';
+
+const buildAgenticCompletionMetadata = (
+  model: string,
+  metrics?: {
+    totalTokenUsage?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+  }
+): AnalysisRunCompletionMetadata => ({
+  model,
+  modelVersion: model,
+  promptTokens: metrics?.totalTokenUsage?.promptTokens ?? null,
+  completionTokens: metrics?.totalTokenUsage?.completionTokens ?? null,
+  totalTokens: metrics?.totalTokenUsage?.totalTokens ?? null,
+});
 
 class AnalysisWorker {
   private boss: PgBoss | null = null;
@@ -102,7 +129,7 @@ class AnalysisWorker {
 
   public async recoverInterruptedJobs(): Promise<void> {
     await this.ensureStarted();
-    const mode = resolveAgenticMode();
+    const mode = resolveExecutionMode();
     const primaryEngine = getPrimaryRunEngine(mode);
 
     const result = await query(
@@ -171,7 +198,7 @@ class AnalysisWorker {
   public async queueCase(caseId: string): Promise<QueueCaseResult> {
     await this.ensureStarted();
 
-    const mode = resolveAgenticMode();
+    const mode = resolveExecutionMode();
     const primaryEngine = getPrimaryRunEngine(mode);
     const activeRun = await getLatestActiveAnalysisRun(caseId, primaryEngine);
     if (activeRun) {
@@ -216,7 +243,7 @@ class AnalysisWorker {
     };
   }
 
-  private async processAgenticPrimaryCase(job: AnalysisQueueJob, mode: AgenticMode): Promise<void> {
+  private async processAgenticPrimaryCase(job: AnalysisQueueJob, mode: AnalysisExecutionMode): Promise<void> {
     const { caseId, runId } = job;
     const agenticRunSpan = startPhoenixSpan('analysis.agentic.run', {
       caseId,
@@ -250,7 +277,10 @@ class AnalysisWorker {
         maxTotalChars,
       });
 
-      await markAnalysisRunSucceeded(runId, agenticResult.artifact.model);
+      await markAnalysisRunSucceeded(
+        runId,
+        buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics)
+      );
 
       await query(
         `UPDATE cases
@@ -304,14 +334,14 @@ class AnalysisWorker {
       }
 
       agenticRunSpan.end('ERROR', errorMessage);
-      logger.error(`Agentic direct mode failed for case ${caseId}: ${errorMessage}`);
+      logger.error(`Agentic mode failed for case ${caseId}: ${errorMessage}`);
       throw error;
     }
   }
 
   private async processCase(job: AnalysisQueueJob): Promise<void> {
     const { caseId, runId } = job;
-    const mode = resolveAgenticMode();
+    const mode = resolveExecutionMode();
     const primaryEngine = getPrimaryRunEngine(mode);
 
     if (primaryEngine === 'agentic') {
@@ -343,7 +373,7 @@ class AnalysisWorker {
         [caseId]
       );
 
-      await runCaseAnalysis({
+      const pipelineState = await runCaseAnalysis({
         caseId,
         runId,
         maxCharsPerFile,
@@ -354,7 +384,7 @@ class AnalysisWorker {
       baselineRunSpan.end('OK');
       logger.info(`Baseline analysis completed for case ${caseId} (run ${runId})`);
 
-      if (mode === 'off') {
+      if (!shouldRunShadowAgentic(mode)) {
         return;
       }
 
@@ -378,32 +408,35 @@ class AnalysisWorker {
           maxTotalChars,
         });
 
-        await markAnalysisRunSucceeded(agenticRun.id, agenticResult.artifact.model);
+        await markAnalysisRunSucceeded(
+          agenticRun.id,
+          buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics)
+        );
         agenticRunSpan.end('OK');
 
-        if (mode === 'direct') {
-          await query(
-            `UPDATE cases
-             SET analysis_status = 'succeeded',
-                 analysis_summary = $2,
-                 analysis_questions = $3,
-                 analysis_artifact = $4,
-                 analysis_model = $5,
-                 analysis_error = NULL,
-                 analysis_completed_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1`,
-            [
-              caseId,
-              agenticResult.artifact.summary,
-              JSON.stringify(agenticResult.artifact.questions),
-              JSON.stringify(agenticResult.artifact.artifact),
-              agenticResult.artifact.model,
-            ]
-          );
+        if (pipelineState.analysis) {
+          const comparison = buildShadowComparisonMetrics({
+            baselineRunId: runId,
+            agenticRunId: agenticRun.id,
+            baselineAnalysis: pipelineState.analysis,
+            agenticSummary: agenticResult.artifact.summary,
+            agenticQuestions: agenticResult.artifact.questions,
+            agenticModel: agenticResult.artifact.model,
+            criticPassed: agenticResult.criticScore?.passed ?? null,
+            criticScore: agenticResult.criticScore?.score ?? null,
+          });
+
+          await insertCaseAnalysisArtifact({
+            runId,
+            caseId,
+            artifactType: 'final',
+            stageName: 'shadow-comparison',
+            engine: 'baseline',
+            payload: comparison as unknown as Record<string, unknown>,
+          });
         }
 
-        logger.info(`Agentic analysis completed for case ${caseId} (run ${agenticRun.id}, mode ${mode})`);
+        logger.info(`Agentic shadow analysis completed for case ${caseId} (run ${agenticRun.id}, mode ${mode})`);
       } catch (agenticError) {
         const agenticMessage =
           agenticError instanceof Error
@@ -412,26 +445,13 @@ class AnalysisWorker {
 
         await markAnalysisRunFailed(agenticRun.id, agenticMessage);
         agenticRunSpan.end('ERROR', agenticMessage);
+        logger.error(`Agentic shadow mode failed for case ${caseId}: ${agenticMessage}`);
+      }
 
-        if (mode === 'direct') {
-          await query(
-            `UPDATE cases
-             SET analysis_status = 'failed',
-                 analysis_summary = NULL,
-                 analysis_questions = NULL,
-                 analysis_artifact = NULL,
-                 analysis_model = NULL,
-                 analysis_error = $2,
-                 analysis_completed_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $1`,
-            [caseId, `[agentic_direct_failed] ${agenticMessage}`]
-          );
-
-          logger.error(`Agentic direct mode failed for case ${caseId}: ${agenticMessage}`);
-        } else {
-          logger.error(`Agentic shadow mode failed for case ${caseId}: ${agenticMessage}`);
-        }
+      if (pipelineState.analysis) {
+        logger.info(`Baseline output retained for case ${caseId} after shadow agentic run`, {
+          baselineModel: pipelineState.analysis.model,
+        });
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown analysis error';

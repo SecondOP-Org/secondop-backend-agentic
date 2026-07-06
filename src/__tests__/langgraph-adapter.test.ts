@@ -88,6 +88,8 @@ describe('LangGraph agentic adapter', () => {
         fileName: 'report.pdf',
         text: 'Clinical report text. possible cardiac chest pressure. Persistent chest pain. Serial biomarkers. Requires clinician review.',
         charCount: 120,
+        extractionMethod: 'pdf-parse',
+        reused: false,
       },
     ]);
     const reports = [

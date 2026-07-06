@@ -4,6 +4,7 @@ import { query } from '../database/connection';
 import { generateCaseAnalysis } from '../services/analysis.service';
 import { extractCaseReports } from '../services/reportExtraction.service';
 import { insertAnalysisEvent, markAnalysisRunSucceeded } from '../services/analysisRun.service';
+import { insertCaseAnalysisArtifact } from '../services/caseAnalysisRunArtifact.service';
 import { buildCaseAnalysisArtifact } from '../services/analysisArtifact.service';
 
 jest.mock('../database/connection', () => ({
@@ -27,17 +28,27 @@ jest.mock('../services/analysisRun.service', () => ({
   markAnalysisRunSucceeded: jest.fn(),
 }));
 
+jest.mock('../services/caseAnalysisRunArtifact.service', () => {
+  const actual = jest.requireActual('../services/caseAnalysisRunArtifact.service');
+  return {
+    ...actual,
+    insertCaseAnalysisArtifact: jest.fn(),
+  };
+});
+
 const mockedQuery = query as jest.MockedFunction<typeof query>;
 const mockedExtractCaseReports = extractCaseReports as jest.MockedFunction<typeof extractCaseReports>;
 const mockedGenerateCaseAnalysis = generateCaseAnalysis as jest.MockedFunction<typeof generateCaseAnalysis>;
 const mockedInsertAnalysisEvent = insertAnalysisEvent as jest.MockedFunction<typeof insertAnalysisEvent>;
 const mockedMarkAnalysisRunSucceeded = markAnalysisRunSucceeded as jest.MockedFunction<typeof markAnalysisRunSucceeded>;
+const mockedInsertCaseAnalysisArtifact = insertCaseAnalysisArtifact as jest.MockedFunction<typeof insertCaseAnalysisArtifact>;
 
 describe('Case analysis agent orchestrator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedInsertAnalysisEvent.mockResolvedValue(undefined as any);
     mockedMarkAnalysisRunSucceeded.mockResolvedValue(undefined as any);
+    mockedInsertCaseAnalysisArtifact.mockResolvedValue(undefined as any);
     mockedQuery.mockResolvedValue({ rows: [] } as any);
   });
 
@@ -65,6 +76,8 @@ describe('Case analysis agent orchestrator', () => {
         fileName: 'report.pdf',
         text: 'Clinical report text',
         charCount: 20,
+        extractionMethod: 'pdf-parse',
+        reused: false,
       },
     ]);
 
@@ -90,7 +103,7 @@ describe('Case analysis agent orchestrator', () => {
       runId: 'run-1',
       maxCharsPerFile: 12000,
       maxTotalChars: 30000,
-      executionMode: 'off',
+      executionMode: 'baseline',
     });
 
     expect(result.analysis?.topQuestions).toHaveLength(3);
@@ -108,7 +121,22 @@ describe('Case analysis agent orchestrator', () => {
       stepStatus: 'completed',
     });
 
-    expect(mockedMarkAnalysisRunSucceeded).toHaveBeenCalledWith('run-1', 'gpt-4.1-mini');
+    expect(mockedMarkAnalysisRunSucceeded).toHaveBeenCalledWith('run-1', {
+      model: 'gpt-4.1-mini',
+      modelVersion: 'gpt-4.1-mini',
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+    });
+
+    expect(mockedInsertCaseAnalysisArtifact).toHaveBeenCalledTimes(5);
+    expect(mockedInsertCaseAnalysisArtifact.mock.calls.map((call) => call[0].artifactType)).toEqual([
+      'validation',
+      'extraction',
+      'synthesis',
+      'guard',
+      'final',
+    ]);
   });
 
   it('emits a failed event and returns normalized model error', async () => {
@@ -133,6 +161,8 @@ describe('Case analysis agent orchestrator', () => {
         fileName: 'report.pdf',
         text: 'Clinical report text',
         charCount: 20,
+        extractionMethod: 'pdf-parse',
+        reused: false,
       },
     ]);
 
@@ -144,7 +174,7 @@ describe('Case analysis agent orchestrator', () => {
         runId: 'run-2',
         maxCharsPerFile: 12000,
         maxTotalChars: 30000,
-        executionMode: 'off',
+        executionMode: 'baseline',
       })
     ).rejects.toEqual(expect.any(AgentError));
 

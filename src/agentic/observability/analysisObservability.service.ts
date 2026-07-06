@@ -1,4 +1,6 @@
 import { query } from '../../database/connection';
+import { normalizeExecutionMode, toLegacyExecutionMode } from '../core/executionMode';
+import { listArtifactsByRunId } from '../../services/caseAnalysisRunArtifact.service';
 
 interface TokenUsageAggregate {
   promptTokens: number;
@@ -90,7 +92,9 @@ const aggregateEventTokenUsage = (
 
 export const getCaseRunTrace = async (caseId: string, runId?: string) => {
   const runsResult = await query(
-    `SELECT id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, created_at
+    `SELECT id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, error_message,
+            pipeline_version, model_version, prompt_version, latency_ms, prompt_tokens, completion_tokens,
+            total_tokens, estimated_cost_usd, created_at
      FROM case_analysis_runs
      WHERE case_id = $1
      ORDER BY created_at DESC
@@ -138,11 +142,19 @@ export const getCaseRunTrace = async (caseId: string, runId?: string) => {
     usageEventRows.rows as Array<{ run_id?: string; metadata_json?: unknown }>
   );
 
+  const artifacts = selectedRunId ? await listArtifactsByRunId(selectedRunId) : [];
+
   return {
-    runs: runsResult.rows,
+    runs: (runsResult.rows as Array<Record<string, unknown>>).map((row) => ({
+      ...row,
+      execution_mode: normalizeExecutionMode(String(row.execution_mode || 'baseline')),
+      legacy_execution_mode: toLegacyExecutionMode(normalizeExecutionMode(String(row.execution_mode || 'baseline'))),
+      error_message: row.error_message ?? row.error ?? null,
+    })),
     selectedRunId: selectedRunId || null,
     events: eventsResult.rows,
     shadow: shadowResult.rows[0] || null,
+    artifacts,
     runTokenUsageByRunId,
     selectedRunTokenUsage: selectedRunId ? runTokenUsageByRunId[selectedRunId] || null : null,
   };

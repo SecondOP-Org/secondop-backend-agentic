@@ -80,6 +80,7 @@ describe('Case analysis controllers', () => {
       selectedRunId: null,
       events: [],
       shadow: null,
+      artifacts: [],
       runTokenUsageByRunId: {},
       selectedRunTokenUsage: null,
     });
@@ -267,6 +268,7 @@ describe('Case analysis controllers', () => {
           analysisRunId: 'run-baseline',
           agenticRunId: 'run-agentic',
           agenticShadowStatus: 'succeeded',
+          executionMode: 'shadow',
           agenticMode: 'shadow',
           agenticCriticScore: {
             passed: true,
@@ -286,6 +288,7 @@ describe('Case analysis controllers', () => {
       selectedRunId: 'run-1',
       events: [{ step_name: 'clinical-synthesis', step_status: 'completed' }],
       shadow: { final_status: 'succeeded' },
+      artifacts: [{ artifact_type: 'final', stage_name: 'persist-results' }],
     } as any);
 
     const req = createPatientRequest({}, { caseId: 'case-1' }, { runId: 'run-1' });
@@ -303,6 +306,7 @@ describe('Case analysis controllers', () => {
         selectedRunId: 'run-1',
         events: [{ step_name: 'clinical-synthesis', step_status: 'completed' }],
         shadow: { final_status: 'succeeded' },
+        artifacts: [{ artifact_type: 'final', stage_name: 'persist-results' }],
       },
     });
   });
@@ -361,6 +365,29 @@ describe('Case analysis controllers', () => {
         observations: null,
       },
     });
+  });
+
+  it('blocks submit when analysis was invalidated after report changes', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', pdf_count: 1, dicom_count: 0 }] } as any);
+
+    const req = createPatientRequest(
+      {
+        specialistQuestions: ['Q1', 'Q2', 'Q3'],
+      },
+      { caseId: 'case-1' }
+    );
+
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await submitCase(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    const err = next.mock.calls[0][0] as AppError;
+    expect(err.statusCode).toBe(400);
+    expect(err.message).toContain('Run analysis again');
   });
 
   it('blocks submit when analysis has not succeeded', async () => {

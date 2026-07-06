@@ -9,6 +9,7 @@ import {
   extractObservationsFromArtifact,
   hydrateCaseAnalysisArtifact,
 } from '../services/analysisArtifact.service';
+import { toLegacyExecutionMode } from '../agentic/core/executionMode';
 import { getLatestAnalysisRun, getLatestAnalysisRunByEngine, getLatestShadowResultByCaseId } from '../services/analysisRun.service';
 import { getCaseRunTrace } from '../agentic/observability/analysisObservability.service';
 import { analysisWorker } from '../services/analysisWorker.service';
@@ -381,7 +382,10 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
       payload.agenticRunId = latestAgenticRun?.id || null;
       payload.agenticShadowStatus = latestAgenticRun?.status || "not_run";
       payload.agenticCriticScore = latestShadow?.critic_score_json || null;
-      payload.agenticMode = latestAgenticRun?.execution_mode || null;
+      payload.executionMode = latestAgenticRun?.execution_mode || null;
+      payload.agenticMode = latestAgenticRun
+        ? toLegacyExecutionMode(latestAgenticRun.execution_mode)
+        : null;
     }
 
     res.json({
@@ -457,6 +461,13 @@ export const submitCase = async (req: AuthRequest, res: Response, next: NextFunc
       : parseOptionalSpecialistQuestions(req.body.specialistQuestions);
 
     if (requiresPdfAnalysis && row.analysis_status !== 'succeeded') {
+      if (row.analysis_status === 'not_started') {
+        throw new AppError(
+          'Uploaded reports changed since the last analysis. Run analysis again before submission.',
+          400
+        );
+      }
+
       throw new AppError('Case analysis must succeed before submission', 400);
     }
 
