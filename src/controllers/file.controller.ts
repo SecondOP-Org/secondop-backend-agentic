@@ -83,6 +83,26 @@ const getAccessibleFileById = async (fileId: string, userId: string): Promise<Au
   return result.rows[0] as AuthorizedFileRow;
 };
 
+const ensurePatientOwnsDraftCase = async (caseId: string, userId: string): Promise<void> => {
+  const result = await query(
+    `SELECT c.status
+     FROM cases c
+     JOIN patients p ON p.id = c.patient_id
+     WHERE c.id = $1
+       AND p.user_id = $2`,
+    [caseId, userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new AppError('Case not found or access denied', 403);
+  }
+
+  const status = String(result.rows[0].status || '');
+  if (status !== 'draft') {
+    throw new AppError('Files can only be deleted while the case is still a draft', 403);
+  }
+};
+
 const resolveStoredFilePath = (fileUrl: string): string => {
   const relativePath = fileUrl.replace(/^\/+/, '');
   return path.join(process.cwd(), relativePath);
@@ -252,9 +272,21 @@ export const downloadFile = async (req: AuthRequest, res: Response, next: NextFu
 export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { fileId } = req.params;
-    const file = await getAccessibleFileById(fileId, req.user!.id);
+    const userId = req.user!.id;
+
+    if (req.user!.type !== 'patient') {
+      throw new AppError('Only patients can delete uploaded case files', 403);
+    }
+
+    const file = await getAccessibleFileById(fileId, userId);
     const isPdf = isPdfMedicalFile(file.file_type, file.file_name);
     const caseId = file.case_id;
+
+    if (!caseId) {
+      throw new AppError('File is not attached to a case', 400);
+    }
+
+    await ensurePatientOwnsDraftCase(caseId, userId);
 
     const filePath = resolveStoredFilePath(file.file_url);
     if (fs.existsSync(filePath)) {
@@ -263,13 +295,15 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
 
     await query('DELETE FROM medical_files WHERE id = $1', [fileId]);
 
-    if (isPdf && caseId) {
-      await invalidateCaseAnalysisAfterPdfChange(caseId);
-    }
+    const analysisInvalidated = isPdf ? await invalidateCaseAnalysisAfterPdfChange(caseId) : false;
 
     res.json({
       status: 'success',
       message: 'File deleted successfully',
+      data: {
+        caseId,
+        analysisInvalidated,
+      },
     });
   } catch (error) {
     next(error);

@@ -367,6 +367,29 @@ describe('Case analysis controllers', () => {
     });
   });
 
+  it('blocks submit when analysis was invalidated after report changes', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', pdf_count: 1, dicom_count: 0 }] } as any);
+
+    const req = createPatientRequest(
+      {
+        specialistQuestions: ['Q1', 'Q2', 'Q3'],
+      },
+      { caseId: 'case-1' }
+    );
+
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await submitCase(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    const err = next.mock.calls[0][0] as AppError;
+    expect(err.statusCode).toBe(400);
+    expect(err.message).toContain('Run analysis again');
+  });
+
   it('blocks submit when analysis has not succeeded', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)

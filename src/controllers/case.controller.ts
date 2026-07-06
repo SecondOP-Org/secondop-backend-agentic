@@ -461,6 +461,13 @@ export const submitCase = async (req: AuthRequest, res: Response, next: NextFunc
       : parseOptionalSpecialistQuestions(req.body.specialistQuestions);
 
     if (requiresPdfAnalysis && row.analysis_status !== 'succeeded') {
+      if (row.analysis_status === 'not_started') {
+        throw new AppError(
+          'Uploaded reports changed since the last analysis. Run analysis again before submission.',
+          400
+        );
+      }
+
       throw new AppError('Case analysis must succeed before submission', 400);
     }
 
