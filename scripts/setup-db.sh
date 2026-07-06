@@ -71,6 +71,15 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/009_dicom_ima
 echo "  → Running 010_langgraph_checkpoints.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/010_langgraph_checkpoints.sql
 
+echo "  → Running 011_analysis_run_metadata.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/011_analysis_run_metadata.sql
+
+echo "  → Running 012_case_analysis_artifacts.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/012_case_analysis_artifacts.sql
+
+echo "  → Running 013_medical_file_extraction_reuse.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/013_medical_file_extraction_reuse.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
