@@ -1,8 +1,10 @@
 import { CaseAnalysisArtifact } from '../../services/analysisArtifact.service';
 import { CaseAnalysisResult, CaseIntakeData } from '../../services/analysis.service';
 import { ExtractedReport } from '../../services/reportExtraction.service';
+import { AnalysisExecutionMode } from './executionMode';
 
-export type AgenticMode = 'off' | 'shadow' | 'direct';
+/** @deprecated Use AnalysisExecutionMode instead. */
+export type AgenticMode = AnalysisExecutionMode;
 export type AgenticAction =
   | 'VALIDATE_INTAKE'
   | 'EXTRACT_REPORTS'
@@ -55,7 +57,7 @@ export interface AgenticFinalArtifact {
 export interface AgenticLoopState {
   caseId: string;
   runId: string;
-  mode: AgenticMode;
+  mode: AnalysisExecutionMode;
   stepCount: number;
   refinementCount: number;
   criticFeedback: string | null;
@@ -84,7 +86,7 @@ export interface AgenticActionHistoryItem {
 export interface AgenticRuntimeContext {
   caseId: string;
   runId: string;
-  mode: AgenticMode;
+  mode: AnalysisExecutionMode;
   maxCharsPerFile: number;
   maxTotalChars: number;
   policy: AgenticPolicy;

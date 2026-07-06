@@ -36,6 +36,10 @@ jest.mock('../agents/case-analysis/runCaseAnalysis', () => ({
   runCaseAnalysis: jest.fn(),
 }));
 
+jest.mock('../agentic/orchestration/runAgenticCaseAnalysis', () => ({
+  runAgenticCaseAnalysis: jest.fn(),
+}));
+
 jest.mock('../services/analysisRun.service', () => ({
   createAnalysisRun: jest.fn(),
   getLatestActiveAnalysisRun: jest.fn(),
@@ -67,7 +71,7 @@ describe('Analysis worker', () => {
       case_id: 'case-1',
       status: 'queued',
       engine: 'baseline',
-      execution_mode: 'off',
+      execution_mode: 'baseline',
       started_at: null,
       completed_at: null,
       model: null,

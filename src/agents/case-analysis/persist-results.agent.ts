@@ -32,7 +32,13 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         ]
       );
 
-      await markAnalysisRunSucceeded(context.runId, input.analysis.model);
+      await markAnalysisRunSucceeded(context.runId, {
+        model: input.analysis.model,
+        modelVersion: input.analysis.model,
+        promptTokens: input.analysis.usage?.promptTokens ?? null,
+        completionTokens: input.analysis.usage?.completionTokens ?? null,
+        totalTokens: input.analysis.usage?.totalTokens ?? null,
+      });
 
       return input;
     } catch (error) {

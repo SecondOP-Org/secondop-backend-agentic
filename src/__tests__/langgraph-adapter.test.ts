@@ -88,6 +88,8 @@ describe('LangGraph agentic adapter', () => {
         fileName: 'report.pdf',
         text: 'Clinical report text',
         charCount: 20,
+        extractionMethod: 'pdf-parse',
+        reused: false,
       },
     ]);
     mockedGenerateCaseAnalysis.mockResolvedValue({

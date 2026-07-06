@@ -2,14 +2,14 @@ import { insertAnalysisEvent } from '../../services/analysisRun.service';
 import { SpanHandle, startPhoenixSpan } from '../../observability/phoenix.service';
 import { AgentContext, AgentEvent } from './agent.types';
 
-type ExecutionMode = 'off' | 'shadow' | 'direct';
+import { AnalysisExecutionMode, toLegacyExecutionMode } from '../../agentic/core/executionMode';
 
 interface CreateAgentContextOptions {
   caseId: string;
   runId: string;
   maxCharsPerFile: number;
   maxTotalChars: number;
-  executionMode: ExecutionMode;
+  executionMode: AnalysisExecutionMode;
 }
 
 export const createAgentContext = (options: CreateAgentContextOptions): AgentContext => {
@@ -34,6 +34,7 @@ export const createAgentContext = (options: CreateAgentContextOptions): AgentCon
     const metadata: Record<string, unknown> = {
       engine: 'baseline',
       executionMode: options.executionMode,
+      legacyExecutionMode: toLegacyExecutionMode(options.executionMode),
       ...(event.metadata || {}),
     };
 

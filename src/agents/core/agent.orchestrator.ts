@@ -6,6 +6,7 @@ interface AgentPipelineOptions<Output> {
   initialState: Output;
   resolveErrorCode: (stepName: string) => AgentErrorCode;
   buildMetadata: (stepName: string, state: Output) => Record<string, unknown> | null;
+  onStepCompleted?: (stepName: string, state: Output) => Promise<void>;
 }
 
 export const runAgentPipeline = async <Output>(options: AgentPipelineOptions<Output>): Promise<Output> => {
@@ -30,6 +31,10 @@ export const runAgentPipeline = async <Output>(options: AgentPipelineOptions<Out
         completedAt: new Date(),
         metadata: options.buildMetadata(step.name, state),
       });
+
+      if (options.onStepCompleted) {
+        await options.onStepCompleted(step.name, state);
+      }
     } catch (error) {
       const normalized = normalizeAgentError(error, options.resolveErrorCode(step.name));
 

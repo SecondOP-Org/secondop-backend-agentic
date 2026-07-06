@@ -11,6 +11,13 @@ import {
   parseDicomViewport,
   savePersistedAnnotations,
 } from '../services/dicomImaging.service';
+import { computeFileSha256 } from '../services/fileHash.service';
+import {
+  invalidateCaseAnalysisAfterPdfChange,
+  isPdfMedicalFile,
+  updatePdfValidationStatus,
+} from '../services/medicalFileAnalysis.service';
+import { validatePdfUpload } from '../services/reportExtraction.service';
 
 interface AuthorizedFileRow {
   id: string;
@@ -76,6 +83,26 @@ const getAccessibleFileById = async (fileId: string, userId: string): Promise<Au
   return result.rows[0] as AuthorizedFileRow;
 };
 
+const ensurePatientOwnsDraftCase = async (caseId: string, userId: string): Promise<void> => {
+  const result = await query(
+    `SELECT c.status
+     FROM cases c
+     JOIN patients p ON p.id = c.patient_id
+     WHERE c.id = $1
+       AND p.user_id = $2`,
+    [caseId, userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new AppError('Case not found or access denied', 403);
+  }
+
+  const status = String(result.rows[0].status || '');
+  if (status !== 'draft') {
+    throw new AppError('Files can only be deleted while the case is still a draft', 403);
+  }
+};
+
 const resolveStoredFilePath = (fileUrl: string): string => {
   const relativePath = fileUrl.replace(/^\/+/, '');
   return path.join(process.cwd(), relativePath);
@@ -107,23 +134,61 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
     const patientId = await findAccessibleCasePatientId(caseId, userId);
     const fileUrl = `/uploads/${req.file.filename}`;
     const isDicom = isDicomUpload(req.file);
+    const isPdf = isPdfMedicalFile(req.file.mimetype, req.file.originalname);
+    const filePath = resolveStoredFilePath(fileUrl);
+    const fileSha256 = await computeFileSha256(filePath);
 
     const result = await query(
-      `INSERT INTO medical_files (case_id, patient_id, uploaded_by, file_name, file_type, file_size, file_url, file_category, description, is_dicom)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO medical_files (
+        case_id,
+        patient_id,
+        uploaded_by,
+        file_name,
+        file_type,
+        file_size,
+        file_url,
+        file_category,
+        description,
+        is_dicom,
+        file_sha256,
+        pdf_validation_status,
+        pdf_extraction_status
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [caseId, patientId, userId, req.file.originalname, req.file.mimetype, req.file.size, fileUrl, category, description, isDicom]
+      [
+        caseId,
+        patientId,
+        userId,
+        req.file.originalname,
+        req.file.mimetype,
+        req.file.size,
+        fileUrl,
+        category,
+        description,
+        isDicom,
+        fileSha256,
+        isPdf ? 'pending' : null,
+        isPdf ? 'pending' : null,
+      ]
     );
 
     const fileRecord = result.rows[0] as { id: string; case_id: string };
 
     if (isDicom) {
-      const filePath = resolveStoredFilePath(fileUrl);
       await extractAndPersistDicomMetadata({
         fileId: fileRecord.id,
         caseId: fileRecord.case_id,
         filePath,
       });
+    } else if (isPdf) {
+      const validation = await validatePdfUpload(filePath);
+      await updatePdfValidationStatus(
+        fileRecord.id,
+        validation.valid ? 'succeeded' : 'failed',
+        validation.error
+      );
+      await invalidateCaseAnalysisAfterPdfChange(caseId);
     }
 
     res.status(201).json({
@@ -207,7 +272,21 @@ export const downloadFile = async (req: AuthRequest, res: Response, next: NextFu
 export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { fileId } = req.params;
-    const file = await getAccessibleFileById(fileId, req.user!.id);
+    const userId = req.user!.id;
+
+    if (req.user!.type !== 'patient') {
+      throw new AppError('Only patients can delete uploaded case files', 403);
+    }
+
+    const file = await getAccessibleFileById(fileId, userId);
+    const isPdf = isPdfMedicalFile(file.file_type, file.file_name);
+    const caseId = file.case_id;
+
+    if (!caseId) {
+      throw new AppError('File is not attached to a case', 400);
+    }
+
+    await ensurePatientOwnsDraftCase(caseId, userId);
 
     const filePath = resolveStoredFilePath(file.file_url);
     if (fs.existsSync(filePath)) {
@@ -216,9 +295,15 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
 
     await query('DELETE FROM medical_files WHERE id = $1', [fileId]);
 
+    const analysisInvalidated = isPdf ? await invalidateCaseAnalysisAfterPdfChange(caseId) : false;
+
     res.json({
       status: 'success',
       message: 'File deleted successfully',
+      data: {
+        caseId,
+        analysisInvalidated,
+      },
     });
   } catch (error) {
     next(error);

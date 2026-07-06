@@ -6,6 +6,15 @@ import { IntakeValidationAgent } from './intake-validation.agent';
 import { PersistResultsAgent } from './persist-results.agent';
 import { QuestionGuardAgent } from './question-guard.agent';
 import { ReportExtractionAgent } from './report-extraction.agent';
+import { AnalysisExecutionMode } from '../../agentic/core/executionMode';
+import {
+  buildBaselineValidationPayload,
+  buildExtractionPayload,
+  buildFinalPayload,
+  buildGuardPayload,
+  buildSynthesisPayload,
+  insertCaseAnalysisArtifact,
+} from '../../services/caseAnalysisRunArtifact.service';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
 interface RunCaseAnalysisOptions {
@@ -13,7 +22,7 @@ interface RunCaseAnalysisOptions {
   runId: string;
   maxCharsPerFile: number;
   maxTotalChars: number;
-  executionMode: 'off' | 'shadow' | 'direct';
+  executionMode: AnalysisExecutionMode;
 }
 
 const resolveErrorCode = (stepName: string): AgentErrorCode => {
@@ -74,6 +83,77 @@ const buildMetadata = (stepName: string, state: CaseAnalysisPipelineState): Reco
   }
 };
 
+const persistBaselineStageArtifact = async (
+  stepName: string,
+  state: CaseAnalysisPipelineState,
+  runId: string
+): Promise<void> => {
+  switch (stepName) {
+    case 'intake-validation':
+      if (state.intake) {
+        await insertCaseAnalysisArtifact({
+          runId,
+          caseId: state.caseId,
+          artifactType: 'validation',
+          stageName: stepName,
+          engine: 'baseline',
+          payload: buildBaselineValidationPayload(state.intake),
+        });
+      }
+      return;
+    case 'report-extraction':
+      if (state.reports) {
+        await insertCaseAnalysisArtifact({
+          runId,
+          caseId: state.caseId,
+          artifactType: 'extraction',
+          stageName: stepName,
+          engine: 'baseline',
+          payload: buildExtractionPayload(state.reports),
+        });
+      }
+      return;
+    case 'clinical-synthesis':
+      if (state.analysis) {
+        await insertCaseAnalysisArtifact({
+          runId,
+          caseId: state.caseId,
+          artifactType: 'synthesis',
+          stageName: stepName,
+          engine: 'baseline',
+          payload: buildSynthesisPayload(state.analysis, state.observations),
+        });
+      }
+      return;
+    case 'question-guard':
+      if (state.analysis) {
+        await insertCaseAnalysisArtifact({
+          runId,
+          caseId: state.caseId,
+          artifactType: 'guard',
+          stageName: stepName,
+          engine: 'baseline',
+          payload: buildGuardPayload(state.analysis),
+        });
+      }
+      return;
+    case 'persist-results':
+      if (state.analysis) {
+        await insertCaseAnalysisArtifact({
+          runId,
+          caseId: state.caseId,
+          artifactType: 'final',
+          stageName: stepName,
+          engine: 'baseline',
+          payload: buildFinalPayload(state.analysis),
+        });
+      }
+      return;
+    default:
+      return;
+  }
+};
+
 export const runCaseAnalysis = async (options: RunCaseAnalysisOptions): Promise<CaseAnalysisPipelineState> => {
   const context = createAgentContext({
     caseId: options.caseId,
@@ -99,5 +179,8 @@ export const runCaseAnalysis = async (options: RunCaseAnalysisOptions): Promise<
     },
     resolveErrorCode,
     buildMetadata,
+    onStepCompleted: async (stepName, state) => {
+      await persistBaselineStageArtifact(stepName, state, options.runId);
+    },
   });
 };

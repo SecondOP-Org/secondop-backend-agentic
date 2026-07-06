@@ -110,6 +110,8 @@ export interface CaseAnalysisResult {
   agenticRunId?: string | null;
   agenticShadowStatus?: 'not_run' | 'queued' | 'processing' | 'succeeded' | 'failed';
   agenticCriticScore?: unknown;
+  executionMode?: 'baseline' | 'shadow' | 'agentic' | null;
+  /** @deprecated Use executionMode. Legacy alias for trace compatibility. */
   agenticMode?: 'off' | 'shadow' | 'direct' | null;
 }
 
