@@ -139,6 +139,7 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
             specialist_questions: [],
           },
           confidence_score: 0,
+          uncertainty_flags: [],
           disclaimer: '',
           evidence_refs: [],
           model: context.model,
