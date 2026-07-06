@@ -91,6 +91,7 @@ export const buildContractEvalFixtures = (): ContractEvalFixture[] => {
       artifact: {
         ...validArtifact,
         confidence_score: 0.4,
+        uncertainty_flags: [],
         structured_summary: {
           ...validArtifact.structured_summary,
           limitations_caveats: '',
