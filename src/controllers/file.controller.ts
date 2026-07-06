@@ -11,6 +11,13 @@ import {
   parseDicomViewport,
   savePersistedAnnotations,
 } from '../services/dicomImaging.service';
+import { computeFileSha256 } from '../services/fileHash.service';
+import {
+  invalidateCaseAnalysisAfterPdfChange,
+  isPdfMedicalFile,
+  updatePdfValidationStatus,
+} from '../services/medicalFileAnalysis.service';
+import { validatePdfUpload } from '../services/reportExtraction.service';
 
 interface AuthorizedFileRow {
   id: string;
@@ -107,23 +114,61 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
     const patientId = await findAccessibleCasePatientId(caseId, userId);
     const fileUrl = `/uploads/${req.file.filename}`;
     const isDicom = isDicomUpload(req.file);
+    const isPdf = isPdfMedicalFile(req.file.mimetype, req.file.originalname);
+    const filePath = resolveStoredFilePath(fileUrl);
+    const fileSha256 = await computeFileSha256(filePath);
 
     const result = await query(
-      `INSERT INTO medical_files (case_id, patient_id, uploaded_by, file_name, file_type, file_size, file_url, file_category, description, is_dicom)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO medical_files (
+        case_id,
+        patient_id,
+        uploaded_by,
+        file_name,
+        file_type,
+        file_size,
+        file_url,
+        file_category,
+        description,
+        is_dicom,
+        file_sha256,
+        pdf_validation_status,
+        pdf_extraction_status
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [caseId, patientId, userId, req.file.originalname, req.file.mimetype, req.file.size, fileUrl, category, description, isDicom]
+      [
+        caseId,
+        patientId,
+        userId,
+        req.file.originalname,
+        req.file.mimetype,
+        req.file.size,
+        fileUrl,
+        category,
+        description,
+        isDicom,
+        fileSha256,
+        isPdf ? 'pending' : null,
+        isPdf ? 'pending' : null,
+      ]
     );
 
     const fileRecord = result.rows[0] as { id: string; case_id: string };
 
     if (isDicom) {
-      const filePath = resolveStoredFilePath(fileUrl);
       await extractAndPersistDicomMetadata({
         fileId: fileRecord.id,
         caseId: fileRecord.case_id,
         filePath,
       });
+    } else if (isPdf) {
+      const validation = await validatePdfUpload(filePath);
+      await updatePdfValidationStatus(
+        fileRecord.id,
+        validation.valid ? 'succeeded' : 'failed',
+        validation.error
+      );
+      await invalidateCaseAnalysisAfterPdfChange(caseId);
     }
 
     res.status(201).json({
@@ -208,6 +253,8 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
   try {
     const { fileId } = req.params;
     const file = await getAccessibleFileById(fileId, req.user!.id);
+    const isPdf = isPdfMedicalFile(file.file_type, file.file_name);
+    const caseId = file.case_id;
 
     const filePath = resolveStoredFilePath(file.file_url);
     if (fs.existsSync(filePath)) {
@@ -215,6 +262,10 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
     }
 
     await query('DELETE FROM medical_files WHERE id = $1', [fileId]);
+
+    if (isPdf && caseId) {
+      await invalidateCaseAnalysisAfterPdfChange(caseId);
+    }
 
     res.json({
       status: 'success',

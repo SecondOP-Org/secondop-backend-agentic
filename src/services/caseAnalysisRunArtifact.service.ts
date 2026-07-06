@@ -154,10 +154,13 @@ export const buildBaselineValidationPayload = (intake: CaseIntakeData): Record<s
 export const buildExtractionPayload = (reports: ExtractedReport[]): Record<string, unknown> => ({
   reportCount: reports.length,
   totalChars: reports.reduce((sum, report) => sum + report.charCount, 0),
+  reusedCount: reports.filter((report) => report.reused).length,
   reports: reports.map((report) => ({
     fileId: report.fileId,
     fileName: report.fileName,
     charCount: report.charCount,
+    extractionMethod: report.extractionMethod,
+    reused: report.reused,
     textPreview: report.text.slice(0, 500),
   })),
 });
