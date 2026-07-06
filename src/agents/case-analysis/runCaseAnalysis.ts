@@ -6,6 +6,7 @@ import { IntakeValidationAgent } from './intake-validation.agent';
 import { PersistResultsAgent } from './persist-results.agent';
 import { QuestionGuardAgent } from './question-guard.agent';
 import { ReportExtractionAgent } from './report-extraction.agent';
+import { AnalysisExecutionMode } from '../../agentic/core/executionMode';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
 interface RunCaseAnalysisOptions {
@@ -13,7 +14,7 @@ interface RunCaseAnalysisOptions {
   runId: string;
   maxCharsPerFile: number;
   maxTotalChars: number;
-  executionMode: 'off' | 'shadow' | 'direct';
+  executionMode: AnalysisExecutionMode;
 }
 
 const resolveErrorCode = (stepName: string): AgentErrorCode => {

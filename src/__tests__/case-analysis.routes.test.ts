@@ -267,6 +267,7 @@ describe('Case analysis controllers', () => {
           analysisRunId: 'run-baseline',
           agenticRunId: 'run-agentic',
           agenticShadowStatus: 'succeeded',
+          executionMode: 'shadow',
           agenticMode: 'shadow',
           agenticCriticScore: {
             passed: true,

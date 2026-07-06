@@ -67,10 +67,12 @@ const flushAsync = async () => {
 };
 
 describe('Analysis worker agentic modes', () => {
-  const originalMode = process.env.ANALYSIS_AGENTIC_MODE;
+  const originalMode = process.env.ANALYSIS_EXECUTION_MODE;
+  const originalLegacyMode = process.env.ANALYSIS_AGENTIC_MODE;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.ANALYSIS_EXECUTION_MODE;
     mockedQuery.mockResolvedValue({ rows: [] } as any);
     mockedGetLatestActiveAnalysisRun.mockResolvedValue(null as any);
     mockedMarkAnalysisRunProcessing.mockResolvedValue(true as any);
@@ -81,10 +83,11 @@ describe('Analysis worker agentic modes', () => {
   });
 
   afterEach(() => {
-    process.env.ANALYSIS_AGENTIC_MODE = originalMode;
+    process.env.ANALYSIS_EXECUTION_MODE = originalMode;
+    process.env.ANALYSIS_AGENTIC_MODE = originalLegacyMode;
   });
 
-  it('uses agentic output as source of truth in direct mode', async () => {
+  it('uses agentic output as source of truth in agentic mode', async () => {
     process.env.ANALYSIS_AGENTIC_MODE = 'direct';
 
     mockedRunAgenticCaseAnalysis.mockResolvedValueOnce({
@@ -110,10 +113,10 @@ describe('Analysis worker agentic modes', () => {
     await analysisWorker.queueCase('case-1');
     await flushAsync();
 
-    expect(mockedCreateAnalysisRun).toHaveBeenCalledWith('case-1', 'queued', 'agentic', 'direct');
+    expect(mockedCreateAnalysisRun).toHaveBeenCalledWith('case-1', 'queued', 'agentic', 'agentic');
     expect(mockedRunCaseAnalysis).not.toHaveBeenCalled();
     expect(mockedRunAgenticCaseAnalysis).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'direct', caseId: 'case-1', runId: 'run-analysis' })
+      expect.objectContaining({ mode: 'agentic', caseId: 'case-1', runId: 'run-analysis' })
     );
 
     const directPersistCall = mockedQuery.mock.calls.find((call) =>
@@ -123,7 +126,10 @@ describe('Analysis worker agentic modes', () => {
     );
 
     expect(directPersistCall).toBeDefined();
-    expect(mockedMarkAnalysisRunSucceeded).toHaveBeenCalledWith('run-analysis', 'gpt-4.1-mini');
+    expect(mockedMarkAnalysisRunSucceeded).toHaveBeenCalledWith(
+      'run-analysis',
+      expect.objectContaining({ model: 'gpt-4.1-mini' })
+    );
   });
 
   it('keeps baseline path unaffected when shadow mode agentic execution fails', async () => {

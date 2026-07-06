@@ -1,15 +1,11 @@
-import { AgenticAction, AgenticError, AgenticMode, AgenticPolicy } from './types';
+import { AgenticAction, AgenticError, AgenticPolicy } from './types';
+import { AnalysisExecutionMode, resolveExecutionMode } from './executionMode';
 
-const validModes: AgenticMode[] = ['off', 'shadow', 'direct'];
+export { resolveExecutionMode, normalizeExecutionMode, toLegacyExecutionMode, isAgenticPrimaryMode, shouldRunShadowAgentic } from './executionMode';
+export type { AnalysisExecutionMode, LegacyAnalysisExecutionMode } from './executionMode';
 
-export const resolveAgenticMode = (): AgenticMode => {
-  const raw = (process.env.ANALYSIS_AGENTIC_MODE || 'off').toLowerCase();
-  if (validModes.includes(raw as AgenticMode)) {
-    return raw as AgenticMode;
-  }
-
-  return 'off';
-};
+/** @deprecated Use resolveExecutionMode instead. */
+export const resolveAgenticMode = (): AnalysisExecutionMode => resolveExecutionMode();
 
 export const buildAgenticPolicy = (): AgenticPolicy => {
   const maxSteps = Math.max(1, parseInt(process.env.AGENTIC_MAX_STEPS || '8', 10));

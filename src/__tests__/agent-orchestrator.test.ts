@@ -90,7 +90,7 @@ describe('Case analysis agent orchestrator', () => {
       runId: 'run-1',
       maxCharsPerFile: 12000,
       maxTotalChars: 30000,
-      executionMode: 'off',
+      executionMode: 'baseline',
     });
 
     expect(result.analysis?.topQuestions).toHaveLength(3);
@@ -108,7 +108,13 @@ describe('Case analysis agent orchestrator', () => {
       stepStatus: 'completed',
     });
 
-    expect(mockedMarkAnalysisRunSucceeded).toHaveBeenCalledWith('run-1', 'gpt-4.1-mini');
+    expect(mockedMarkAnalysisRunSucceeded).toHaveBeenCalledWith('run-1', {
+      model: 'gpt-4.1-mini',
+      modelVersion: 'gpt-4.1-mini',
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+    });
   });
 
   it('emits a failed event and returns normalized model error', async () => {
@@ -144,7 +150,7 @@ describe('Case analysis agent orchestrator', () => {
         runId: 'run-2',
         maxCharsPerFile: 12000,
         maxTotalChars: 30000,
-        executionMode: 'off',
+        executionMode: 'baseline',
       })
     ).rejects.toEqual(expect.any(AgentError));
 

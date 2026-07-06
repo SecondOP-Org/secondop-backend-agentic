@@ -1,10 +1,13 @@
 import { query } from '../database/connection';
 import { AgenticCriticScore } from '../agentic/core/types';
+import { normalizeExecutionMode, AnalysisExecutionMode } from '../agentic/core/executionMode';
+import { getAnalysisRunVersionMetadata } from './analysisVersioning';
 import { CaseAnalysisArtifact } from './analysisArtifact.service';
+
+export type { AnalysisExecutionMode } from '../agentic/core/executionMode';
 
 export type AnalysisRunStatus = 'queued' | 'processing' | 'succeeded' | 'failed';
 export type AnalysisRunEngine = 'baseline' | 'agentic';
-export type AnalysisExecutionMode = 'off' | 'shadow' | 'direct';
 
 export interface AnalysisRun {
   id: string;
@@ -16,6 +19,15 @@ export interface AnalysisRun {
   completed_at: Date | null;
   model: string | null;
   error: string | null;
+  error_message: string | null;
+  pipeline_version: string | null;
+  model_version: string | null;
+  prompt_version: string | null;
+  latency_ms: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  estimated_cost_usd: number | null;
   created_at: Date;
 }
 
@@ -60,17 +72,59 @@ interface CreateShadowResultInput {
   error?: string;
 }
 
+export interface AnalysisRunCompletionMetadata {
+  model: string;
+  modelVersion?: string | null;
+  pipelineVersion?: string | null;
+  promptVersion?: string | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
+  estimatedCostUsd?: number | null;
+}
+
+const ANALYSIS_RUN_SELECT_FIELDS = `
+  id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, error_message,
+  pipeline_version, model_version, prompt_version, latency_ms, prompt_tokens, completion_tokens,
+  total_tokens, estimated_cost_usd, created_at
+`;
+
+const toNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
 const mapAnalysisRunRow = (row: Record<string, unknown>): AnalysisRun => {
+  const errorMessage =
+    typeof row.error_message === 'string'
+      ? row.error_message
+      : typeof row.error === 'string'
+        ? row.error
+        : null;
+
   return {
     id: String(row.id),
     case_id: String(row.case_id),
     status: row.status as AnalysisRunStatus,
     engine: (row.engine as AnalysisRunEngine) || 'baseline',
-    execution_mode: (row.execution_mode as AnalysisExecutionMode) || 'off',
+    execution_mode: normalizeExecutionMode(String(row.execution_mode || 'baseline')),
     started_at: row.started_at instanceof Date ? row.started_at : null,
     completed_at: row.completed_at instanceof Date ? row.completed_at : null,
     model: typeof row.model === 'string' ? row.model : null,
-    error: typeof row.error === 'string' ? row.error : null,
+    error: typeof row.error === 'string' ? row.error : errorMessage,
+    error_message: errorMessage,
+    pipeline_version: typeof row.pipeline_version === 'string' ? row.pipeline_version : null,
+    model_version: typeof row.model_version === 'string' ? row.model_version : null,
+    prompt_version: typeof row.prompt_version === 'string' ? row.prompt_version : null,
+    latency_ms: toNullableNumber(row.latency_ms),
+    prompt_tokens: toNullableNumber(row.prompt_tokens),
+    completion_tokens: toNullableNumber(row.completion_tokens),
+    total_tokens: toNullableNumber(row.total_tokens),
+    estimated_cost_usd: toNullableNumber(row.estimated_cost_usd),
     created_at: row.created_at as Date,
   };
 };
@@ -80,7 +134,7 @@ const mapShadowRow = (row: Record<string, unknown>): ShadowResult => {
     id: String(row.id),
     case_id: String(row.case_id),
     run_id: String(row.run_id),
-    mode: row.mode as AnalysisExecutionMode,
+    mode: normalizeExecutionMode(String(row.mode || 'shadow')),
     summary: typeof row.summary === 'string' ? row.summary : '',
     questions_json: Array.isArray(row.questions_json) ? (row.questions_json as string[]) : [],
     observations_json: Array.isArray(row.observations_json) ? (row.observations_json as string[]) : [],
@@ -96,14 +150,18 @@ export const createAnalysisRun = async (
   caseId: string,
   status: AnalysisRunStatus = 'queued',
   engine: AnalysisRunEngine = 'baseline',
-  executionMode: AnalysisExecutionMode = 'off'
+  executionMode: AnalysisExecutionMode = 'baseline'
 ): Promise<AnalysisRun> => {
+  const versions = getAnalysisRunVersionMetadata();
+
   try {
     const result = await query(
-      `INSERT INTO case_analysis_runs (case_id, status, engine, execution_mode)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, created_at`,
-      [caseId, status, engine, executionMode]
+      `INSERT INTO case_analysis_runs (
+         case_id, status, engine, execution_mode, pipeline_version, prompt_version
+       )
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING ${ANALYSIS_RUN_SELECT_FIELDS}`,
+      [caseId, status, engine, executionMode, versions.pipelineVersion, versions.promptVersion]
     );
 
     return mapAnalysisRunRow(result.rows[0] as Record<string, unknown>);
@@ -122,7 +180,7 @@ export const createAnalysisRun = async (
 
 export const getLatestAnalysisRun = async (caseId: string): Promise<AnalysisRun | null> => {
   const result = await query(
-    `SELECT id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, created_at
+    `SELECT ${ANALYSIS_RUN_SELECT_FIELDS}
      FROM case_analysis_runs
      WHERE case_id = $1
      ORDER BY created_at DESC
@@ -142,7 +200,7 @@ export const getLatestAnalysisRunByEngine = async (
   engine: AnalysisRunEngine
 ): Promise<AnalysisRun | null> => {
   const result = await query(
-    `SELECT id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, created_at
+    `SELECT ${ANALYSIS_RUN_SELECT_FIELDS}
      FROM case_analysis_runs
      WHERE case_id = $1 AND engine = $2
      ORDER BY created_at DESC
@@ -162,7 +220,7 @@ export const getLatestActiveAnalysisRun = async (
   engine: AnalysisRunEngine = 'baseline'
 ): Promise<AnalysisRun | null> => {
   const result = await query(
-    `SELECT id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, created_at
+    `SELECT ${ANALYSIS_RUN_SELECT_FIELDS}
      FROM case_analysis_runs
      WHERE case_id = $1
        AND engine = $2
@@ -198,6 +256,7 @@ export const markAnalysisRunQueued = async (runId: string, errorMessage?: string
     `UPDATE case_analysis_runs
      SET status = 'queued',
          error = $2,
+         error_message = $2,
          started_at = NULL,
          completed_at = NULL
      WHERE id = $1`,
@@ -205,15 +264,42 @@ export const markAnalysisRunQueued = async (runId: string, errorMessage?: string
   );
 };
 
-export const markAnalysisRunSucceeded = async (runId: string, model: string): Promise<void> => {
+export const markAnalysisRunSucceeded = async (
+  runId: string,
+  metadata: AnalysisRunCompletionMetadata
+): Promise<void> => {
+  const versions = getAnalysisRunVersionMetadata();
+
   await query(
     `UPDATE case_analysis_runs
      SET status = 'succeeded',
          model = $2,
+         model_version = $3,
+         pipeline_version = COALESCE(pipeline_version, $4),
+         prompt_version = COALESCE(prompt_version, $5),
+         prompt_tokens = $6,
+         completion_tokens = $7,
+         total_tokens = $8,
+         estimated_cost_usd = $9,
+         latency_ms = CASE
+           WHEN started_at IS NULL THEN NULL
+           ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)) * 1000))
+         END,
          error = NULL,
+         error_message = NULL,
          completed_at = CURRENT_TIMESTAMP
      WHERE id = $1`,
-    [runId, model]
+    [
+      runId,
+      metadata.model,
+      metadata.modelVersion || metadata.model,
+      metadata.pipelineVersion || versions.pipelineVersion,
+      metadata.promptVersion || versions.promptVersion,
+      metadata.promptTokens ?? null,
+      metadata.completionTokens ?? null,
+      metadata.totalTokens ?? null,
+      metadata.estimatedCostUsd ?? null,
+    ]
   );
 };
 
@@ -222,6 +308,11 @@ export const markAnalysisRunFailed = async (runId: string, errorMessage: string)
     `UPDATE case_analysis_runs
      SET status = 'failed',
          error = $2,
+         error_message = $2,
+         latency_ms = CASE
+           WHEN started_at IS NULL THEN NULL
+           ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)) * 1000))
+         END,
          completed_at = CURRENT_TIMESTAMP
      WHERE id = $1`,
     [runId, errorMessage]
