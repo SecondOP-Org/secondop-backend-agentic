@@ -32,6 +32,7 @@
     "command-center:report": "node scripts/command-center-report.mjs",
     "e2e:smoke": "node scripts/e2e-smoke.mjs",
     "e2e:smoke:analysis": "E2E_ENABLE_ANALYSIS=true node scripts/e2e-smoke.mjs",
+    "eval:harness": "ts-node scripts/run-evals.ts",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts"
