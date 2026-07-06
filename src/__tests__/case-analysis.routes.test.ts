@@ -80,6 +80,7 @@ describe('Case analysis controllers', () => {
       selectedRunId: null,
       events: [],
       shadow: null,
+      artifacts: [],
       runTokenUsageByRunId: {},
       selectedRunTokenUsage: null,
     });
@@ -287,6 +288,7 @@ describe('Case analysis controllers', () => {
       selectedRunId: 'run-1',
       events: [{ step_name: 'clinical-synthesis', step_status: 'completed' }],
       shadow: { final_status: 'succeeded' },
+      artifacts: [{ artifact_type: 'final', stage_name: 'persist-results' }],
     } as any);
 
     const req = createPatientRequest({}, { caseId: 'case-1' }, { runId: 'run-1' });
@@ -304,6 +306,7 @@ describe('Case analysis controllers', () => {
         selectedRunId: 'run-1',
         events: [{ step_name: 'clinical-synthesis', step_status: 'completed' }],
         shadow: { final_status: 'succeeded' },
+        artifacts: [{ artifact_type: 'final', stage_name: 'persist-results' }],
       },
     });
   });

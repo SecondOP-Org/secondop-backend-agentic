@@ -1,5 +1,6 @@
 import { query } from '../../database/connection';
 import { normalizeExecutionMode, toLegacyExecutionMode } from '../core/executionMode';
+import { listArtifactsByRunId } from '../../services/caseAnalysisRunArtifact.service';
 
 interface TokenUsageAggregate {
   promptTokens: number;
@@ -141,6 +142,8 @@ export const getCaseRunTrace = async (caseId: string, runId?: string) => {
     usageEventRows.rows as Array<{ run_id?: string; metadata_json?: unknown }>
   );
 
+  const artifacts = selectedRunId ? await listArtifactsByRunId(selectedRunId) : [];
+
   return {
     runs: (runsResult.rows as Array<Record<string, unknown>>).map((row) => ({
       ...row,
@@ -151,6 +154,7 @@ export const getCaseRunTrace = async (caseId: string, runId?: string) => {
     selectedRunId: selectedRunId || null,
     events: eventsResult.rows,
     shadow: shadowResult.rows[0] || null,
+    artifacts,
     runTokenUsageByRunId,
     selectedRunTokenUsage: selectedRunId ? runTokenUsageByRunId[selectedRunId] || null : null,
   };

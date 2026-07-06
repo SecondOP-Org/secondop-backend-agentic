@@ -3,6 +3,14 @@ import { runAgenticRuntime } from '../agentic/core/runtime';
 jest.mock('../agentic/observability/eventEmitter', () => ({
   emitAgenticStepEvent: jest.fn().mockResolvedValue(undefined),
 }));
+
+jest.mock('../services/caseAnalysisRunArtifact.service', () => {
+  const actual = jest.requireActual('../services/caseAnalysisRunArtifact.service');
+  return {
+    ...actual,
+    insertCaseAnalysisArtifact: jest.fn().mockResolvedValue(undefined),
+  };
+});
 import { AgenticError, AgenticLoopState } from '../agentic/core/types';
 import { buildCaseAnalysisArtifact } from '../services/analysisArtifact.service';
 

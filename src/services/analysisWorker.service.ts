@@ -22,6 +22,10 @@ import {
   markAnalysisRunSucceeded,
 } from './analysisRun.service';
 import type { AnalysisRunEngine } from './analysisRun.service';
+import {
+  buildShadowComparisonMetrics,
+  insertCaseAnalysisArtifact,
+} from './caseAnalysisRunArtifact.service';
 
 const maxCharsPerFile = parseInt(process.env.ANALYSIS_MAX_CHARS_PER_FILE || '12000', 10);
 const maxTotalChars = parseInt(process.env.ANALYSIS_MAX_TOTAL_CHARS || '30000', 10);
@@ -409,6 +413,28 @@ class AnalysisWorker {
           buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics)
         );
         agenticRunSpan.end('OK');
+
+        if (pipelineState.analysis) {
+          const comparison = buildShadowComparisonMetrics({
+            baselineRunId: runId,
+            agenticRunId: agenticRun.id,
+            baselineAnalysis: pipelineState.analysis,
+            agenticSummary: agenticResult.artifact.summary,
+            agenticQuestions: agenticResult.artifact.questions,
+            agenticModel: agenticResult.artifact.model,
+            criticPassed: agenticResult.criticScore?.passed ?? null,
+            criticScore: agenticResult.criticScore?.score ?? null,
+          });
+
+          await insertCaseAnalysisArtifact({
+            runId,
+            caseId,
+            artifactType: 'final',
+            stageName: 'shadow-comparison',
+            engine: 'baseline',
+            payload: comparison as unknown as Record<string, unknown>,
+          });
+        }
 
         logger.info(`Agentic shadow analysis completed for case ${caseId} (run ${agenticRun.id}, mode ${mode})`);
       } catch (agenticError) {
