@@ -25,6 +25,7 @@ pnpm-debug.log*
 
 # Uploads
 uploads/
+/data/
 temp/
 
 # IDE

@@ -1,8 +1,8 @@
 import fs from 'fs';
-import path from 'path';
 import pdfParse from 'pdf-parse';
 import { query } from '../database/connection';
 import logger from '../utils/logger';
+import { resolveStoredFilePath } from '../utils/uploadPath';
 import { computeFileSha256 } from './fileHash.service';
 import {
   getReusableMedicalFileExtraction,
@@ -21,11 +21,6 @@ export interface ExtractedReport {
   extractionMethod: 'pdf-parse' | 'raw-fallback' | 'cache';
   reused: boolean;
 }
-
-const resolveStoredFilePath = (fileUrl: string): string => {
-  const normalized = fileUrl.startsWith('/') ? fileUrl.slice(1) : fileUrl;
-  return path.resolve(process.cwd(), normalized);
-};
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
 
