@@ -102,6 +102,18 @@ BEGIN
       'pending'
     );
   END IF;
+
+  INSERT INTO case_assignments (case_id, doctor_id, status)
+  SELECT c.id, d.id, 'assigned'
+  FROM cases c
+  JOIN patients p ON p.id = c.patient_id
+  JOIN users patient_user ON patient_user.id = p.user_id
+  JOIN doctors d ON d.user_id = smith_user_id
+  WHERE patient_user.email = 'patient@example.com'
+    AND NOT EXISTS (
+      SELECT 1 FROM case_assignments existing WHERE existing.case_id = c.id
+    )
+  ON CONFLICT (case_id, doctor_id) DO NOTHING;
 END $$;
 
 COMMIT;
