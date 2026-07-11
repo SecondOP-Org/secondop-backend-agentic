@@ -367,41 +367,35 @@ describe('Case analysis controllers', () => {
     });
   });
 
-  it('blocks submit when analysis was invalidated after report changes', async () => {
+  it('allows submit when PDF is present and AI was skipped', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', pdf_count: 1, dicom_count: 0 }] } as any);
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any);
 
-    const req = createPatientRequest(
-      {
-        specialistQuestions: ['Q1', 'Q2', 'Q3'],
-      },
-      { caseId: 'case-1' }
-    );
-
+    const req = createPatientRequest({ specialistQuestions: [] }, { caseId: 'case-1' });
     const res = createMockResponse();
     const next = jest.fn();
 
     await submitCase(req, res, next);
 
-    expect(next).toHaveBeenCalledTimes(1);
-    const err = next.mock.calls[0][0] as AppError;
-    expect(err.statusCode).toBe(400);
-    expect(err.message).toContain('Run analysis again');
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      message: 'Case submitted successfully',
+    });
+    expect(mockedQuery).toHaveBeenLastCalledWith(
+      expect.stringContaining('UPDATE cases'),
+      ['case-1', JSON.stringify([])]
+    );
   });
 
-  it('blocks submit when analysis has not succeeded', async () => {
+  it('blocks submit while analysis is still running', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
       .mockResolvedValueOnce({ rows: [{ analysis_status: 'processing', pdf_count: 1, dicom_count: 0 }] } as any);
 
-    const req = createPatientRequest(
-      {
-        specialistQuestions: ['Q1', 'Q2', 'Q3'],
-      },
-      { caseId: 'case-1' }
-    );
-
+    const req = createPatientRequest({ specialistQuestions: ['Q1', 'Q2', 'Q3'] }, { caseId: 'case-1' });
     const res = createMockResponse();
     const next = jest.fn();
 
@@ -409,31 +403,46 @@ describe('Case analysis controllers', () => {
 
     expect(next).toHaveBeenCalledTimes(1);
     const err = next.mock.calls[0][0] as AppError;
-    expect(err.statusCode).toBe(400);
-    expect(err.message).toContain('analysis must succeed');
+    expect(err.statusCode).toBe(409);
+    expect(err.message).toContain('still running');
   });
 
-  it('blocks submit when specialist questions count is not exactly three', async () => {
+  it('allows submit with optional specialist questions after successful analysis', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', pdf_count: 1, dicom_count: 0 }] } as any);
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any);
 
-    const req = createPatientRequest(
-      {
-        specialistQuestions: ['Q1', 'Q2'],
-      },
-      { caseId: 'case-1' }
-    );
-
+    const req = createPatientRequest({ specialistQuestions: ['Q1', 'Q2'] }, { caseId: 'case-1' });
     const res = createMockResponse();
     const next = jest.fn();
 
     await submitCase(req, res, next);
 
-    expect(next).toHaveBeenCalledTimes(1);
-    const err = next.mock.calls[0][0] as AppError;
-    expect(err.statusCode).toBe(400);
-    expect(err.message).toContain('exactly 3');
+    expect(next).not.toHaveBeenCalled();
+    expect(mockedQuery).toHaveBeenLastCalledWith(
+      expect.stringContaining('UPDATE cases'),
+      ['case-1', JSON.stringify(['Q1', 'Q2'])]
+    );
+  });
+
+  it('allows submit when analysis failed', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'failed', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any);
+
+    const req = createPatientRequest({ specialistQuestions: [] }, { caseId: 'case-1' });
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await submitCase(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      message: 'Case submitted successfully',
+    });
   });
 
   it('enforces ownership and returns 403 for cross-tenant access', async () => {
