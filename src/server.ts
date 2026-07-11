@@ -17,6 +17,7 @@ import logger from './utils/logger';
 import { closePool, initializeDatabase } from './database/connection';
 import { query } from './database/connection';
 import { analysisWorker } from './services/analysisWorker.service';
+import { ensureDemoData } from './services/demoData.service';
 import { initializePhoenixObservability } from './observability/phoenix.service';
 import { parseCorsOrigins } from './config/cors';
 
@@ -219,6 +220,7 @@ const startServer = async () => {
     // Initialize database connection
     await initializeDatabase();
     logger.info('Database connected successfully');
+    await ensureDemoData();
     await analysisWorker.recoverInterruptedJobs();
 
     httpServer.listen(PORT, () => {
