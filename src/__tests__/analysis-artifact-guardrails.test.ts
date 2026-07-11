@@ -1,7 +1,9 @@
 import {
   buildCaseAnalysisArtifact,
   findGroundedEvidenceSnippet,
+  StructuredSummary,
 } from '../services/analysisArtifact.service';
+import { validateCaseAnalysisContract } from '../evals/contractChecks';
 
 describe('analysis artifact guardrails', () => {
   const reports = [
@@ -49,5 +51,39 @@ describe('analysis artifact guardrails', () => {
       )
     ).toBe(true);
     expect(artifact.uncertainty_flags).toEqual(['Single lab report only']);
+  });
+
+  it('covers paraphrased summary sections with best-effort evidence refs', () => {
+    const artifact = buildCaseAnalysisArtifact({
+      structuredSummary: {
+        chief_concern: 'Possible metabolic dysregulation with tiredness',
+        key_report_findings: 'Glycated hemoglobin above target range',
+        red_flags_to_discuss: 'Warrants repeat laboratory evaluation',
+        follow_up_discussion_points: 'Discuss lifestyle and monitoring cadence',
+        limitations_caveats: 'Assessment limited to one uploaded laboratory report',
+      },
+      specialistQuestions: [
+        'What repeat A1c interval is appropriate?',
+        'Should additional metabolic labs be ordered now?',
+        'What lifestyle changes should be discussed first?',
+      ],
+      confidenceScore: 0.55,
+      uncertaintyFlags: ['Assessment limited to one uploaded laboratory report'],
+      reports,
+      model: 'gpt-4.1-mini',
+    });
+
+    const populatedSections = Object.entries(artifact.structured_summary)
+      .filter(([, value]) => value.trim().length > 0)
+      .map(([section]) => section as keyof StructuredSummary);
+    const coveredSections = new Set(artifact.evidence_refs.map((ref) => ref.section));
+
+    expect(populatedSections.every((section) => coveredSections.has(section))).toBe(true);
+    expect(validateCaseAnalysisContract(artifact, { reports }).passed).toBe(true);
+    expect(
+      artifact.evidence_refs.every((ref) =>
+        reports[0].text.toLowerCase().includes(ref.snippet.toLowerCase().slice(0, 12))
+      )
+    ).toBe(true);
   });
 });

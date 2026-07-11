@@ -110,43 +110,56 @@ const normalizeForMatch = (value: string): string => value.replace(/\s+/g, ' ').
 
 const tokenizeForOverlap = (value: string): string[] =>
   normalizeForMatch(value)
-    .split(' ')
-    .filter((word) => word.length > 3);
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length >= 3);
 
-export const findGroundedEvidenceSnippet = (
+const getReportChunks = (report: ExtractedReport): string[] =>
+  report.text
+    .split(/[.!?\n]+/)
+    .map((chunk) => chunk.trim())
+    .filter((chunk) => chunk.length >= 12);
+
+const scoreChunkOverlap = (sectionWords: string[], chunk: string): number => {
+  const normalizedChunk = normalizeForMatch(chunk);
+  return sectionWords.filter((word) => normalizedChunk.includes(word)).length;
+};
+
+const matchEvidenceInReports = (
   sectionText: string,
-  reports: ExtractedReport[]
+  reports: ExtractedReport[],
+  minOverlap: number
 ): { fileId: string; fileName: string; snippet: string } | null => {
   const normalizedSection = normalizeForMatch(sectionText);
   if (!normalizedSection || reports.length === 0) {
     return null;
   }
 
+  const sectionCandidates = [sectionText, ...sectionText.split(/[.!?]+/).map((part) => part.trim())].filter(
+    (candidate) => candidate.length >= 12
+  );
   const sectionWords = tokenizeForOverlap(sectionText);
-  const minOverlap = Math.min(2, Math.max(1, sectionWords.length));
+  const requiredOverlap = Math.max(minOverlap, Math.min(2, Math.max(1, sectionWords.length)));
   let bestMatch: { fileId: string; fileName: string; snippet: string; score: number } | null = null;
 
   for (const report of reports) {
     const normalizedReport = normalizeForMatch(report.text);
-    if (normalizedSection.length >= 12 && normalizedReport.includes(normalizedSection.slice(0, 120))) {
-      const startIndex = normalizedReport.indexOf(normalizedSection.slice(0, 120));
-      const rawSnippet = report.text.slice(startIndex, startIndex + 220).trim();
-      return {
-        fileId: report.fileId,
-        fileName: report.fileName,
-        snippet: rawSnippet || sectionText.slice(0, 220),
-      };
+
+    for (const candidate of sectionCandidates) {
+      const normalizedCandidate = normalizeForMatch(candidate);
+      if (normalizedCandidate.length >= 12 && normalizedReport.includes(normalizedCandidate.slice(0, 120))) {
+        const startIndex = normalizedReport.indexOf(normalizedCandidate.slice(0, 120));
+        const rawSnippet = report.text.slice(startIndex, startIndex + 220).trim();
+        return {
+          fileId: report.fileId,
+          fileName: report.fileName,
+          snippet: rawSnippet || candidate.slice(0, 220),
+        };
+      }
     }
 
-    const chunks = report.text
-      .split(/[.!?\n]+/)
-      .map((chunk) => chunk.trim())
-      .filter((chunk) => chunk.length >= 12);
-
-    for (const chunk of chunks) {
-      const normalizedChunk = normalizeForMatch(chunk);
-      const overlap = sectionWords.filter((word) => normalizedChunk.includes(word)).length;
-      if (overlap < minOverlap) {
+    for (const chunk of getReportChunks(report)) {
+      const overlap = scoreChunkOverlap(sectionWords, chunk);
+      if (overlap < requiredOverlap) {
         continue;
       }
 
@@ -172,6 +185,74 @@ export const findGroundedEvidenceSnippet = (
   };
 };
 
+export const findGroundedEvidenceSnippet = (
+  sectionText: string,
+  reports: ExtractedReport[]
+): { fileId: string; fileName: string; snippet: string } | null => {
+  return matchEvidenceInReports(sectionText, reports, 1);
+};
+
+export const findBestEffortEvidenceSnippet = (
+  sectionText: string,
+  reports: ExtractedReport[]
+): { fileId: string; fileName: string; snippet: string } | null => {
+  const grounded = matchEvidenceInReports(sectionText, reports, 1);
+  if (grounded) {
+    return grounded;
+  }
+
+  const sectionWords = tokenizeForOverlap(sectionText);
+  let bestMatch: { fileId: string; fileName: string; snippet: string; score: number } | null = null;
+
+  for (const report of reports) {
+    for (const chunk of getReportChunks(report)) {
+      const overlap = scoreChunkOverlap(sectionWords, chunk);
+      if (overlap === 0) {
+        continue;
+      }
+
+      if (!bestMatch || overlap > bestMatch.score) {
+        bestMatch = {
+          fileId: report.fileId,
+          fileName: report.fileName,
+          snippet: chunk.slice(0, 220),
+          score: overlap,
+        };
+      }
+    }
+  }
+
+  if (bestMatch) {
+    return {
+      fileId: bestMatch.fileId,
+      fileName: bestMatch.fileName,
+      snippet: bestMatch.snippet,
+    };
+  }
+
+  for (const report of reports) {
+    const chunks = getReportChunks(report);
+    if (chunks.length > 0) {
+      return {
+        fileId: report.fileId,
+        fileName: report.fileName,
+        snippet: chunks[0].slice(0, 220),
+      };
+    }
+
+    const trimmed = report.text.trim();
+    if (trimmed.length >= 12) {
+      return {
+        fileId: report.fileId,
+        fileName: report.fileName,
+        snippet: trimmed.slice(0, 220),
+      };
+    }
+  }
+
+  return null;
+};
+
 const buildEvidenceRefs = (
   structuredSummary: StructuredSummary,
   reports: ExtractedReport[] | undefined
@@ -187,7 +268,8 @@ const buildEvidenceRefs = (
         return null;
       }
 
-      const grounded = findGroundedEvidenceSnippet(content, reports);
+      const grounded =
+        findGroundedEvidenceSnippet(content, reports) ?? findBestEffortEvidenceSnippet(content, reports);
       if (!grounded) {
         return null;
       }
