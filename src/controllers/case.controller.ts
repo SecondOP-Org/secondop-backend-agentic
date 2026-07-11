@@ -14,6 +14,7 @@ import { getLatestAnalysisRun, getLatestAnalysisRunByEngine, getLatestShadowResu
 import { getCaseRunTrace } from '../agentic/observability/analysisObservability.service';
 import { analysisWorker } from '../services/analysisWorker.service';
 import { getImagingStudiesForCase } from '../services/dicomImaging.service';
+import { generateDoctorOpinionPdf } from '../services/doctorOpinionPdf.service';
 
 interface IntakePayload {
   age: number;
@@ -773,6 +774,112 @@ export const updateCaseStatus = async (req: AuthRequest, res: Response, next: Ne
     res.json({
       status: 'success',
       message: 'Case status updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { caseId } = req.params;
+    const { content, status } = req.body;
+    const userId = req.user!.id;
+
+    if (typeof content !== 'string' || !content.trim()) {
+      throw new AppError('content is required', 400);
+    }
+
+    const nextStatus = typeof status === 'string' && status.trim() ? status.trim() : 'completed';
+
+    await ensureDoctorAssignedToCase(caseId, userId);
+
+    const caseResult = await query(
+      `SELECT c.id, c.title, c.case_number, c.submitted_date,
+              p.user_id as patient_user_id,
+              p.first_name as patient_first_name,
+              p.last_name as patient_last_name,
+              d.first_name as doctor_first_name,
+              d.last_name as doctor_last_name,
+              d.specialty as doctor_specialty
+       FROM cases c
+       JOIN patients p ON p.id = c.patient_id
+       JOIN case_assignments ca ON ca.case_id = c.id
+       JOIN doctors d ON d.id = ca.doctor_id
+       WHERE c.id = $1 AND d.user_id = $2
+       LIMIT 1`,
+      [caseId, userId]
+    );
+
+    if (caseResult.rows.length === 0) {
+      throw new AppError('Case not found for assigned doctor', 404);
+    }
+
+    const row = caseResult.rows[0];
+    const patientName = `${row.patient_first_name || ''} ${row.patient_last_name || ''}`.trim() || 'Patient';
+    const doctorName = `${row.doctor_first_name || ''} ${row.doctor_last_name || ''}`.trim() || 'Specialist';
+
+    const pdfFile = await generateDoctorOpinionPdf({
+      caseTitle: row.title,
+      caseNumber: row.case_number,
+      patientName,
+      doctorName,
+      doctorSpecialty: row.doctor_specialty || '',
+      clinicalResponse: content.trim(),
+      submittedDate: row.submitted_date,
+    });
+
+    const attachments = [
+      {
+        filename: pdfFile.filename,
+        originalName: pdfFile.originalName,
+        size: pdfFile.size,
+        mimetype: 'application/pdf',
+      },
+    ];
+
+    const messageResult = await query(
+      `INSERT INTO messages (case_id, sender_id, receiver_id, content, message_type, attachments)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        caseId,
+        userId,
+        row.patient_user_id,
+        content.trim(),
+        'doctor_opinion',
+        JSON.stringify(attachments),
+      ]
+    );
+
+    await query(
+      `UPDATE cases
+       SET status = $1,
+           completed_date = CASE WHEN $1 = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_date END,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [nextStatus, caseId]
+    );
+
+    await query(
+      `UPDATE case_assignments
+       SET status = 'completed',
+           completed_date = CURRENT_TIMESTAMP
+       WHERE case_id = $1
+         AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`,
+      [caseId, userId]
+    );
+
+    const io = req.app.get('io');
+    io.to(`case-${caseId}`).emit('new-message', messageResult.rows[0]);
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        message: messageResult.rows[0],
+        attachment: attachments[0],
+      },
+      message: 'Doctor opinion sent with PDF attachment',
     });
   } catch (error) {
     next(error);
