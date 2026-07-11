@@ -3,11 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { AppError } from './errorHandler';
-
-const resolveUploadDir = (): string => {
-  const configured = process.env.UPLOAD_DIR || './uploads';
-  return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
-};
+import { resolveUploadDir } from '../utils/uploadPath';
 
 // Configure storage
 const storage = multer.diskStorage({

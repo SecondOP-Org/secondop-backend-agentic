@@ -18,6 +18,7 @@ import {
   updatePdfValidationStatus,
 } from '../services/medicalFileAnalysis.service';
 import { validatePdfUpload } from '../services/reportExtraction.service';
+import { resolveStoredFilePath } from '../utils/uploadPath';
 
 interface AuthorizedFileRow {
   id: string;
@@ -101,11 +102,6 @@ const ensurePatientOwnsDraftCase = async (caseId: string, userId: string): Promi
   if (status !== 'draft') {
     throw new AppError('Files can only be deleted while the case is still a draft', 403);
   }
-};
-
-const resolveStoredFilePath = (fileUrl: string): string => {
-  const relativePath = fileUrl.replace(/^\/+/, '');
-  return path.join(process.cwd(), relativePath);
 };
 
 const isDicomUpload = (file: Express.Multer.File): boolean => {
