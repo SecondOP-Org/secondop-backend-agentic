@@ -80,6 +80,12 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/012_case_anal
 echo "  → Running 013_medical_file_extraction_reuse.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/013_medical_file_extraction_reuse.sql
 
+echo "  → Running 014_flexible_specialist_questions.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/014_flexible_specialist_questions.sql
+
+echo "  → Running 015_share_ai_analysis_with_specialists.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/015_share_ai_analysis_with_specialists.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
