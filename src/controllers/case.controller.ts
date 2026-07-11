@@ -123,7 +123,7 @@ const ensureCaseAccess = async (
   await ensureDoctorAssignedToCase(caseId, userId);
 };
 
-const parseSpecialistQuestions = (input: unknown): string[] => {
+export const parseSpecialistQuestions = (input: unknown): string[] => {
   if (!Array.isArray(input) || input.length !== 3) {
     throw new AppError('specialistQuestions must contain exactly 3 items', 400);
   }
@@ -137,16 +137,19 @@ const parseSpecialistQuestions = (input: unknown): string[] => {
   });
 };
 
-const parseOptionalSpecialistQuestions = (input: unknown): string[] => {
-  if (typeof input === 'undefined' || input === null) {
+// Patient-supplied specialist questions are always optional now.
+// Accept 0–3 questions; trim, drop empties, cap at 3. Never throw on count.
+// (Exactly-3 validation for AI-generated questions lives in analysis services / eval harness.)
+const parseFlexibleSpecialistQuestions = (input: unknown): string[] => {
+  if (!Array.isArray(input)) {
     return [];
   }
 
-  if (Array.isArray(input) && input.length === 0) {
-    return [];
-  }
-
-  return parseSpecialistQuestions(input);
+  return input
+    .filter((value): value is string => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0)
+    .slice(0, 3);
 };
 
 const fetchAssignedDoctors = async (caseId: string) => {
@@ -456,20 +459,13 @@ export const submitCase = async (req: AuthRequest, res: Response, next: NextFunc
       throw new AppError('Upload at least one report before submission', 400);
     }
 
-    const requiresPdfAnalysis = row.pdf_count > 0;
-    const specialistQuestions = requiresPdfAnalysis
-      ? parseSpecialistQuestions(req.body.specialistQuestions)
-      : parseOptionalSpecialistQuestions(req.body.specialistQuestions);
+    const specialistQuestions = parseFlexibleSpecialistQuestions(req.body.specialistQuestions);
 
-    if (requiresPdfAnalysis && row.analysis_status !== 'succeeded') {
-      if (row.analysis_status === 'not_started') {
-        throw new AppError(
-          'Uploaded reports changed since the last analysis. Run analysis again before submission.',
-          400
-        );
-      }
-
-      throw new AppError('Case analysis must succeed before submission', 400);
+    if (row.analysis_status === 'queued' || row.analysis_status === 'processing') {
+      throw new AppError(
+        'AI analysis is still running. Wait for it to finish, or it will be attached automatically.',
+        409
+      );
     }
 
     await query(
