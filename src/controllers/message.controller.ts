@@ -1,4 +1,6 @@
 import { Response, NextFunction } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { query } from '../database/connection';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -167,6 +169,71 @@ export const deleteMessage = async (req: AuthRequest, res: Response, next: NextF
       status: 'success',
       message: 'Message deleted successfully',
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const resolveUploadDir = (): string => {
+  const configured = process.env.UPLOAD_DIR || './uploads';
+  return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
+};
+
+export const downloadMessageAttachment = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { filename } = req.params;
+    const { caseId } = req.query;
+    const userId = req.user!.id;
+
+    if (typeof caseId !== 'string' || !caseId.trim()) {
+      throw new AppError('caseId query parameter is required', 400);
+    }
+
+    if (typeof filename !== 'string' || !filename.trim() || filename.includes('..') || filename.includes('/')) {
+      throw new AppError('Invalid attachment filename', 400);
+    }
+
+    await assertCaseAccess(caseId, userId);
+
+    const attachmentResult = await query(
+      `SELECT 1
+       FROM messages m
+       WHERE m.case_id = $1
+         AND m.attachments IS NOT NULL
+         AND m.attachments::text LIKE $2
+       LIMIT 1`,
+      [caseId, `%${filename}%`]
+    );
+
+    if (attachmentResult.rows.length === 0) {
+      throw new AppError('Attachment not found for this case', 404);
+    }
+
+    const filePath = path.join(resolveUploadDir(), filename);
+    if (!fs.existsSync(filePath)) {
+      throw new AppError('Attachment file not found on server', 404);
+    }
+
+    const originalNameResult = await query(
+      `SELECT attachments
+       FROM messages
+       WHERE case_id = $1
+         AND attachments::text LIKE $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [caseId, `%${filename}%`]
+    );
+
+    let downloadName = filename;
+    const attachments = originalNameResult.rows[0]?.attachments;
+    if (Array.isArray(attachments)) {
+      const match = attachments.find((item: { filename?: string; originalName?: string }) => item.filename === filename);
+      if (match?.originalName) {
+        downloadName = match.originalName;
+      }
+    }
+
+    res.download(filePath, downloadName);
   } catch (error) {
     next(error);
   }

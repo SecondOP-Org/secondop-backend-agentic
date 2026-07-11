@@ -13,6 +13,7 @@ import {
   assignDoctorToCase,
   getDoctorCases,
   updateCaseStatus,
+  sendDoctorOpinion,
 } from '../controllers/case.controller';
 import { authenticate, authorize } from '../middleware/auth';
 
@@ -33,6 +34,7 @@ router.post('/:caseId/submit', authorize('patient'), submitCase);
 router.get('/doctor/cases', authorize('doctor'), getDoctorCases);
 router.post('/:caseId/assign', authorize('patient'), assignDoctorToCase);
 router.put('/:caseId/status', authorize('doctor'), updateCaseStatus);
+router.post('/:caseId/doctor-opinion', authorize('doctor'), sendDoctorOpinion);
 
 // Common routes
 router.get('/:caseId', getCaseById);
