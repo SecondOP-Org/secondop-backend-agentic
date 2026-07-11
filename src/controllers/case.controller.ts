@@ -152,6 +152,43 @@ const parseFlexibleSpecialistQuestions = (input: unknown): string[] => {
     .slice(0, 3);
 };
 
+const parseShareAiAnalysisWithSpecialists = (input: unknown): boolean => {
+  if (input === undefined || input === null) {
+    return true;
+  }
+
+  if (typeof input === 'boolean') {
+    return input;
+  }
+
+  throw new AppError('shareAiAnalysisWithSpecialists must be a boolean', 400);
+};
+
+type CaseRowWithAiSharing = Record<string, unknown> & {
+  share_ai_analysis_with_specialists?: boolean | null;
+};
+
+const redactAiAnalysisForDoctor = <T extends CaseRowWithAiSharing>(row: T): T => ({
+  ...row,
+  analysis_status: 'not_started',
+  analysis_summary: null,
+  analysis_artifact: null,
+  analysis_questions: null,
+  analysis_model: null,
+  analysis_error: null,
+});
+
+const sanitizeCaseRowForViewer = <T extends CaseRowWithAiSharing>(
+  row: T,
+  userType: 'patient' | 'doctor'
+): T => {
+  if (userType === 'doctor' && row.share_ai_analysis_with_specialists === false) {
+    return redactAiAnalysisForDoctor(row);
+  }
+
+  return row;
+};
+
 const fetchAssignedDoctors = async (caseId: string) => {
   const assignments = await query(
     `SELECT ca.id,
@@ -336,7 +373,13 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
     await ensureCaseAccess(caseId, userId, userType);
 
     const result = await query(
-      `SELECT analysis_status, analysis_summary, analysis_questions, analysis_artifact, analysis_model, analysis_error
+      `SELECT analysis_status,
+              analysis_summary,
+              analysis_questions,
+              analysis_artifact,
+              analysis_model,
+              analysis_error,
+              share_ai_analysis_with_specialists
        FROM cases
        WHERE id = $1`,
       [caseId]
@@ -353,7 +396,25 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
       analysis_artifact: unknown;
       analysis_model: string | null;
       analysis_error: string | null;
+      share_ai_analysis_with_specialists: boolean;
     };
+
+    if (userType === 'doctor' && row.share_ai_analysis_with_specialists === false) {
+      res.json({
+        status: 'success',
+        data: {
+          analysisStatus: 'not_started',
+          summary: null,
+          analysisQuestions: null,
+          artifact: null,
+          error: null,
+          analysisRunId: null,
+          observations: null,
+          aiAnalysisSharedWithSpecialists: false,
+        },
+      });
+      return;
+    }
 
     const latestRun = await getLatestAnalysisRun(caseId);
     const artifact = hydrateCaseAnalysisArtifact({
@@ -460,6 +521,9 @@ export const submitCase = async (req: AuthRequest, res: Response, next: NextFunc
     }
 
     const specialistQuestions = parseFlexibleSpecialistQuestions(req.body.specialistQuestions);
+    const shareAiAnalysisWithSpecialists = parseShareAiAnalysisWithSpecialists(
+      req.body.shareAiAnalysisWithSpecialists
+    );
 
     if (row.analysis_status === 'queued' || row.analysis_status === 'processing') {
       throw new AppError(
@@ -471,10 +535,11 @@ export const submitCase = async (req: AuthRequest, res: Response, next: NextFunc
     await query(
       `UPDATE cases
        SET specialist_questions = $2,
+           share_ai_analysis_with_specialists = $3,
            status = 'pending',
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
-      [caseId, JSON.stringify(specialistQuestions)]
+      [caseId, JSON.stringify(specialistQuestions), shareAiAnalysisWithSpecialists]
     );
 
     res.json({
@@ -608,10 +673,15 @@ export const getCaseById = async (req: AuthRequest, res: Response, next: NextFun
     const assignedDoctors = await fetchAssignedDoctors(caseId);
     const imagingStudies = await getImagingStudiesForCase(caseId);
 
+    const caseRow = sanitizeCaseRowForViewer(
+      caseResult.rows[0] as CaseRowWithAiSharing,
+      userType
+    );
+
     res.json({
       status: 'success',
       data: {
-        ...caseResult.rows[0],
+        ...caseRow,
         intake: intakeResult.rows[0] || null,
         files: filesResult.rows,
         imagingStudies,
@@ -740,7 +810,7 @@ export const getDoctorCases = async (req: AuthRequest, res: Response, next: Next
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data: result.rows.map((row: CaseRowWithAiSharing) => sanitizeCaseRowForViewer(row, 'doctor')),
     });
   } catch (error) {
     next(error);

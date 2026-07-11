@@ -2,6 +2,7 @@ import {
   createCase,
   getCaseAnalysis,
   getCaseAnalysisTrace,
+  getCaseById,
   queueCaseAnalysis,
   submitCase,
 } from '../controllers/case.controller';
@@ -65,6 +66,19 @@ const createPatientRequest = (body: any = {}, params: any = {}, queryParams: any
       id: 'user-patient-1',
       email: 'patient@example.com',
       type: 'patient',
+    },
+  } as unknown as AuthRequest;
+};
+
+const createDoctorRequest = (body: any = {}, params: any = {}, queryParams: any = {}): AuthRequest => {
+  return {
+    body,
+    params,
+    query: queryParams,
+    user: {
+      id: 'user-doctor-1',
+      email: 'doctor@example.com',
+      type: 'doctor',
     },
   } as unknown as AuthRequest;
 };
@@ -182,6 +196,7 @@ describe('Case analysis controllers', () => {
             analysis_artifact: null,
             analysis_model: 'gpt-4.1-mini',
             analysis_error: null,
+            share_ai_analysis_with_specialists: true,
           },
         ],
       } as any);
@@ -236,6 +251,7 @@ describe('Case analysis controllers', () => {
             }),
             analysis_model: 'gpt-4.1-mini',
             analysis_error: null,
+            share_ai_analysis_with_specialists: true,
           },
         ],
       } as any);
@@ -386,7 +402,7 @@ describe('Case analysis controllers', () => {
     });
     expect(mockedQuery).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE cases'),
-      ['case-1', JSON.stringify([])]
+      ['case-1', JSON.stringify([]), true]
     );
   });
 
@@ -422,7 +438,7 @@ describe('Case analysis controllers', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockedQuery).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE cases'),
-      ['case-1', JSON.stringify(['Q1', 'Q2'])]
+      ['case-1', JSON.stringify(['Q1', 'Q2']), true]
     );
   });
 
@@ -442,6 +458,106 @@ describe('Case analysis controllers', () => {
     expect(res.json).toHaveBeenCalledWith({
       status: 'success',
       message: 'Case submitted successfully',
+    });
+  });
+
+  it('persists shareAiAnalysisWithSpecialists=false on submit', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any);
+
+    const req = createPatientRequest(
+      { specialistQuestions: ['Q1'], shareAiAnalysisWithSpecialists: false },
+      { caseId: 'case-1' }
+    );
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await submitCase(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(mockedQuery).toHaveBeenLastCalledWith(
+      expect.stringContaining('UPDATE cases'),
+      ['case-1', JSON.stringify(['Q1']), false]
+    );
+  });
+
+  it('redacts AI analysis for doctors when patient opted out of sharing', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            analysis_status: 'succeeded',
+            analysis_summary: 'Chief Concern\nExample concern',
+            analysis_questions: ['Q1', 'Q2', 'Q3'],
+            analysis_artifact: null,
+            analysis_model: 'gpt-4.1-mini',
+            analysis_error: null,
+            share_ai_analysis_with_specialists: false,
+          },
+        ],
+      } as any);
+
+    const req = createDoctorRequest({}, { caseId: 'case-1' });
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await getCaseAnalysis(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: {
+        analysisStatus: 'not_started',
+        summary: null,
+        analysisQuestions: null,
+        artifact: null,
+        error: null,
+        analysisRunId: null,
+        observations: null,
+        aiAnalysisSharedWithSpecialists: false,
+      },
+    });
+  });
+
+  it('redacts AI fields in getCaseById for doctors when sharing is disabled', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'case-1',
+            title: 'Cardiology case',
+            analysis_status: 'succeeded',
+            analysis_summary: 'Chief Concern\nExample concern',
+            analysis_artifact: { structured_summary: { chief_concern: 'Example concern' } },
+            share_ai_analysis_with_specialists: false,
+          },
+        ],
+      } as any)
+      .mockResolvedValueOnce({ rows: [] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any);
+
+    const req = createDoctorRequest({}, { caseId: 'case-1' });
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await getCaseById(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      status: 'success',
+      data: expect.objectContaining({
+        id: 'case-1',
+        analysis_status: 'not_started',
+        analysis_summary: null,
+        analysis_artifact: null,
+        share_ai_analysis_with_specialists: false,
+      }),
     });
   });
 
