@@ -89,6 +89,12 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/015_share_ai_
 echo "  → Running 016_doctor_response_drafts.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/016_doctor_response_drafts.sql
 
+echo "  → Running 017_practice_team_model.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/017_practice_team_model.sql
+
+echo "  → Running 018_seed_demo_practice.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/018_seed_demo_practice.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
