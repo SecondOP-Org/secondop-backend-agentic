@@ -21,6 +21,10 @@ import {
   previewDoctorOpinion,
   startCaseReviewHandler,
 } from '../controllers/case.controller';
+import {
+  createCaseInternalNoteHandler,
+  getCaseInternalNotesHandler,
+} from '../controllers/caseTeam.controller';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
@@ -43,6 +47,8 @@ router.delete('/:caseId/doctor-assignment', authorize('doctor'), removeDoctorCas
 router.post('/:caseId/assign', authorize('patient'), assignDoctorToCase);
 router.put('/:caseId/status', authorize('doctor'), updateCaseStatus);
 router.post('/:caseId/start-review', authorize('doctor'), startCaseReviewHandler);
+router.get('/:caseId/internal-notes', authorize('doctor'), getCaseInternalNotesHandler);
+router.post('/:caseId/internal-notes', authorize('doctor'), createCaseInternalNoteHandler);
 router.get('/:caseId/doctor-response', authorize('doctor'), getDoctorResponseDraft);
 router.put('/:caseId/doctor-response', authorize('doctor'), saveDoctorResponseDraftHandler);
 router.post('/:caseId/doctor-opinion/preview', authorize('doctor'), previewDoctorOpinion);
