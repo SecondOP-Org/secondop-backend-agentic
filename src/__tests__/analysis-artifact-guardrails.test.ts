@@ -13,6 +13,8 @@ describe('analysis artifact guardrails', () => {
       text: 'Hemoglobin A1c 8.2%. Patient reports fatigue. Repeat testing recommended in 3 months.',
       charCount: 80,
       extractionMethod: 'pdf-parse' as const,
+      extractionQuality: 'high' as const,
+      ocrConfidence: null,
       reused: false,
     },
   ];

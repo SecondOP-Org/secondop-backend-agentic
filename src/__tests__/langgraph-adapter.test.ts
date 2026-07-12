@@ -89,6 +89,8 @@ describe('LangGraph agentic adapter', () => {
         text: 'Clinical report text. possible cardiac chest pressure. Persistent chest pain. Serial biomarkers. Requires clinician review.',
         charCount: 120,
         extractionMethod: 'pdf-parse',
+        extractionQuality: 'high',
+        ocrConfidence: null,
         reused: false,
       },
     ]);
@@ -99,6 +101,8 @@ describe('LangGraph agentic adapter', () => {
         text: 'Clinical report text. possible cardiac chest pressure. Persistent chest pain. Serial biomarkers. Requires clinician review.',
         charCount: 120,
         extractionMethod: 'pdf-parse' as const,
+        extractionQuality: 'high' as const,
+        ocrConfidence: null,
         reused: false,
       },
     ];

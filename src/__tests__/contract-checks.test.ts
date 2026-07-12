@@ -24,6 +24,8 @@ describe('contractChecks', () => {
       ].join('. '),
       charCount: 180,
       extractionMethod: 'pdf-parse' as const,
+      extractionQuality: 'high' as const,
+      ocrConfidence: null,
       reused: false,
     },
   ];

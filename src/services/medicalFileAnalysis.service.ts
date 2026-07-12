@@ -1,8 +1,14 @@
 import { query } from '../database/connection';
+import { ExtractionQuality } from './ocrConfig.service';
 
 export type PdfValidationStatus = 'pending' | 'succeeded' | 'failed';
 export type PdfExtractionStatus = 'pending' | 'succeeded' | 'failed' | 'reused';
-export type ExtractionMethod = 'pdf-parse' | 'raw-fallback' | 'cache';
+export type ExtractionMethod =
+  | 'pdf-parse'
+  | 'raw-fallback'
+  | 'cache'
+  | 'textract'
+  | 'vision-llm';
 
 export interface StoredMedicalFileExtraction {
   id: string;
@@ -12,6 +18,8 @@ export interface StoredMedicalFileExtraction {
   extraction_method: ExtractionMethod;
   extracted_text: string;
   char_count: number;
+  extraction_quality: ExtractionQuality | null;
+  ocr_confidence: number | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -35,6 +43,19 @@ export const isPdfMedicalFile = (fileType: string, fileName: string): boolean =>
   }
 
   return fileName.toLowerCase().endsWith('.pdf');
+};
+
+export const isImageMedicalFile = (fileType: string, fileName: string): boolean => {
+  const normalizedType = fileType.toLowerCase();
+  if (normalizedType.startsWith('image/')) {
+    return true;
+  }
+
+  return /\.(jpe?g|png|gif|webp)$/i.test(fileName);
+};
+
+export const isReportMedicalFile = (fileType: string, fileName: string): boolean => {
+  return isPdfMedicalFile(fileType, fileName) || isImageMedicalFile(fileType, fileName);
 };
 
 export const persistMedicalFileHash = async (fileId: string, fileSha256: string): Promise<void> => {
@@ -89,6 +110,13 @@ const mapExtractionRow = (row: Record<string, unknown>): StoredMedicalFileExtrac
   extraction_method: String(row.extraction_method) as ExtractionMethod,
   extracted_text: String(row.extracted_text),
   char_count: Number(row.char_count),
+  extraction_quality: row.extraction_quality
+    ? (String(row.extraction_quality) as ExtractionQuality)
+    : null,
+  ocr_confidence:
+    row.ocr_confidence === null || row.ocr_confidence === undefined
+      ? null
+      : Number(row.ocr_confidence),
   created_at: row.created_at instanceof Date ? row.created_at : new Date(String(row.created_at)),
   updated_at: row.updated_at instanceof Date ? row.updated_at : new Date(String(row.updated_at)),
 });
@@ -98,7 +126,8 @@ export const getReusableMedicalFileExtraction = async (
   fileSha256: string
 ): Promise<StoredMedicalFileExtraction | null> => {
   const result = await query(
-    `SELECT id, file_id, case_id, file_sha256, extraction_method, extracted_text, char_count, created_at, updated_at
+    `SELECT id, file_id, case_id, file_sha256, extraction_method, extracted_text, char_count,
+            extraction_quality, ocr_confidence, created_at, updated_at
      FROM medical_file_extractions
      WHERE file_id = $1
        AND file_sha256 = $2
@@ -119,6 +148,8 @@ export const upsertMedicalFileExtraction = async (input: {
   fileSha256: string;
   extractionMethod: Exclude<ExtractionMethod, 'cache'>;
   extractedText: string;
+  extractionQuality?: ExtractionQuality | null;
+  ocrConfidence?: number | null;
 }): Promise<StoredMedicalFileExtraction> => {
   const result = await query(
     `INSERT INTO medical_file_extractions (
@@ -127,16 +158,21 @@ export const upsertMedicalFileExtraction = async (input: {
       file_sha256,
       extraction_method,
       extracted_text,
-      char_count
+      char_count,
+      extraction_quality,
+      ocr_confidence
     )
-    VALUES ($1, $2, $3, $4, $5, $6)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT (file_id, file_sha256)
     DO UPDATE SET
       extraction_method = EXCLUDED.extraction_method,
       extracted_text = EXCLUDED.extracted_text,
       char_count = EXCLUDED.char_count,
+      extraction_quality = EXCLUDED.extraction_quality,
+      ocr_confidence = EXCLUDED.ocr_confidence,
       updated_at = CURRENT_TIMESTAMP
-    RETURNING id, file_id, case_id, file_sha256, extraction_method, extracted_text, char_count, created_at, updated_at`,
+    RETURNING id, file_id, case_id, file_sha256, extraction_method, extracted_text, char_count,
+              extraction_quality, ocr_confidence, created_at, updated_at`,
     [
       input.fileId,
       input.caseId,
@@ -144,10 +180,32 @@ export const upsertMedicalFileExtraction = async (input: {
       input.extractionMethod,
       input.extractedText,
       input.extractedText.length,
+      input.extractionQuality ?? null,
+      input.ocrConfidence ?? null,
     ]
   );
 
   return mapExtractionRow(result.rows[0] as Record<string, unknown>);
+};
+
+export const persistFreshReportExtraction = async (input: {
+  caseId: string;
+  row: MedicalFilePdfRow;
+  fileSha256: string;
+  text: string;
+  method: Exclude<ExtractionMethod, 'cache'>;
+  extractionQuality: ExtractionQuality;
+  ocrConfidence: number | null;
+}): Promise<void> => {
+  await upsertMedicalFileExtraction({
+    fileId: input.row.id,
+    caseId: input.caseId,
+    fileSha256: input.fileSha256,
+    extractionMethod: input.method,
+    extractedText: input.text,
+    extractionQuality: input.extractionQuality,
+    ocrConfidence: input.ocrConfidence,
+  });
 };
 
 export const invalidateCaseAnalysisAfterPdfChange = async (caseId: string): Promise<boolean> => {

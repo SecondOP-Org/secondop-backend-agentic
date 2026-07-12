@@ -70,8 +70,19 @@ const buildSystemPrompt = (): string => {
 
 const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport[], guidance?: string): string => {
   const reportText = reports
-    .map((report, index) => `Report ${index + 1} (${report.fileName}):\n${report.text}`)
+    .map((report, index) => {
+      const qualityNote =
+        report.extractionQuality === 'low'
+          ? '\nExtraction quality: low (OCR/handwriting — treat content cautiously).'
+          : report.extractionQuality === 'medium'
+            ? '\nExtraction quality: medium (scanned/OCR content — verify against source).'
+            : '';
+      return `Report ${index + 1} (${report.fileName}):\n${report.text}${qualityNote}`;
+    })
     .join('\n\n');
+
+  const hasLowQualityReports = reports.some((report) => report.extractionQuality === 'low');
+  const hasMediumQualityReports = reports.some((report) => report.extractionQuality === 'medium');
 
   return [
     'Patient Intake:',
@@ -88,6 +99,12 @@ const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport[], gui
     reportText,
     '',
     `Allowed report file names: ${reports.map((report) => report.fileName).join(', ')}`,
+    hasLowQualityReports
+      ? 'One or more reports had low-quality OCR/handwriting extraction. Include explicit uncertainty_flags about unreadable or uncertain extracted text.'
+      : '',
+    hasMediumQualityReports
+      ? 'One or more reports were extracted via OCR from scans or photos. Use cautious language and uncertainty_flags when source text may be incomplete.'
+      : '',
     guidance ? `Agentic Guidance: ${guidance}` : '',
     'Generate a structured_summary, questionnaire with exactly 3 specialist_questions, confidence_score, uncertainty_flags, and disclaimer.',
   ]
