@@ -1,5 +1,4 @@
 import { Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import { query, transaction } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
@@ -15,6 +14,7 @@ import { getCaseRunTrace } from '../agentic/observability/analysisObservability.
 import { analysisWorker } from '../services/analysisWorker.service';
 import { getImagingStudiesForCase } from '../services/dicomImaging.service';
 import { generateDoctorOpinionPdf } from '../services/doctorOpinionPdf.service';
+import { generateCaseNumber } from '../utils/caseNumber';
 
 interface IntakePayload {
   age: number;
@@ -229,7 +229,7 @@ export const createCase = async (req: AuthRequest, res: Response, next: NextFunc
     const status = req.body.status === 'draft' ? 'draft' : 'pending';
     const intake = parseIntake(req.body.intake);
 
-    const caseNumber = `SO-${uuidv4()}`;
+    const caseNumber = generateCaseNumber();
 
     const created = await transaction(async (client) => {
       const caseInsert = await client.query(
