@@ -12,6 +12,8 @@ import {
   deleteCase,
   assignDoctorToCase,
   getDoctorCases,
+  getDoctorDashboardStats,
+  removeDoctorCaseAssignment,
   updateCaseStatus,
   sendDoctorOpinion,
   getDoctorResponseDraft,
@@ -35,6 +37,8 @@ router.post('/:caseId/submit', authorize('patient'), submitCase);
 
 // Doctor routes
 router.get('/doctor/cases', authorize('doctor'), getDoctorCases);
+router.get('/doctor/stats', authorize('doctor'), getDoctorDashboardStats);
+router.delete('/:caseId/doctor-assignment', authorize('doctor'), removeDoctorCaseAssignment);
 router.post('/:caseId/assign', authorize('patient'), assignDoctorToCase);
 router.put('/:caseId/status', authorize('doctor'), updateCaseStatus);
 router.get('/:caseId/doctor-response', authorize('doctor'), getDoctorResponseDraft);
@@ -45,6 +49,6 @@ router.post('/:caseId/doctor-opinion', authorize('doctor'), sendDoctorOpinion);
 // Common routes
 router.get('/:caseId', getCaseById);
 router.put('/:caseId', updateCase);
-router.delete('/:caseId', deleteCase);
+router.delete('/:caseId', authorize('patient'), deleteCase);
 
 export default router;
