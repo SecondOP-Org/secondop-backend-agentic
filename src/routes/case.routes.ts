@@ -14,6 +14,9 @@ import {
   getDoctorCases,
   updateCaseStatus,
   sendDoctorOpinion,
+  getDoctorResponseDraft,
+  saveDoctorResponseDraftHandler,
+  previewDoctorOpinion,
 } from '../controllers/case.controller';
 import { authenticate, authorize } from '../middleware/auth';
 
@@ -34,6 +37,9 @@ router.post('/:caseId/submit', authorize('patient'), submitCase);
 router.get('/doctor/cases', authorize('doctor'), getDoctorCases);
 router.post('/:caseId/assign', authorize('patient'), assignDoctorToCase);
 router.put('/:caseId/status', authorize('doctor'), updateCaseStatus);
+router.get('/:caseId/doctor-response', authorize('doctor'), getDoctorResponseDraft);
+router.put('/:caseId/doctor-response', authorize('doctor'), saveDoctorResponseDraftHandler);
+router.post('/:caseId/doctor-opinion/preview', authorize('doctor'), previewDoctorOpinion);
 router.post('/:caseId/doctor-opinion', authorize('doctor'), sendDoctorOpinion);
 
 // Common routes

@@ -1,0 +1,25 @@
+---
+description: SecondOp agent workflow, safety gates, and source-of-truth docs
+alwaysApply: true
+---
+
+# SecondOp Workflow
+
+Follow the workspace root guides:
+
+- `AGENTS.md` — Linear/GitHub workflow, safety rules, test commands, architecture boundaries
+- `SOUL.md` — safety, traceability, clinician authority, honest uncertainty
+- `AI_CONTRACT.md` — required LLM output shape and medical safety rules
+- `DEPLOYMENT_RUNBOOK.md` — Vercel + Railway deploy sequence
+
+On-demand workflows live in `.cursor/skills/` (Linear spec, feature delivery, AI contract checks, PR review, deploy). Skills operationalize `AGENTS.md`; they do not replace it.
+
+Defaults:
+
+- Linear defines requirements; GitHub defines code and PR state.
+- Smallest correct change; no unrelated refactors or new dependencies without justification.
+- Do not merge, deploy, rotate secrets, or change production config without explicit human approval.
+- Backend domain logic lives in services/agents, not controllers.
+- AI outputs must comply with `AI_CONTRACT.md` and existing eval/contract checks.
+
+Backend depth: this repo's `AGENTS.md` and `docs/MULTI_AGENT_WORKFLOW.md`.

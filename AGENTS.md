@@ -122,3 +122,14 @@ npm run build
 - Test results
 - Risks
 - Follow-ups
+
+## Cursor Skills
+
+On-demand agent playbooks live in `.cursor/skills/`:
+- `secondop-linear-workflow` — spec and Linear status updates
+- `secondop-feature-delivery` — implement issue through draft PR
+- `ai-contract-compliance` — AI/agentic changes and eval harness
+- `secondop-pr-lifecycle` — PR review and merge after approval
+- `secondop-deploy` — staging and production deploy
+
+Policy stays in this file and workspace root `AGENTS.md`; skills add step-by-step execution.
