@@ -18,6 +18,11 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { buildCaseAnalysisArtifact } from '../services/analysisArtifact.service';
 
+jest.mock('../utils/caseIdentifier', () => ({
+  resolveCaseId: jest.fn(async (identifier: string) => identifier.trim()),
+  isUuid: jest.fn(),
+}));
+
 jest.mock('../database/connection', () => ({
   query: jest.fn(),
   transaction: jest.fn(),
