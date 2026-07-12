@@ -1,0 +1,2 @@
+ALTER TABLE case_assignments
+  ADD COLUMN IF NOT EXISTS response_draft JSONB DEFAULT NULL;

@@ -13,7 +13,24 @@ import { getLatestAnalysisRun, getLatestAnalysisRunByEngine, getLatestShadowResu
 import { getCaseRunTrace } from '../agentic/observability/analysisObservability.service';
 import { analysisWorker } from '../services/analysisWorker.service';
 import { getImagingStudiesForCase } from '../services/dicomImaging.service';
-import { generateDoctorOpinionPdf } from '../services/doctorOpinionPdf.service';
+import {
+  buildDoctorOpinionOriginalName,
+  generateDoctorOpinionPdf,
+  generateDoctorOpinionPdfBuffer,
+} from '../services/doctorOpinionPdf.service';
+import {
+  clearDoctorResponseDraft,
+  composeDoctorOpinionContent,
+  getDoctorResponse,
+  resolveSpecialistQuestions,
+  saveDoctorResponseDraft,
+  validateDoctorResponseForSend,
+} from '../services/doctorResponse.service';
+import {
+  isStructuredDoctorResponsePayload,
+  parseDoctorResponseDraft,
+  parseDoctorResponseSend,
+} from '../schemas/doctorResponse.schema';
 import { generateCaseNumber } from '../utils/caseNumber';
 
 interface IntakePayload {
@@ -678,15 +695,23 @@ export const getCaseById = async (req: AuthRequest, res: Response, next: NextFun
       userType
     );
 
+    const responseData: Record<string, unknown> = {
+      ...caseRow,
+      intake: intakeResult.rows[0] || null,
+      files: filesResult.rows,
+      imagingStudies,
+      assigned_doctors: assignedDoctors,
+    };
+
+    if (userType === 'doctor') {
+      responseData.resolved_specialist_questions = resolveSpecialistQuestions(
+        caseResult.rows[0] as CaseRowWithAiSharing
+      );
+    }
+
     res.json({
       status: 'success',
-      data: {
-        ...caseRow,
-        intake: intakeResult.rows[0] || null,
-        files: filesResult.rows,
-        imagingStudies,
-        assigned_doctors: assignedDoctors,
-      },
+      data: responseData,
     });
   } catch (error) {
     next(error);
@@ -846,23 +871,63 @@ export const updateCaseStatus = async (req: AuthRequest, res: Response, next: Ne
   }
 };
 
-export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const getDoctorResponseDraft = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { caseId } = req.params;
-    const { content, status } = req.body;
     const userId = req.user!.id;
 
-    if (typeof content !== 'string' || !content.trim()) {
-      throw new AppError('content is required', 400);
-    }
+    await ensureDoctorAssignedToCase(caseId, userId);
 
-    const nextStatus = typeof status === 'string' && status.trim() ? status.trim() : 'completed';
+    const data = await getDoctorResponse(caseId, userId);
+
+    res.json({
+      status: 'success',
+      data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const saveDoctorResponseDraftHandler = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
+
+    await ensureDoctorAssignedToCase(caseId, userId);
+
+    const draft = await saveDoctorResponseDraft(caseId, userId, req.body);
+
+    res.json({
+      status: 'success',
+      data: { draft },
+      message: 'Doctor response draft saved',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
 
     await ensureDoctorAssignedToCase(caseId, userId);
 
     const caseResult = await query(
       `SELECT c.id, c.title, c.case_number, c.submitted_date,
-              p.user_id as patient_user_id,
+              c.specialist_questions,
+              c.analysis_questions,
+              c.analysis_artifact,
+              c.analysis_summary,
+              c.analysis_model,
+              c.share_ai_analysis_with_specialists,
+              c.analysis_status,
               p.first_name as patient_first_name,
               p.last_name as patient_last_name,
               d.first_name as doctor_first_name,
@@ -885,15 +950,135 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
     const patientName = `${row.patient_first_name || ''} ${row.patient_last_name || ''}`.trim() || 'Patient';
     const doctorName = `${row.doctor_first_name || ''} ${row.doctor_last_name || ''}`.trim() || 'Specialist';
 
-    const pdfFile = await generateDoctorOpinionPdf({
-      caseTitle: row.title,
-      caseNumber: row.case_number,
-      patientName,
-      doctorName,
-      doctorSpecialty: row.doctor_specialty || '',
-      clinicalResponse: content.trim(),
-      submittedDate: row.submitted_date,
-    });
+    let pdfInput: Parameters<typeof generateDoctorOpinionPdfBuffer>[0];
+
+    if (isStructuredDoctorResponsePayload(req.body)) {
+      const payload = parseDoctorResponseDraft(req.body);
+
+      pdfInput = {
+        caseTitle: row.title,
+        caseNumber: row.case_number,
+        patientName,
+        doctorName,
+        doctorSpecialty: row.doctor_specialty || '',
+        submittedDate: row.submitted_date,
+        questionAnswers: payload.questionAnswers,
+        summary: payload.summary,
+        aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+      };
+    } else {
+      const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+      if (!content) {
+        throw new AppError('content or structured doctor response is required', 400);
+      }
+
+      pdfInput = {
+        caseTitle: row.title,
+        caseNumber: row.case_number,
+        patientName,
+        doctorName,
+        doctorSpecialty: row.doctor_specialty || '',
+        submittedDate: row.submitted_date,
+        clinicalResponse: content,
+        aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+      };
+    }
+
+    const pdfBuffer = await generateDoctorOpinionPdfBuffer(pdfInput);
+    const originalName = buildDoctorOpinionOriginalName(row.case_number);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${originalName}"`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
+
+    await ensureDoctorAssignedToCase(caseId, userId);
+
+    const caseResult = await query(
+      `SELECT c.id, c.title, c.case_number, c.submitted_date,
+              c.specialist_questions,
+              c.analysis_questions,
+              c.analysis_artifact,
+              c.analysis_summary,
+              c.analysis_model,
+              c.share_ai_analysis_with_specialists,
+              c.analysis_status,
+              p.user_id as patient_user_id,
+              p.first_name as patient_first_name,
+              p.last_name as patient_last_name,
+              d.first_name as doctor_first_name,
+              d.last_name as doctor_last_name,
+              d.specialty as doctor_specialty
+       FROM cases c
+       JOIN patients p ON p.id = c.patient_id
+       JOIN case_assignments ca ON ca.case_id = c.id
+       JOIN doctors d ON d.id = ca.doctor_id
+       WHERE c.id = $1 AND d.user_id = $2
+       LIMIT 1`,
+      [caseId, userId]
+    );
+
+    if (caseResult.rows.length === 0) {
+      throw new AppError('Case not found for assigned doctor', 404);
+    }
+
+    const row = caseResult.rows[0];
+    const resolvedQuestions = resolveSpecialistQuestions(row);
+    const patientName = `${row.patient_first_name || ''} ${row.patient_last_name || ''}`.trim() || 'Patient';
+    const doctorName = `${row.doctor_first_name || ''} ${row.doctor_last_name || ''}`.trim() || 'Specialist';
+
+    let content: string;
+    let nextStatus: string;
+    let pdfInput: Parameters<typeof generateDoctorOpinionPdf>[0];
+
+    if (isStructuredDoctorResponsePayload(req.body)) {
+      const payload = parseDoctorResponseSend(req.body);
+      validateDoctorResponseForSend(resolvedQuestions, payload);
+      content = composeDoctorOpinionContent(payload);
+      nextStatus = typeof payload.status === 'string' && payload.status.trim() ? payload.status.trim() : 'completed';
+
+      pdfInput = {
+        caseTitle: row.title,
+        caseNumber: row.case_number,
+        patientName,
+        doctorName,
+        doctorSpecialty: row.doctor_specialty || '',
+        submittedDate: row.submitted_date,
+        questionAnswers: payload.questionAnswers,
+        summary: payload.summary,
+        aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+      };
+    } else {
+      const legacyContent = typeof req.body.content === 'string' ? req.body.content : '';
+      if (!legacyContent.trim()) {
+        throw new AppError('content is required', 400);
+      }
+
+      content = legacyContent.trim();
+      nextStatus =
+        typeof req.body.status === 'string' && req.body.status.trim() ? req.body.status.trim() : 'completed';
+
+      pdfInput = {
+        caseTitle: row.title,
+        caseNumber: row.case_number,
+        patientName,
+        doctorName,
+        doctorSpecialty: row.doctor_specialty || '',
+        clinicalResponse: content,
+        submittedDate: row.submitted_date,
+        aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+      };
+    }
+
+    const pdfFile = await generateDoctorOpinionPdf(pdfInput);
 
     const attachments = [
       {
@@ -912,7 +1097,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         caseId,
         userId,
         row.patient_user_id,
-        content.trim(),
+        content,
         'doctor_opinion',
         JSON.stringify(attachments),
       ]
@@ -935,6 +1120,8 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
          AND doctor_id = (SELECT id FROM doctors WHERE user_id = $2)`,
       [caseId, userId]
     );
+
+    await clearDoctorResponseDraft(caseId, userId);
 
     const io = req.app.get('io');
     io.to(`case-${caseId}`).emit('new-message', messageResult.rows[0]);
