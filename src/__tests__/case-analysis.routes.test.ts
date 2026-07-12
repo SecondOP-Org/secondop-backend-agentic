@@ -402,7 +402,7 @@ describe('Case analysis controllers', () => {
     });
     expect(mockedQuery).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE cases'),
-      ['case-1', JSON.stringify([]), true]
+      ['case-1', JSON.stringify([]), true, 3]
     );
   });
 
@@ -438,7 +438,7 @@ describe('Case analysis controllers', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockedQuery).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE cases'),
-      ['case-1', JSON.stringify(['Q1', 'Q2']), true]
+      ['case-1', JSON.stringify(['Q1', 'Q2']), true, 3]
     );
   });
 
@@ -479,7 +479,7 @@ describe('Case analysis controllers', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockedQuery).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE cases'),
-      ['case-1', JSON.stringify(['Q1']), false]
+      ['case-1', JSON.stringify(['Q1']), false, 3]
     );
   });
 

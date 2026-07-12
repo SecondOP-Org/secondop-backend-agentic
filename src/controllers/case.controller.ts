@@ -32,6 +32,13 @@ import {
   parseDoctorResponseSend,
 } from '../schemas/doctorResponse.schema';
 import { generateCaseNumber } from '../utils/caseNumber';
+import {
+  DOCTOR_INBOX_CASE_STATUSES,
+  DEFAULT_TURNAROUND_DAYS,
+  isDueToday,
+  isOverdue,
+  resolveEffectiveDueDate,
+} from '../services/doctorCaseInbox.service';
 
 interface IntakePayload {
   age: number;
@@ -554,9 +561,11 @@ export const submitCase = async (req: AuthRequest, res: Response, next: NextFunc
        SET specialist_questions = $2,
            share_ai_analysis_with_specialists = $3,
            status = 'pending',
+           submitted_date = COALESCE(submitted_date, CURRENT_TIMESTAMP),
+           due_date = COALESCE(due_date, CURRENT_TIMESTAMP + ($4::int * INTERVAL '1 day')),
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $1`,
-      [caseId, JSON.stringify(specialistQuestions), shareAiAnalysisWithSpecialists]
+      [caseId, JSON.stringify(specialistQuestions), shareAiAnalysisWithSpecialists, DEFAULT_TURNAROUND_DAYS]
     );
 
     res.json({
@@ -801,6 +810,20 @@ export const assignDoctorToCase = async (req: AuthRequest, res: Response, next: 
   }
 };
 
+const mapDoctorInboxCaseRow = (row: CaseRowWithAiSharing) => {
+  const sanitized = sanitizeCaseRowForViewer(row, 'doctor');
+  const effectiveDueDate = resolveEffectiveDueDate(
+    row.due_date as string | Date | null | undefined,
+    row.submitted_date as string | Date | null | undefined
+  );
+
+  return {
+    ...sanitized,
+    due_date: effectiveDueDate ? effectiveDueDate.toISOString() : sanitized.due_date,
+    is_overdue: isOverdue(effectiveDueDate, String(row.status || '')),
+  };
+};
+
 export const getDoctorCases = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
@@ -829,13 +852,87 @@ export const getDoctorCases = async (req: AuthRequest, res: Response, next: Next
        JOIN patients p ON p.id = c.patient_id
        LEFT JOIN case_intake ci ON ci.case_id = c.id
        WHERE ca.doctor_id = $1
-       ORDER BY ca.assigned_date DESC`,
-      [doctorId]
+         AND c.status <> 'draft'
+         AND c.status = ANY($2::text[])
+       ORDER BY COALESCE(c.due_date, c.submitted_date + ($3::int * INTERVAL '1 day')) ASC NULLS LAST,
+                ca.assigned_date DESC`,
+      [doctorId, DOCTOR_INBOX_CASE_STATUSES, DEFAULT_TURNAROUND_DAYS]
     );
 
     res.json({
       status: 'success',
-      data: result.rows.map((row: CaseRowWithAiSharing) => sanitizeCaseRowForViewer(row, 'doctor')),
+      data: result.rows.map((row: CaseRowWithAiSharing) => mapDoctorInboxCaseRow(row)),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getDoctorDashboardStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+
+    const doctorResult = await query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    if (doctorResult.rows.length === 0) {
+      throw new AppError('Doctor profile not found', 404);
+    }
+
+    const doctorId = doctorResult.rows[0].id as string;
+
+    const result = await query(
+      `SELECT c.status,
+              COALESCE(c.due_date, c.submitted_date + ($2::int * INTERVAL '1 day')) AS effective_due_date
+       FROM cases c
+       JOIN case_assignments ca ON c.id = ca.case_id
+       WHERE ca.doctor_id = $1
+         AND c.status <> 'draft'
+         AND c.status = ANY($3::text[])`,
+      [doctorId, DEFAULT_TURNAROUND_DAYS, DOCTOR_INBOX_CASE_STATUSES]
+    );
+
+    const rows = result.rows as Array<{ status: string; effective_due_date: string | Date | null }>;
+    const pendingCases = rows.filter((row) => row.status === 'pending').length;
+    const responsesDueToday = rows.filter((row) => {
+      if (row.status === 'completed') {
+        return false;
+      }
+      const due = row.effective_due_date ? new Date(row.effective_due_date) : null;
+      return isDueToday(due && !Number.isNaN(due.getTime()) ? due : null);
+    }).length;
+
+    res.json({
+      status: 'success',
+      data: {
+        pendingCases,
+        responsesDueToday,
+        totalCases: rows.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const removeDoctorCaseAssignment = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
+
+    await ensureDoctorAssignedToCase(caseId, userId);
+
+    const doctorResult = await query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+    const doctorId = doctorResult.rows[0].id as string;
+
+    await query(
+      `DELETE FROM case_assignments
+       WHERE case_id = $1
+         AND doctor_id = $2`,
+      [caseId, doctorId]
+    );
+
+    res.json({
+      status: 'success',
+      message: 'Case removed from your queue',
     });
   } catch (error) {
     next(error);
