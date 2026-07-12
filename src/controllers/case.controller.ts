@@ -365,13 +365,18 @@ export const queueCaseAnalysis = async (req: AuthRequest, res: Response, next: N
       `SELECT COUNT(*)::int as file_count
        FROM medical_files
        WHERE case_id = $1
-         AND (file_type = 'application/pdf' OR LOWER(file_name) LIKE '%.pdf')`,
+         AND (
+           file_type = 'application/pdf'
+           OR LOWER(file_name) LIKE '%.pdf'
+           OR file_type LIKE 'image/%'
+           OR LOWER(file_name) ~ '\\.(jpe?g|png|gif|webp)$'
+         )`,
       [caseId]
     );
 
     const fileCount = filesResult.rows[0].file_count as number;
     if (fileCount < 1) {
-      throw new AppError('At least one PDF file is required before analysis', 400);
+      throw new AppError('At least one medical report (PDF or image) is required before analysis', 400);
     }
 
     const queued = await analysisWorker.queueCase(caseId);

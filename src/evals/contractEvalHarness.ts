@@ -31,6 +31,8 @@ const buildReports = (): ExtractedReport[] => [
     ].join('. '),
     charCount: 320,
     extractionMethod: 'pdf-parse',
+    extractionQuality: 'high',
+    ocrConfidence: null,
     reused: false,
   },
 ];

@@ -1,16 +1,17 @@
 import fs from 'fs';
-import pdfParse from 'pdf-parse';
 import { query } from '../database/connection';
 import logger from '../utils/logger';
 import { resolveStoredFilePath } from '../utils/uploadPath';
 import { computeFileSha256 } from './fileHash.service';
+import { extractTextFromReportFile } from './documentExtraction.service';
+import { ExtractionQuality, getOcrConfig } from './ocrConfig.service';
 import {
   getReusableMedicalFileExtraction,
-  isPdfMedicalFile,
+  isReportMedicalFile,
   MedicalFilePdfRow,
+  persistFreshReportExtraction,
   persistMedicalFileHash,
   updatePdfExtractionStatus,
-  upsertMedicalFileExtraction,
 } from './medicalFileAnalysis.service';
 
 export interface ExtractedReport {
@@ -18,81 +19,24 @@ export interface ExtractedReport {
   fileName: string;
   text: string;
   charCount: number;
-  extractionMethod: 'pdf-parse' | 'raw-fallback' | 'cache';
+  extractionMethod: 'pdf-parse' | 'raw-fallback' | 'cache' | 'textract' | 'vision-llm';
+  extractionQuality: ExtractionQuality;
+  ocrConfidence: number | null;
   reused: boolean;
 }
-
-const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
-
-const cleanTextCandidate = (value: string): string => {
-  return normalizeWhitespace(
-    value
-      .replace(/\\\(/g, '(')
-      .replace(/\\\)/g, ')')
-      .replace(/\\n/g, ' ')
-      .replace(/\\r/g, ' ')
-      .replace(/\\t/g, ' ')
-      .replace(/\\\\/g, '\\')
-      .replace(/[^\x20-\x7E\n\r\t]/g, ' ')
-  );
-};
-
-const parseTextWithPdfParse = async (buffer: Buffer): Promise<string> => {
-  const parsed = await pdfParse(buffer);
-  return normalizeWhitespace(parsed.text || '');
-};
-
-const recoverTextFromRawPdf = (buffer: Buffer): string => {
-  const latin = buffer.toString('latin1');
-  const chunks: string[] = [];
-
-  const literalMatches = latin.match(/\((?:\\.|[^()\\]){8,}\)/g) || [];
-  for (const match of literalMatches) {
-    const value = match.slice(1, -1);
-    const cleaned = cleanTextCandidate(value);
-    if (cleaned.length >= 20 && /[A-Za-z]{3,}/.test(cleaned)) {
-      chunks.push(cleaned);
-    }
-  }
-
-  const asciiMatches = latin.match(/[A-Za-z0-9,.;:\-()/%\s]{30,}/g) || [];
-  for (const match of asciiMatches) {
-    const cleaned = cleanTextCandidate(match);
-    if (cleaned.length >= 30 && /[A-Za-z]{5,}/.test(cleaned)) {
-      chunks.push(cleaned);
-    }
-  }
-
-  const combined = normalizeWhitespace(chunks.join(' '));
-  if (!combined) {
-    return '';
-  }
-
-  const uniqueSegments = Array.from(new Set(combined.split(/(?<=[.?!])\s+/).map((s) => s.trim()).filter(Boolean)));
-  return normalizeWhitespace(uniqueSegments.join(' '));
-};
 
 export const extractTextFromPdf = async (
   filePath: string
 ): Promise<{ text: string; method: 'pdf-parse' | 'raw-fallback' }> => {
-  const buffer = await fs.promises.readFile(filePath);
-
-  try {
-    const text = await parseTextWithPdfParse(buffer);
-    return { text, method: 'pdf-parse' };
-  } catch (error) {
-    const fallbackText = recoverTextFromRawPdf(buffer);
-    if (fallbackText.length >= 120) {
-      logger.warn('pdf-parse failed; using raw PDF text recovery fallback.', {
-        filePath,
-        error: error instanceof Error ? error.message : String(error),
-        recoveredChars: fallbackText.length,
-      });
-      return { text: fallbackText, method: 'raw-fallback' };
-    }
-
-    throw error;
+  const extracted = await extractTextFromReportFile(filePath, 'application/pdf', filePath);
+  if (extracted.method !== 'pdf-parse' && extracted.method !== 'raw-fallback') {
+    return { text: extracted.text, method: 'pdf-parse' };
   }
+
+  return {
+    text: extracted.text,
+    method: extracted.method,
+  };
 };
 
 export const validatePdfUpload = async (
@@ -109,6 +53,37 @@ export const validatePdfUpload = async (
     return {
       valid: false,
       error: error instanceof Error ? error.message : 'Unable to read uploaded PDF.',
+    };
+  }
+};
+
+export const validateImageUpload = async (
+  filePath: string,
+  mimeType: string
+): Promise<{ valid: boolean; error: string | null }> => {
+  try {
+    const buffer = await fs.promises.readFile(filePath);
+    if (buffer.length < 32) {
+      return { valid: false, error: 'Image file is too small to be a valid report.' };
+    }
+
+    if (mimeType === 'image/png' && buffer.slice(0, 8).toString('hex') !== '89504e470d0a1a0a') {
+      return { valid: false, error: 'File does not appear to be a valid PNG image.' };
+    }
+
+    if (
+      (mimeType === 'image/jpeg' || mimeType === 'image/jpg') &&
+      buffer[0] !== 0xff &&
+      buffer[1] !== 0xd8
+    ) {
+      return { valid: false, error: 'File does not appear to be a valid JPEG image.' };
+    }
+
+    return { valid: true, error: null };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : 'Unable to read uploaded image.',
     };
   }
 };
@@ -141,7 +116,7 @@ const ensureFileSha256 = async (row: MedicalFilePdfRow, filePath: string): Promi
   return fileSha256;
 };
 
-const loadPdfMedicalFiles = async (caseId: string): Promise<MedicalFilePdfRow[]> => {
+const loadReportMedicalFiles = async (caseId: string): Promise<MedicalFilePdfRow[]> => {
   const filesResult = await query(
     `SELECT id, file_name, file_type, file_url, file_sha256,
             pdf_validation_status, pdf_validation_error,
@@ -153,29 +128,8 @@ const loadPdfMedicalFiles = async (caseId: string): Promise<MedicalFilePdfRow[]>
   );
 
   return (filesResult.rows as MedicalFilePdfRow[]).filter((row) =>
-    isPdfMedicalFile(row.file_type, row.file_name)
+    isReportMedicalFile(row.file_type, row.file_name)
   );
-};
-
-const persistFreshExtraction = async (input: {
-  caseId: string;
-  row: MedicalFilePdfRow;
-  fileSha256: string;
-  text: string;
-  method: 'pdf-parse' | 'raw-fallback';
-}): Promise<void> => {
-  await upsertMedicalFileExtraction({
-    fileId: input.row.id,
-    caseId: input.caseId,
-    fileSha256: input.fileSha256,
-    extractionMethod: input.method,
-    extractedText: input.text,
-  });
-
-  await updatePdfExtractionStatus(input.row.id, 'succeeded', {
-    error: null,
-    extractedAt: new Date(),
-  });
 };
 
 export const extractCaseReports = async (
@@ -183,17 +137,18 @@ export const extractCaseReports = async (
   maxCharsPerFile: number,
   maxTotalChars: number
 ): Promise<ExtractedReport[]> => {
-  const pdfRows = await loadPdfMedicalFiles(caseId);
+  const reportRows = await loadReportMedicalFiles(caseId);
+  const minChars = getOcrConfig().minChars;
 
-  if (pdfRows.length === 0) {
-    throw new Error('At least one PDF report is required for analysis.');
+  if (reportRows.length === 0) {
+    throw new Error('At least one medical report (PDF or image) is required for analysis.');
   }
 
   const reports: ExtractedReport[] = [];
   const extractionIssues: string[] = [];
   let totalChars = 0;
 
-  for (const row of pdfRows) {
+  for (const row of reportRows) {
     if (totalChars >= maxTotalChars) {
       break;
     }
@@ -211,19 +166,23 @@ export const extractCaseReports = async (
     const reusable = await getReusableMedicalFileExtraction(row.id, fileSha256);
 
     let text = '';
-    let method: 'pdf-parse' | 'raw-fallback' | 'cache' = 'pdf-parse';
+    let method: ExtractedReport['extractionMethod'] = 'pdf-parse';
+    let extractionQuality: ExtractionQuality = 'high';
+    let ocrConfidence: number | null = null;
     let reused = false;
 
-    if (reusable && reusable.extracted_text.length >= 40) {
+    if (reusable && reusable.extracted_text.length >= minChars) {
       text = reusable.extracted_text;
       method = 'cache';
+      extractionQuality = reusable.extraction_quality || 'medium';
+      ocrConfidence = reusable.ocr_confidence;
       reused = true;
       await updatePdfExtractionStatus(row.id, 'reused', {
         error: null,
         extractedAt: reusable.updated_at,
       });
 
-      logger.info('Reused cached PDF extraction for analysis', {
+      logger.info('Reused cached report extraction for analysis', {
         caseId,
         fileId: row.id,
         fileName: row.file_name,
@@ -231,14 +190,16 @@ export const extractCaseReports = async (
       });
     } else {
       try {
-        const extracted = await extractTextFromPdf(filePath);
+        const extracted = await extractTextFromReportFile(filePath, row.file_type, row.file_name);
         text = extracted.text;
         method = extracted.method;
+        extractionQuality = extracted.extractionQuality;
+        ocrConfidence = extracted.ocrConfidence;
       } catch (error) {
         const normalized = normalizeExtractionError(error);
         extractionIssues.push(`${row.file_name}: ${normalized}`);
         await updatePdfExtractionStatus(row.id, 'failed', { error: normalized });
-        logger.warn('PDF extraction failed for file', {
+        logger.warn('Report extraction failed for file', {
           caseId,
           fileId: row.id,
           fileName: row.file_name,
@@ -254,17 +215,24 @@ export const extractCaseReports = async (
         continue;
       }
 
-      await persistFreshExtraction({
+      await persistFreshReportExtraction({
         caseId,
         row,
         fileSha256,
         text,
         method,
+        extractionQuality,
+        ocrConfidence,
+      });
+
+      await updatePdfExtractionStatus(row.id, 'succeeded', {
+        error: null,
+        extractedAt: new Date(),
       });
     }
 
     const boundedText = text.slice(0, maxCharsPerFile);
-    if (boundedText.length < 40) {
+    if (boundedText.length < minChars) {
       const shortError = `extracted text too short (${boundedText.length} chars).`;
       extractionIssues.push(`${row.file_name}: ${shortError}`);
       await updatePdfExtractionStatus(row.id, 'failed', { error: shortError });
@@ -280,17 +248,20 @@ export const extractCaseReports = async (
       text: finalText,
       charCount: finalText.length,
       extractionMethod: method,
+      extractionQuality,
+      ocrConfidence,
       reused,
     });
 
     totalChars += finalText.length;
 
     if (!reused) {
-      logger.info('PDF extracted for analysis', {
+      logger.info('Report extracted for analysis', {
         caseId,
         fileId: row.id,
         fileName: row.file_name,
         method,
+        extractionQuality,
         charCount: finalText.length,
       });
     }
@@ -299,7 +270,7 @@ export const extractCaseReports = async (
   if (reports.length === 0) {
     const issueSummary = extractionIssues.length > 0 ? extractionIssues[0] : 'No extractable text found.';
     throw new Error(
-      `No extractable text found in uploaded PDF reports. ${issueSummary} Scanned-image/malformed/encrypted PDFs are not supported in V1.`
+      `No extractable text found in uploaded medical reports. ${issueSummary} Try a clearer photo, re-export the PDF, or upload an unlocked digital copy.`
     );
   }
 

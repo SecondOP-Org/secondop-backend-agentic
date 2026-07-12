@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-12 - SEC-72 - Hybrid OCR for medical reports (PDF scans + images)
+
+- Status: Ready for test.
+- Human approval: User requested implementation per AGENTS.md workflow.
+- Branch/worktree: `sec-72-hybrid-ocr-reports`.
+- Files changed: `migrations/019_document_ocr.sql`, `src/services/documentExtraction.service.ts`, `src/services/textractOcr.service.ts`, `src/services/visionOcr.service.ts`, `src/services/ocrConfig.service.ts`, `src/services/reportExtraction.service.ts`, `src/services/reportExtractionBackground.service.ts`, `src/services/medicalFileAnalysis.service.ts`, `src/controllers/file.controller.ts`, `src/controllers/case.controller.ts`, `src/services/analysis.service.ts`, `.env.example`, `scripts/setup-db.sh`, `package.json`, tests, `docs/AGENT_RUN_LEDGER.md`. Frontend: consultation upload/gating and extraction status UI.
+- PR: Pending.
+- Checks: Backend `npm run lint`, `npm test` (125 passed), `npm run build` passed. Frontend `npm run lint`, `npm run build` passed.
+- Deployment: None.
+- Verification: Tiered extraction pipeline (`pdf-parse` → Textract → vision for images), image report upload in consultation flow, analysis gate accepts PDF or image reports, OCR quality metadata drives synthesis uncertainty guidance.
+- Blockers: Vision fallback for scanned multi-page PDFs is Textract-only (no native PDF rasterization dependency added).
+- Follow-ups: Optional S3-backed Textract async for multi-page scanned PDFs; vision fallback on PDF page images if needed.
+
 ## 2026-07-02 - SEC-47 - Implement Phase 0 AI eval harness and contract checks
 
 - Status: Ready for test.

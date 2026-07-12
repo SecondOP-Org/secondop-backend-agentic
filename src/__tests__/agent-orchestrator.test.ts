@@ -77,6 +77,8 @@ describe('Case analysis agent orchestrator', () => {
         text: 'Chest pressure. Clinical report text. Worsening dyspnea. Urgent cardiology follow-up. Needs clinician confirmation.',
         charCount: 120,
         extractionMethod: 'pdf-parse',
+        extractionQuality: 'high',
+        ocrConfidence: null,
         reused: false,
       },
     ]);
@@ -88,6 +90,8 @@ describe('Case analysis agent orchestrator', () => {
         text: 'Chest pressure. Clinical report text. Worsening dyspnea. Urgent cardiology follow-up. Needs clinician confirmation.',
         charCount: 120,
         extractionMethod: 'pdf-parse' as const,
+        extractionQuality: 'high' as const,
+        ocrConfidence: null,
         reused: false,
       },
     ];
@@ -176,6 +180,8 @@ describe('Case analysis agent orchestrator', () => {
         text: 'Clinical report text',
         charCount: 20,
         extractionMethod: 'pdf-parse',
+        extractionQuality: 'high',
+        ocrConfidence: null,
         reused: false,
       },
     ]);

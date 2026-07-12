@@ -14,10 +14,13 @@ import {
 import { computeFileSha256 } from '../services/fileHash.service';
 import {
   invalidateCaseAnalysisAfterPdfChange,
+  isImageMedicalFile,
   isPdfMedicalFile,
+  isReportMedicalFile,
   updatePdfValidationStatus,
 } from '../services/medicalFileAnalysis.service';
-import { validatePdfUpload } from '../services/reportExtraction.service';
+import { queueReportExtraction } from '../services/reportExtractionBackground.service';
+import { validateImageUpload, validatePdfUpload } from '../services/reportExtraction.service';
 import { resolveStoredFilePath } from '../utils/uploadPath';
 
 interface AuthorizedFileRow {
@@ -131,6 +134,8 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
     const fileUrl = `/uploads/${req.file.filename}`;
     const isDicom = isDicomUpload(req.file);
     const isPdf = isPdfMedicalFile(req.file.mimetype, req.file.originalname);
+    const isImage = isImageMedicalFile(req.file.mimetype, req.file.originalname);
+    const isReport = isReportMedicalFile(req.file.mimetype, req.file.originalname);
     const filePath = resolveStoredFilePath(fileUrl);
     const fileSha256 = await computeFileSha256(filePath);
 
@@ -164,12 +169,18 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
         description,
         isDicom,
         fileSha256,
-        isPdf ? 'pending' : null,
-        isPdf ? 'pending' : null,
+        isReport ? 'pending' : null,
+        isReport ? 'pending' : null,
       ]
     );
 
-    const fileRecord = result.rows[0] as { id: string; case_id: string };
+    const fileRecord = result.rows[0] as {
+      id: string;
+      case_id: string;
+      file_name: string;
+      file_type: string;
+      file_url: string;
+    };
 
     if (isDicom) {
       await extractAndPersistDicomMetadata({
@@ -177,14 +188,40 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
         caseId: fileRecord.case_id,
         filePath,
       });
-    } else if (isPdf) {
-      const validation = await validatePdfUpload(filePath);
-      await updatePdfValidationStatus(
-        fileRecord.id,
-        validation.valid ? 'succeeded' : 'failed',
-        validation.error
-      );
+    } else if (isReport) {
+      if (isPdf) {
+        const validation = await validatePdfUpload(filePath);
+        await updatePdfValidationStatus(
+          fileRecord.id,
+          validation.valid ? 'succeeded' : 'failed',
+          validation.error
+        );
+      } else if (isImage) {
+        const validation = await validateImageUpload(filePath, req.file.mimetype);
+        await updatePdfValidationStatus(
+          fileRecord.id,
+          validation.valid ? 'succeeded' : 'failed',
+          validation.error
+        );
+      }
+
       await invalidateCaseAnalysisAfterPdfChange(caseId);
+      queueReportExtraction({
+        caseId: fileRecord.case_id,
+        fileSha256,
+        row: {
+          id: fileRecord.id,
+          file_name: fileRecord.file_name,
+          file_type: fileRecord.file_type,
+          file_url: fileRecord.file_url,
+          file_sha256: fileSha256,
+          pdf_validation_status: 'pending',
+          pdf_validation_error: null,
+          pdf_extraction_status: 'pending',
+          pdf_extraction_error: null,
+          pdf_extracted_at: null,
+        },
+      });
     }
 
     res.status(201).json({
@@ -275,7 +312,7 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
     }
 
     const file = await getAccessibleFileById(fileId, userId);
-    const isPdf = isPdfMedicalFile(file.file_type, file.file_name);
+    const isReport = isReportMedicalFile(file.file_type, file.file_name);
     const caseId = file.case_id;
 
     if (!caseId) {
@@ -291,7 +328,7 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
 
     await query('DELETE FROM medical_files WHERE id = $1', [fileId]);
 
-    const analysisInvalidated = isPdf ? await invalidateCaseAnalysisAfterPdfChange(caseId) : false;
+    const analysisInvalidated = isReport ? await invalidateCaseAnalysisAfterPdfChange(caseId) : false;
 
     res.json({
       status: 'success',

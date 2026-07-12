@@ -95,6 +95,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/017_practice_
 echo "  → Running 018_seed_demo_practice.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/018_seed_demo_practice.sql
 
+echo "  → Running 019_document_ocr.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/019_document_ocr.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory

@@ -118,6 +118,8 @@ describe('LLM gateway service integration', () => {
             text: 'Chest pressure noted. Report text reviewed. Worsening symptoms reported. Discuss diagnostics with specialist. Requires clinician review.',
             charCount: 120,
             extractionMethod: 'pdf-parse',
+            extractionQuality: 'high',
+            ocrConfidence: null,
             reused: false,
           },
         ]

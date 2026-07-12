@@ -347,7 +347,7 @@ describe('Case analysis controllers', () => {
     expect(next).toHaveBeenCalledTimes(1);
     const err = next.mock.calls[0][0] as AppError;
     expect(err.statusCode).toBe(400);
-    expect(err.message).toContain('At least one PDF file is required');
+    expect(err.message).toContain('At least one medical report');
   });
 
   it('returns failed analysis payload with a clear extraction error', async () => {
