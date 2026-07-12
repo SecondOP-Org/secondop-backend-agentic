@@ -26,6 +26,7 @@ import {
   saveDoctorResponseDraft,
   validateDoctorResponseForSend,
 } from '../services/doctorResponse.service';
+import { startCaseReview } from '../services/doctorCaseWorkflow.service';
 import {
   isStructuredDoctorResponsePayload,
   parseDoctorResponseDraft,
@@ -969,6 +970,23 @@ export const updateCaseStatus = async (req: AuthRequest, res: Response, next: Ne
   }
 };
 
+export const startCaseReviewHandler = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
+
+    const result = await startCaseReview(caseId, userId);
+
+    res.json({
+      status: 'success',
+      data: result,
+      message: 'Case review started',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getDoctorResponseDraft = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { caseId } = req.params;
@@ -1030,7 +1048,8 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
               p.last_name as patient_last_name,
               d.first_name as doctor_first_name,
               d.last_name as doctor_last_name,
-              d.specialty as doctor_specialty
+              d.specialty as doctor_specialty,
+              d.license_number as doctor_license_number
        FROM cases c
        JOIN patients p ON p.id = c.patient_id
        JOIN case_assignments ca ON ca.case_id = c.id
@@ -1059,6 +1078,7 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         patientName,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
+        doctorLicenseNumber: row.doctor_license_number || null,
         submittedDate: row.submitted_date,
         questionAnswers: payload.questionAnswers,
         summary: payload.summary,
@@ -1076,6 +1096,7 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         patientName,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
+        doctorLicenseNumber: row.doctor_license_number || null,
         submittedDate: row.submitted_date,
         clinicalResponse: content,
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
@@ -1114,7 +1135,8 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
               p.last_name as patient_last_name,
               d.first_name as doctor_first_name,
               d.last_name as doctor_last_name,
-              d.specialty as doctor_specialty
+              d.specialty as doctor_specialty,
+              d.license_number as doctor_license_number
        FROM cases c
        JOIN patients p ON p.id = c.patient_id
        JOIN case_assignments ca ON ca.case_id = c.id
@@ -1149,6 +1171,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         patientName,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
+        doctorLicenseNumber: row.doctor_license_number || null,
         submittedDate: row.submitted_date,
         questionAnswers: payload.questionAnswers,
         summary: payload.summary,
@@ -1170,6 +1193,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         patientName,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
+        doctorLicenseNumber: row.doctor_license_number || null,
         clinicalResponse: content,
         submittedDate: row.submitted_date,
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
