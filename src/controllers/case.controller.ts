@@ -32,6 +32,7 @@ import {
   parseDoctorResponseSend,
 } from '../schemas/doctorResponse.schema';
 import { generateCaseNumber } from '../utils/caseNumber';
+import { resolveCaseId } from '../utils/caseIdentifier';
 import {
   DOCTOR_INBOX_CASE_STATUSES,
   DEFAULT_TURNAROUND_DAYS,
@@ -389,7 +390,7 @@ export const queueCaseAnalysis = async (req: AuthRequest, res: Response, next: N
 
 export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { caseId } = req.params;
+    const caseId = await resolveCaseId(req.params.caseId);
     const userId = req.user!.id;
     const userType = req.user!.type;
     const includeAgentic = String(req.query.includeAgentic || "").toLowerCase() === "true";
@@ -472,7 +473,7 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
       payload.agenticShadowStatus = latestAgenticRun?.status || "not_run";
       payload.agenticCriticScore = latestShadow?.critic_score_json || null;
       payload.executionMode = latestAgenticRun?.execution_mode || null;
-      payload.agenticMode = latestAgenticRun
+      payload.agenticMode = latestAgenticRun?.execution_mode
         ? toLegacyExecutionMode(latestAgenticRun.execution_mode)
         : null;
     }
@@ -488,7 +489,7 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
 
 export const getCaseAnalysisTrace = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { caseId } = req.params;
+    const caseId = await resolveCaseId(req.params.caseId);
     const userId = req.user!.id;
     const userType = req.user!.type;
     const runId = typeof req.query.runId === "string" ? req.query.runId : undefined;
