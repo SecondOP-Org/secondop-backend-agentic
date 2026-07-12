@@ -33,6 +33,7 @@ import labResultsRoutes from './routes/labResults.routes';
 import billingRoutes from './routes/billing.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import doctorRoutes from './routes/doctor.routes';
+import practiceRoutes from './routes/practice.routes';
 import commandCenterRoutes from './routes/commandCenter.routes';
 import aiGatewayRoutes from './routes/aiGateway.routes';
 import { buildHealthResponse, getVersion } from './controllers/version.controller';
@@ -165,6 +166,7 @@ app.use(`/api/${API_VERSION}/lab-results`, labResultsRoutes);
 app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 app.use(`/api/${API_VERSION}/appointments`, appointmentRoutes);
 app.use(`/api/${API_VERSION}/doctors`, doctorRoutes);
+app.use(`/api/${API_VERSION}/practices`, practiceRoutes);
 app.use(`/api/${API_VERSION}/admin/command-center`, commandCenterRoutes);
 app.use(`/api/${API_VERSION}/ai-gateway`, aiGatewayRoutes);
 
