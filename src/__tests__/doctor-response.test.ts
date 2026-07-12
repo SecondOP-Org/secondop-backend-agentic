@@ -291,6 +291,7 @@ describe('doctor response workflow', () => {
             },
           ],
           summary: 'Overall summary',
+          attestationAccepted: true,
         },
         { caseId: 'case-1' }
       );
@@ -316,6 +317,7 @@ describe('doctor response workflow', () => {
               { questionId: 'sq-1', question: 'Question 1', answer: 'Answer 1' },
             ],
             summary: 'Summary',
+            attestationAccepted: true as const,
           }
         )
       ).toThrow(AppError);
@@ -445,6 +447,7 @@ describe('doctor response workflow', () => {
             },
           ],
           summary: 'Overall summary',
+          attestationAccepted: true,
         },
         { caseId: 'case-1' }
       );

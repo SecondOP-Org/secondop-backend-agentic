@@ -15,6 +15,7 @@ export interface DoctorOpinionPdfInput {
   patientName: string;
   doctorName: string;
   doctorSpecialty: string;
+  doctorLicenseNumber?: string | null;
   submittedDate?: string | null;
   clinicalResponse?: string;
   questionAnswers?: DoctorOpinionQuestionAnswer[];
@@ -166,6 +167,9 @@ const renderDoctorOpinionPdf = (
   doc.text(
     `${input.doctorName}${input.doctorSpecialty ? ` — ${input.doctorSpecialty}` : ''}`
   );
+  if (input.doctorLicenseNumber) {
+    doc.text(`License / registration: ${input.doctorLicenseNumber}`);
+  }
   doc.moveDown(0.75);
 
   const structuredAnswers = (input.questionAnswers || []).filter(
@@ -194,6 +198,14 @@ const renderDoctorOpinionPdf = (
     drawSectionHeader(doc, 'Clinical Opinion');
     drawBodyParagraph(doc, legacyResponse);
   }
+
+  drawSectionHeader(doc, 'Specialist Attestation');
+  drawBodyParagraph(
+    doc,
+    `I, ${input.doctorName}${input.doctorSpecialty ? `, ${input.doctorSpecialty}` : ''}${
+      input.doctorLicenseNumber ? ` (License ${input.doctorLicenseNumber})` : ''
+    }, attest that this report reflects my independent clinical judgment based on the records and information available at the time of review.`
+  );
 
   drawFooterDisclaimer(doc, Boolean(input.aiAssistedReview));
 };

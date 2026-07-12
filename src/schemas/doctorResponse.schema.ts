@@ -20,6 +20,9 @@ export const doctorResponseSendSchema = doctorResponseDraftSchema.extend({
     })
   ),
   summary: z.string().min(1, 'summary is required'),
+  attestationAccepted: z.literal(true, {
+    errorMap: () => ({ message: 'Attestation is required before sending' }),
+  }),
 });
 
 export type DoctorQuestionAnswer = z.infer<typeof doctorQuestionAnswerSchema>;

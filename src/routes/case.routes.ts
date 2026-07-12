@@ -19,6 +19,7 @@ import {
   getDoctorResponseDraft,
   saveDoctorResponseDraftHandler,
   previewDoctorOpinion,
+  startCaseReviewHandler,
 } from '../controllers/case.controller';
 import { authenticate, authorize } from '../middleware/auth';
 
@@ -41,6 +42,7 @@ router.get('/doctor/stats', authorize('doctor'), getDoctorDashboardStats);
 router.delete('/:caseId/doctor-assignment', authorize('doctor'), removeDoctorCaseAssignment);
 router.post('/:caseId/assign', authorize('patient'), assignDoctorToCase);
 router.put('/:caseId/status', authorize('doctor'), updateCaseStatus);
+router.post('/:caseId/start-review', authorize('doctor'), startCaseReviewHandler);
 router.get('/:caseId/doctor-response', authorize('doctor'), getDoctorResponseDraft);
 router.put('/:caseId/doctor-response', authorize('doctor'), saveDoctorResponseDraftHandler);
 router.post('/:caseId/doctor-opinion/preview', authorize('doctor'), previewDoctorOpinion);

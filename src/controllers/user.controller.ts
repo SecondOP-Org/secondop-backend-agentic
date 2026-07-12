@@ -81,7 +81,31 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
         [firstName, lastName, dateOfBirth, gender, address, city, state, country, postalCode, userId]
       );
     } else {
-      const { firstName, lastName, specialty, bio, consultationFee, languages } = updates;
+      const {
+        firstName,
+        lastName,
+        specialty,
+        bio,
+        consultationFee,
+        languages,
+        subSpecialties,
+        licenseNumber,
+        yearsOfExperience,
+        hospitalAffiliation,
+        education,
+        certifications,
+        city,
+        country,
+        phone,
+      } = updates;
+
+      if (phone) {
+        await query(
+          'UPDATE users SET phone = COALESCE($1, phone), updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+          [phone, userId]
+        );
+      }
+
       await query(
         `UPDATE doctors SET 
          first_name = COALESCE($1, first_name),
@@ -90,9 +114,33 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
          bio = COALESCE($4, bio),
          consultation_fee = COALESCE($5, consultation_fee),
          languages = COALESCE($6, languages),
+         sub_specialties = COALESCE($7, sub_specialties),
+         license_number = COALESCE($8, license_number),
+         years_of_experience = COALESCE($9, years_of_experience),
+         hospital_affiliation = COALESCE($10, hospital_affiliation),
+         education = COALESCE($11, education),
+         certifications = COALESCE($12, certifications),
+         city = COALESCE($13, city),
+         country = COALESCE($14, country),
          updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $7`,
-        [firstName, lastName, specialty, bio, consultationFee, languages, userId]
+         WHERE user_id = $15`,
+        [
+          firstName,
+          lastName,
+          specialty,
+          bio,
+          consultationFee,
+          languages,
+          subSpecialties,
+          licenseNumber,
+          yearsOfExperience,
+          hospitalAffiliation,
+          education,
+          certifications,
+          city,
+          country,
+          userId,
+        ]
       );
     }
 
