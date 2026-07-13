@@ -18,7 +18,9 @@ export const synthesizeSummaryTool = async (
       ? `Critic feedback to address before finalizing: ${state.criticFeedback}`
       : undefined;
 
-    const analysis = await generateCaseAnalysis(state.intake, state.reports, guidance, context.model);
+    const analysis = await generateCaseAnalysis(state.intake, state.reports, guidance, context.model, {
+      runId: context.runId,
+    });
 
     return {
       ...state,

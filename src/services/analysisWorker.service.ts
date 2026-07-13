@@ -26,6 +26,7 @@ import {
   buildShadowComparisonMetrics,
   insertCaseAnalysisArtifact,
 } from './caseAnalysisRunArtifact.service';
+import { clearDeidVault } from './deidVault.service';
 
 const maxCharsPerFile = parseInt(process.env.ANALYSIS_MAX_CHARS_PER_FILE || '12000', 10);
 const maxTotalChars = parseInt(process.env.ANALYSIS_MAX_TOTAL_CHARS || '30000', 10);
@@ -302,6 +303,8 @@ class AnalysisWorker {
         ]
       );
 
+      await clearDeidVault(runId);
+
       agenticRunSpan.end('OK');
       logger.info(`Agentic analysis completed for case ${caseId} (run ${runId}, mode ${mode})`);
     } catch (error) {
@@ -412,6 +415,7 @@ class AnalysisWorker {
           agenticRun.id,
           buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics)
         );
+        await clearDeidVault(agenticRun.id);
         agenticRunSpan.end('OK');
 
         if (pipelineState.analysis) {

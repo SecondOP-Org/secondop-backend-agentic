@@ -13,7 +13,17 @@ import {
   enforceCaseAnalysisContract,
   LOW_CONFIDENCE_THRESHOLD,
 } from '../evals/contractChecks';
-
+import {
+  collectReportMappings,
+  deidentifyIntakeNarratives,
+  reidentifyArtifact,
+} from './analysisDeidentification.service';
+import { mergeMappings } from './deidentification.service';
+import {
+  resolveTokenMapping,
+  upsertDeidVault,
+} from './deidVault.service';
+import { getPresidioConfig } from './presidioConfig.service';
 export interface CaseIntakeData {
   age: number;
   sex: string;
@@ -68,7 +78,7 @@ const buildSystemPrompt = (): string => {
   ].join('\n');
 };
 
-const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport[], guidance?: string): string => {
+export const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport[], guidance?: string): string => {
   const reportText = reports
     .map((report, index) => {
       const qualityNote =
@@ -245,7 +255,8 @@ export const generateCaseAnalysis = async (
   intake: CaseIntakeData,
   reports: ExtractedReport[],
   guidance?: string,
-  overrideModel?: string
+  overrideModel?: string,
+  options?: { runId?: string }
 ): Promise<CaseAnalysisResult> => {
   const client = getOpenAIClient();
   if (!client) {
@@ -254,6 +265,19 @@ export const generateCaseAnalysis = async (
 
   const selectedModel = overrideModel || getModelName();
   validateLiteLlmModelAlias(selectedModel);
+  const runId = options?.runId;
+
+  // De-identify intake narratives; report text was already tokenized in extractCaseReports.
+  const deidentifiedIntake = await deidentifyIntakeNarratives(intake);
+  let tokenMapping = mergeMappings(deidentifiedIntake.mapping, collectReportMappings(reports));
+
+  // Persist sealed vault BEFORE the LLM call so crash/retry can still re-identify.
+  if (runId && getPresidioConfig().enabled && Object.keys(tokenMapping).length > 0) {
+    await upsertDeidVault(runId, tokenMapping);
+  }
+
+  const promptIntake = deidentifiedIntake.intake;
+  const userPrompt = buildUserPrompt(promptIntake, reports, guidance);
 
   const completionRequest: OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming & {
     metadata?: Record<string, string>;
@@ -267,7 +291,7 @@ export const generateCaseAnalysis = async (
       },
       {
         role: 'user',
-        content: buildUserPrompt(intake, reports, guidance),
+        content: userPrompt,
       },
     ],
     response_format: {
@@ -354,10 +378,16 @@ export const generateCaseAnalysis = async (
 
   const validated = parseAndValidateOutput(rawContent, reports, selectedModel, usageMetrics);
 
+  // Prefer in-memory map; fall back to durable sealed vault (crash/retry safety).
+  tokenMapping = await resolveTokenMapping(runId, tokenMapping);
+
+  // Re-identify for clinician-facing artifact; model only ever saw tokens.
+  const clinicianFacing = reidentifyArtifact(validated.artifact, tokenMapping);
+
   return {
-    summary: validated.summary,
-    topQuestions: validated.topQuestions,
-    artifact: validated.artifact,
+    summary: clinicianFacing.summary,
+    topQuestions: clinicianFacing.topQuestions,
+    artifact: clinicianFacing.artifact,
     model: selectedModel,
     usage: usageMetrics,
   };

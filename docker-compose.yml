@@ -70,6 +70,37 @@ services:
       - ./litellm/config.example.yaml:/app/config.yaml:ro
     command: ["--config", "/app/config.yaml", "--port", "4000"]
 
+  # Microsoft Presidio — PHI/PII detection + anonymization sidecars (opt-in profile).
+  # Start with: docker compose --profile deid up -d
+  # Then set DEID_ENABLED=true and the PRESIDIO_* URLs in .env
+  presidio-analyzer:
+    image: mcr.microsoft.com/presidio-analyzer:latest
+    container_name: secondop-presidio-analyzer
+    profiles: ["deid"]
+    restart: unless-stopped
+    ports:
+      - "${PRESIDIO_ANALYZER_PORT:-5002}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  presidio-anonymizer:
+    image: mcr.microsoft.com/presidio-anonymizer:latest
+    container_name: secondop-presidio-anonymizer
+    profiles: ["deid"]
+    restart: unless-stopped
+    ports:
+      - "${PRESIDIO_ANONYMIZER_PORT:-5001}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 volumes:
   secondop_postgres_data:
   secondop_pgadmin_data:

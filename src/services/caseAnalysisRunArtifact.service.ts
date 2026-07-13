@@ -1,6 +1,10 @@
 import { query } from '../database/connection';
 import { CaseAnalysisArtifact } from './analysisArtifact.service';
 import { CaseAnalysisResult, CaseIntakeData } from './analysis.service';
+import {
+  aggregateDeidentificationAudits,
+  DeidentificationAudit,
+} from './deidentification.service';
 import { ExtractedReport } from './reportExtraction.service';
 
 export const CASE_ANALYSIS_ARTIFACT_VERSION = '1';
@@ -151,19 +155,36 @@ export const buildBaselineValidationPayload = (intake: CaseIntakeData): Record<s
   allergies: intake.allergies,
 });
 
-export const buildExtractionPayload = (reports: ExtractedReport[]): Record<string, unknown> => ({
-  reportCount: reports.length,
-  totalChars: reports.reduce((sum, report) => sum + report.charCount, 0),
-  reusedCount: reports.filter((report) => report.reused).length,
-  reports: reports.map((report) => ({
-    fileId: report.fileId,
-    fileName: report.fileName,
-    charCount: report.charCount,
-    extractionMethod: report.extractionMethod,
-    reused: report.reused,
-    textPreview: report.text.slice(0, 500),
-  })),
-});
+export const buildExtractionPayload = (reports: ExtractedReport[]): Record<string, unknown> => {
+  const deidentification = aggregateDeidentificationAudits(
+    reports
+      .map((report) => report.deidentification)
+      .filter((audit): audit is DeidentificationAudit => Boolean(audit))
+  );
+
+  return {
+    reportCount: reports.length,
+    totalChars: reports.reduce((sum, report) => sum + report.charCount, 0),
+    reusedCount: reports.filter((report) => report.reused).length,
+    deidentification,
+    reports: reports.map((report) => ({
+      fileId: report.fileId,
+      fileName: report.fileName,
+      charCount: report.charCount,
+      extractionMethod: report.extractionMethod,
+      reused: report.reused,
+      textPreview: report.text.slice(0, 500),
+      deidentification: report.deidentification
+        ? {
+            enabled: report.deidentification.enabled,
+            entityCount: report.deidentification.entityCount,
+            entities: report.deidentification.entities,
+            operator: report.deidentification.operator,
+          }
+        : null,
+    })),
+  };
+};
 
 export const buildSynthesisPayload = (analysis: CaseAnalysisResult, observations: string[] | undefined): Record<string, unknown> => ({
   model: analysis.model,

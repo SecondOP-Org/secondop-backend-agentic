@@ -10,7 +10,9 @@ export const extractReportsTool = async (
   }
 
   try {
-    const reports = await extractCaseReports(context.caseId, context.maxCharsPerFile, context.maxTotalChars);
+    const reports = await extractCaseReports(context.caseId, context.maxCharsPerFile, context.maxTotalChars, {
+      runId: context.runId,
+    });
 
     return {
       ...state,

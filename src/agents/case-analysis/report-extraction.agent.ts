@@ -11,7 +11,9 @@ export class ReportExtractionAgent implements AgentStep<CaseAnalysisPipelineStat
     }
 
     try {
-      const reports = await extractCaseReports(context.caseId, context.maxCharsPerFile, context.maxTotalChars);
+      const reports = await extractCaseReports(context.caseId, context.maxCharsPerFile, context.maxTotalChars, {
+      runId: context.runId,
+    });
 
       return {
         ...input,
