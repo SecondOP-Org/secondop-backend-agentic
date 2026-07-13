@@ -30,16 +30,16 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-13 - (no Linear) - Presidio production-grade durable vault
 
-- Status: Ready for test.
-- Human approval: User asked to make Presidio de-identification production grade.
+- Status: In Review (draft PR).
+- Human approval: User asked to make Presidio de-identification production grade, then commit and open a draft PR.
 - Branch/worktree: `presidio-phase1-deidentification`.
 - Files changed: `migrations/020_case_analysis_deid_vault.sql`, `src/services/deidVault.service.ts`, `presidioHealth.service.ts`, analysis/reportExtraction/persist/worker wiring with `runId`, Presidio status route, docker healthchecks, tests, setup-db, docs.
-- PR: Pending.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/46 (draft)
 - Checks: `npm run lint`, `npm test` (138 passed, 1 skipped), `npm run build`, `npm run eval:harness` passed. Local migration `020` applied.
 - Deployment: None. Requires migration `020` + Presidio sidecars + `DEID_REVERSIBLE_KEY` before enabling in staging.
-- Verification: Sealed vault upsert before LLM; load-on-reidentify fallback; clear after success; fail closed without key; health probes.
-- Blockers: Railway Presidio deploy + human staging enablement.
-- Follow-ups: Vision-OCR image PHI; staging smoke with DEID_ENABLED.
+- Verification: Sealed vault upsert before LLM; load-on-reidentify fallback; clear after success; fail closed without key; health probes; live Presidio smoke with fake PHI passed earlier.
+- Blockers: Railway Presidio deploy + human staging enablement; waiting on merge approval.
+- Follow-ups: Vision-OCR image PHI; staging smoke with DEID_ENABLED; align workspace `AI_CONTRACT.md` if maintained outside this repo.
 
 ## 2026-07-13 - (no Linear) - Presidio full de-identification (Phases 1–3)
 
