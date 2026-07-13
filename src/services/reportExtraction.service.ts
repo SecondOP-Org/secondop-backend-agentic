@@ -13,6 +13,14 @@ import {
   persistMedicalFileHash,
   updatePdfExtractionStatus,
 } from './medicalFileAnalysis.service';
+import {
+  DeidentificationAudit,
+  DeidentificationMapping,
+  deidentifyText,
+  mergeMappings,
+} from './deidentification.service';
+import { upsertDeidVault } from './deidVault.service';
+import { getPresidioConfig } from './presidioConfig.service';
 
 export interface ExtractedReport {
   fileId: string;
@@ -23,6 +31,9 @@ export interface ExtractedReport {
   extractionQuality: ExtractionQuality;
   ocrConfidence: number | null;
   reused: boolean;
+  deidentification?: DeidentificationAudit;
+  /** Server-side only token map. Never include in API responses or observability payloads. */
+  mapping?: DeidentificationMapping;
 }
 
 export const extractTextFromPdf = async (
@@ -135,7 +146,8 @@ const loadReportMedicalFiles = async (caseId: string): Promise<MedicalFilePdfRow
 export const extractCaseReports = async (
   caseId: string,
   maxCharsPerFile: number,
-  maxTotalChars: number
+  maxTotalChars: number,
+  options?: { runId?: string }
 ): Promise<ExtractedReport[]> => {
   const reportRows = await loadReportMedicalFiles(caseId);
   const minChars = getOcrConfig().minChars;
@@ -242,18 +254,25 @@ export const extractCaseReports = async (
     const remaining = maxTotalChars - totalChars;
     const finalText = boundedText.slice(0, remaining);
 
+    // De-identify before text enters the analysis pipeline / LLM prompt path.
+    // Raw OCR cache remains local; fail closed when DEID_ENABLED and Presidio is down.
+    const deidentified = await deidentifyText(finalText);
+    const analysisText = deidentified.deidentifiedText;
+
     reports.push({
       fileId: row.id,
       fileName: row.file_name,
-      text: finalText,
-      charCount: finalText.length,
+      text: analysisText,
+      charCount: analysisText.length,
       extractionMethod: method,
       extractionQuality,
       ocrConfidence,
       reused,
+      deidentification: deidentified.audit,
+      mapping: deidentified.mapping,
     });
 
-    totalChars += finalText.length;
+    totalChars += analysisText.length;
 
     if (!reused) {
       logger.info('Report extracted for analysis', {
@@ -262,7 +281,8 @@ export const extractCaseReports = async (
         fileName: row.file_name,
         method,
         extractionQuality,
-        charCount: finalText.length,
+        charCount: analysisText.length,
+        deidEntityCount: deidentified.audit.entityCount,
       });
     }
   }
@@ -272,6 +292,14 @@ export const extractCaseReports = async (
     throw new Error(
       `No extractable text found in uploaded medical reports. ${issueSummary} Try a clearer photo, re-export the PDF, or upload an unlocked digital copy.`
     );
+  }
+
+  // Mid-run durability: seal report token maps before synthesis/LLM.
+  if (options?.runId && getPresidioConfig().enabled) {
+    const reportMapping = mergeMappings(...reports.map((report) => report.mapping));
+    if (Object.keys(reportMapping).length > 0) {
+      await upsertDeidVault(options.runId, reportMapping);
+    }
   }
 
   return reports;

@@ -28,6 +28,32 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-13 - (no Linear) - Presidio production-grade durable vault
+
+- Status: In Review (draft PR).
+- Human approval: User asked to make Presidio de-identification production grade, then commit and open a draft PR.
+- Branch/worktree: `presidio-phase1-deidentification`.
+- Files changed: `migrations/020_case_analysis_deid_vault.sql`, `src/services/deidVault.service.ts`, `presidioHealth.service.ts`, analysis/reportExtraction/persist/worker wiring with `runId`, Presidio status route, docker healthchecks, tests, setup-db, docs.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/46 (draft)
+- Checks: `npm run lint`, `npm test` (138 passed, 1 skipped), `npm run build`, `npm run eval:harness` passed. Local migration `020` applied.
+- Deployment: None. Requires migration `020` + Presidio sidecars + `DEID_REVERSIBLE_KEY` before enabling in staging.
+- Verification: Sealed vault upsert before LLM; load-on-reidentify fallback; clear after success; fail closed without key; health probes; live Presidio smoke with fake PHI passed earlier.
+- Blockers: Railway Presidio deploy + human staging enablement; waiting on merge approval.
+- Follow-ups: Vision-OCR image PHI; staging smoke with DEID_ENABLED; align workspace `AI_CONTRACT.md` if maintained outside this repo.
+
+## 2026-07-13 - (no Linear) - Presidio full de-identification (Phases 1–3)
+
+- Status: Ready for test.
+- Human approval: User asked to skip Linear and implement the full `PRESIDIO_DEIDENTIFICATION_SPEC.md`.
+- Branch/worktree: `presidio-phase1-deidentification`.
+- Files changed: Presidio client/config/recognizers, deidentification + analysisDeidentification services, reportExtraction/analysis/visionOcr wiring, docker-compose deid profile, `.env.example`, AI_CONTRACT (workspace), tests, spec, ledger.
+- PR: Pending.
+- Checks: `npm run lint`, `npm test` (133 passed, 1 skipped), `npm run build`, `npm run eval:harness` passed.
+- Deployment: None. Railway Presidio sidecars not provisioned (requires human/ops).
+- Verification: Token vault de-id before LLM; reidentify clinician artifact; intake narrative de-id; MRN/insurance/accession ad-hoc recognizers; fail-closed; audit without raw PHI.
+- Blockers: Live Presidio containers for end-to-end smoke; optional `DEID_REVERSIBLE_KEY` for sealed maps; Railway deploy approval.
+- Follow-ups: Vision-OCR image PHI; durable DB vault column if cross-process resume needed; Railway Presidio services.
+
 ## 2026-07-12 - SEC-72 - Hybrid OCR for medical reports (PDF scans + images)
 
 - Status: Ready for test.

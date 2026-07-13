@@ -1,5 +1,6 @@
 import { query } from '../../database/connection';
 import { markAnalysisRunSucceeded } from '../../services/analysisRun.service';
+import { clearDeidVault } from '../../services/deidVault.service';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
@@ -44,6 +45,9 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         completionTokens: input.analysis.usage?.completionTokens ?? null,
         totalTokens: input.analysis.usage?.totalTokens ?? null,
       });
+
+      // Clinician artifact is persisted with real values; drop sealed map to minimize PHI retention.
+      await clearDeidVault(context.runId);
 
       return input;
     } catch (error) {

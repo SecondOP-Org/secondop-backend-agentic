@@ -92,7 +92,7 @@ The backend exposes `GET /api/v1/ai-gateway/status` for doctors. It reports mode
 ## Out Of Scope For V1
 
 - Production rollout
-- PHI tokenization
+- PHI tokenization (handled separately via Presidio; see `PRESIDIO_DEIDENTIFICATION_SPEC.md`)
 - Automatic provider routing beyond LiteLLM config aliases
 - Prompt changes
 - Output schema changes

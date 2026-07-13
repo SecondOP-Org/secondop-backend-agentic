@@ -50,6 +50,7 @@ const pdfRow = {
 describe('reportExtraction reuse', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.DEID_ENABLED = 'false';
     mockedExistsSync.mockReturnValue(true);
     mockedComputeFileSha256.mockResolvedValue('hash-1');
     mockedReadFile.mockResolvedValue(Buffer.from('%PDF-1.4 clinical report text content long enough for extraction'));

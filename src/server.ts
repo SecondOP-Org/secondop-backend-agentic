@@ -36,6 +36,7 @@ import doctorRoutes from './routes/doctor.routes';
 import practiceRoutes from './routes/practice.routes';
 import commandCenterRoutes from './routes/commandCenter.routes';
 import aiGatewayRoutes from './routes/aiGateway.routes';
+import presidioRoutes from './routes/presidio.routes';
 import { buildHealthResponse, getVersion } from './controllers/version.controller';
 
 // Load environment variables
@@ -169,6 +170,7 @@ app.use(`/api/${API_VERSION}/doctors`, doctorRoutes);
 app.use(`/api/${API_VERSION}/practices`, practiceRoutes);
 app.use(`/api/${API_VERSION}/admin/command-center`, commandCenterRoutes);
 app.use(`/api/${API_VERSION}/ai-gateway`, aiGatewayRoutes);
+app.use(`/api/${API_VERSION}/presidio`, presidioRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
