@@ -30,15 +30,15 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-14 - SEC-84 - DICOM header PHI de-identification on ingest
 
-- Status: In Progress.
+- Status: In Review (draft PR).
 - Human approval: User asked to merge SEC-83 and continue.
 - Branch/worktree: `sec-84-dicom-deid`.
 - Files changed: `dicomDeidentification.service.ts`, `022_dicom_deid_vault.sql`, ingest/upload wiring, `dcmjs` dependency, tests, `.env.example`, setup-db/migrate through 022.
-- PR: (pending)
-- Checks: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/51 (draft)
+- Checks: `npm run lint`, `npm test` (151 passed, 1 skipped), `npm run build`.
 - Deployment: None. Apply migration `022`; enable `DICOM_DEID_ENABLED` only with `DEID_REVERSIBLE_KEY` after compliance review.
 - Verification: Header PHI stripped/replaced; study UID remap consistent; sealed vault; audit without raw PHI.
-- Blockers: Waiting on merge approval after PR.
+- Blockers: Waiting on merge approval.
 - Follow-ups: Burned-in pixel PHI / Presidio image redactor; privileged re-id tooling.
 
 ## 2026-07-14 - SEC-83 - Key-image capture into opinion PDF
