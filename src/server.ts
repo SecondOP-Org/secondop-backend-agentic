@@ -20,6 +20,7 @@ import { analysisWorker } from './services/analysisWorker.service';
 import { ensureDemoData } from './services/demoData.service';
 import { initializePhoenixObservability } from './observability/phoenix.service';
 import { parseCorsOrigins } from './config/cors';
+import { assertAgenticRuntimeConfigAtStartup } from './config/agenticRuntime';
 
 // Import routes
 import authRoutes from './routes/auth.routes';
@@ -221,6 +222,9 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
+    // Fail fast on unsupported AGENTIC_RUNTIME before accepting traffic.
+    assertAgenticRuntimeConfigAtStartup();
+
     // Initialize database connection
     await initializeDatabase();
     logger.info('Database connected successfully');

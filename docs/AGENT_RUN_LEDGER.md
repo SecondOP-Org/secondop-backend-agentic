@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-14 - SEC-14 - Guard unsupported LangChain runtime at startup
+
+- Status: In Progress.
+- Human approval: User asked for SEC-14 then SEC-11.
+- Branch/worktree: `sec-14-langchain-runtime-guard`.
+- Files changed: `src/config/agenticRuntime.ts`, `src/server.ts` startup assert, adapter/orchestration shared helpers, tests, `.env.example`, `docs/LANGGRAPH_RUNTIME.md`.
+- PR: (pending)
+- Checks: (pending)
+- Deployment: None.
+- Verification: Unsupported `AGENTIC_RUNTIME` fails startup; `native`/`langchain` preserved; langchain fallback policy logged explicitly.
+- Blockers: None.
+- Follow-ups: SEC-11 pagination after this PR is ready.
+
 ## 2026-07-14 - SEC-51 - Real-time case-analysis progress stream
 
 - Status: In Review (draft PRs).

@@ -17,10 +17,9 @@ import { synthesizeSummaryTool } from '../tools/synthesize.tool';
 import { getLangGraphCheckpointer } from './checkpointer';
 import { buildLangGraphThreadId } from './threadId';
 import { LangChainAgentAdapter, LangChainRunResult } from './types';
+import { isLangChainRuntimeEnabled } from '../../config/agenticRuntime';
 
-export const isLangChainRuntimeEnabled = (): boolean => {
-  return (process.env.AGENTIC_RUNTIME || 'native').toLowerCase() === 'langchain';
-};
+export { isLangChainRuntimeEnabled };
 
 interface LangGraphRuntimeState {
   state: AgenticLoopState;
