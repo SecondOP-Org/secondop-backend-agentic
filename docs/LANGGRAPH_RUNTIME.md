@@ -27,7 +27,8 @@ The first graph intentionally mirrors the existing workflow:
 
 - Default: `AGENTIC_RUNTIME=native` or unset.
 - LangGraph path: set `AGENTIC_RUNTIME=langchain`.
-- Fallback: `AGENTIC_LANGCHAIN_ALLOW_FALLBACK=true` keeps native fallback enabled if the LangGraph runtime fails.
+- Supported values only: `native`, `langchain`. Any other value fails process startup (SEC-14) via `assertAgenticRuntimeConfigAtStartup()` in `src/server.ts`.
+- Fallback: `AGENTIC_LANGCHAIN_ALLOW_FALLBACK=true` keeps native fallback enabled if the LangGraph runtime fails. Startup logs make this policy explicit when `langchain` is selected.
 - Checkpoint schema: `LANGGRAPH_CHECKPOINT_SCHEMA=public` by default. The migration creates the official LangGraph checkpoint tables in the default schema.
 
 ## Durable Checkpoints

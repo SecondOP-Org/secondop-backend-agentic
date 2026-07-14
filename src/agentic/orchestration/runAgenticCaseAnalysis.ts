@@ -12,6 +12,7 @@ import { persistShadowTool } from '../tools/persist_shadow.tool';
 import { synthesizeSummaryTool } from '../tools/synthesize.tool';
 import { AgenticMode, AgenticRuntimeContext } from '../core/types';
 import { buildAgenticRunMetrics } from '../observability/metrics';
+import { isLangChainFallbackAllowed } from '../../config/agenticRuntime';
 import { isLangChainRuntimeEnabled, runAgenticViaLangChain } from '../langchain/adapter';
 
 interface RunAgenticCaseAnalysisOptions {
@@ -77,7 +78,7 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
         };
         logger.info(`LangChain runtime used for case ${options.caseId} (run ${options.runId})`);
       } catch (error) {
-        const fallbackAllowed = (process.env.AGENTIC_LANGCHAIN_ALLOW_FALLBACK || 'true').toLowerCase() !== 'false';
+        const fallbackAllowed = isLangChainFallbackAllowed();
         if (!fallbackAllowed) {
           throw error;
         }
