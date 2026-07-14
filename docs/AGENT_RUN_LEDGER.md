@@ -34,8 +34,8 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked to merge SEC-82 and proceed.
 - Branch/worktree: `sec-83-key-images`.
 - Files changed: `doctorResponse.schema.ts` (`keyImages`), `doctorResponse.service.ts` (append/resolve labels), `doctorOpinionPdf.service.ts` (embed section), `case.controller.ts` / `case.routes.ts` (`POST .../key-images`), `upload.ts` (`keyImageUpload`); FE Send to report + draft list.
-- PR: (pending push)
-- Checks: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/50 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/49
+- Checks: `npm run lint`, `npm test` (146 passed, 1 skipped), `npm run build`; FE lint/build passed.
 - Deployment: None.
 - Verification: Captured PNG stored under uploads; PDF Key Images section with series/slice label.
 - Blockers: Waiting on merge approval.
