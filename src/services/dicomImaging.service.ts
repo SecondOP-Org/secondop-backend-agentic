@@ -9,11 +9,16 @@ export interface DicomAnnotationPoint {
 
 export interface DicomAnnotationPayload {
   id: string;
-  type: 'distance' | 'area' | 'arrow' | 'text';
+  type: 'distance' | 'area' | 'arrow' | 'text' | 'angle';
   points: DicomAnnotationPoint[];
   text?: string;
   color: string;
   measurement?: number;
+  huStats?: {
+    mean: number;
+    min: number;
+    max: number;
+  };
 }
 
 export interface DicomViewportPayload {
@@ -371,7 +376,7 @@ export const parseDicomAnnotations = (input: unknown): DicomAnnotationPayload[] 
       throw new Error(`annotations[${index}].id is required`);
     }
 
-    if (!['distance', 'area', 'arrow', 'text'].includes(annotation.type)) {
+    if (!['distance', 'area', 'arrow', 'text', 'angle'].includes(annotation.type)) {
       throw new Error(`annotations[${index}].type is invalid`);
     }
 
@@ -383,6 +388,19 @@ export const parseDicomAnnotations = (input: unknown): DicomAnnotationPayload[] 
       throw new Error(`annotations[${index}].color is required`);
     }
 
+    const huStats =
+      annotation.huStats &&
+      typeof annotation.huStats === 'object' &&
+      Number.isFinite(annotation.huStats.mean) &&
+      Number.isFinite(annotation.huStats.min) &&
+      Number.isFinite(annotation.huStats.max)
+        ? {
+            mean: Number(annotation.huStats.mean),
+            min: Number(annotation.huStats.min),
+            max: Number(annotation.huStats.max),
+          }
+        : undefined;
+
     return {
       id: annotation.id.trim(),
       type: annotation.type,
@@ -390,6 +408,7 @@ export const parseDicomAnnotations = (input: unknown): DicomAnnotationPayload[] 
       color: annotation.color.trim(),
       text: typeof annotation.text === 'string' ? annotation.text : undefined,
       measurement: Number.isFinite(annotation.measurement as number) ? Number(annotation.measurement) : undefined,
+      huStats,
     };
   });
 };
