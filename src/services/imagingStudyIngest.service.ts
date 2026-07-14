@@ -5,6 +5,13 @@ import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 import { computeFileSha256 } from './fileHash.service';
 import { extractAndPersistDicomMetadata, getImagingStudiesForCase } from './dicomImaging.service';
+import {
+  createDicomDeidContext,
+  deidentifyDicomFileInPlace,
+  isDicomDeidEnabled,
+  upsertDicomDeidVault,
+  type DicomDeidContext,
+} from './dicomDeidentification.service';
 import { isDicomMagicFile } from '../utils/dicomMagic';
 import { listFilesFromDicomdir } from '../utils/dicomdir';
 import { extractZipArchive } from '../utils/zipExtract';
@@ -42,6 +49,7 @@ interface PersistInstanceInput {
   sourcePath: string;
   displayName: string;
   description?: string;
+  deidContext?: DicomDeidContext;
 }
 
 const getMaxStudyBytes = (): number =>
@@ -128,8 +136,8 @@ const persistDicomInstance = async ({
   sourcePath,
   displayName,
   description,
+  deidContext,
 }: PersistInstanceInput): Promise<IngestedStudyFile> => {
-  const stats = await fs.stat(sourcePath);
   const uploadDir = resolveUploadDir();
   await fs.mkdir(uploadDir, { recursive: true });
 
@@ -137,6 +145,13 @@ const persistDicomInstance = async ({
   const destination = path.join(uploadDir, storedName);
   await fs.copyFile(sourcePath, destination);
 
+  let deidResult: Awaited<ReturnType<typeof deidentifyDicomFileInPlace>> | null = null;
+  if (isDicomDeidEnabled()) {
+    const context = deidContext || createDicomDeidContext(caseId);
+    deidResult = await deidentifyDicomFileInPlace(destination, context);
+  }
+
+  const stats = await fs.stat(destination);
   const fileUrl = `/uploads/${storedName}`;
   const fileSha256 = await computeFileSha256(destination);
 
@@ -170,6 +185,16 @@ const persistDicomInstance = async ({
   );
 
   const fileRecord = result.rows[0] as IngestedStudyFile;
+
+  if (deidResult) {
+    await upsertDicomDeidVault({
+      fileId: fileRecord.id,
+      caseId,
+      studyInstanceUid: deidResult.remappedStudyUid,
+      mapping: deidResult.mapping,
+      audit: deidResult.audit,
+    });
+  }
 
   await extractAndPersistDicomMetadata({
     fileId: fileRecord.id,
@@ -230,6 +255,7 @@ export const ingestImagingStudyFromZip = async (input: {
     await extractZipArchive(input.zipPath, workDir);
     const { instancePaths, skippedNonDicom } = await collectDicomInstancePaths(workDir);
     const totalBytes = await assertStudyLimits(instancePaths);
+    const deidContext = createDicomDeidContext(input.caseId);
 
     const files: IngestedStudyFile[] = [];
     for (const instancePath of instancePaths) {
@@ -242,6 +268,7 @@ export const ingestImagingStudyFromZip = async (input: {
           sourcePath: instancePath,
           displayName: relative || path.basename(instancePath),
           description: input.description,
+          deidContext,
         })
       );
     }
@@ -287,6 +314,7 @@ export const ingestImagingStudyFromFiles = async (input: {
 
     const { instancePaths, skippedNonDicom } = await collectDicomInstancePaths(workDir);
     const totalBytes = await assertStudyLimits(instancePaths);
+    const deidContext = createDicomDeidContext(input.caseId);
 
     const files: IngestedStudyFile[] = [];
     for (const instancePath of instancePaths) {
@@ -299,6 +327,7 @@ export const ingestImagingStudyFromFiles = async (input: {
           sourcePath: instancePath,
           displayName: relative || path.basename(instancePath),
           description: input.description,
+          deidContext,
         })
       );
     }

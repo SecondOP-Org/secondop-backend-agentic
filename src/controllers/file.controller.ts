@@ -15,6 +15,12 @@ import {
   ingestImagingStudyFromFiles,
   ingestImagingStudyFromZip,
 } from '../services/imagingStudyIngest.service';
+import {
+  createDicomDeidContext,
+  deidentifyDicomFileInPlace,
+  isDicomDeidEnabled,
+  upsertDicomDeidVault,
+} from '../services/dicomDeidentification.service';
 import { computeFileSha256 } from '../services/fileHash.service';
 import {
   invalidateCaseAnalysisAfterPdfChange,
@@ -202,6 +208,13 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
     const isImage = isImageMedicalFile(req.file.mimetype, req.file.originalname);
     const isReport = isReportMedicalFile(req.file.mimetype, req.file.originalname);
     const filePath = resolveStoredFilePath(fileUrl);
+
+    let deidResult: Awaited<ReturnType<typeof deidentifyDicomFileInPlace>> | null = null;
+    if (isDicom && isDicomDeidEnabled()) {
+      deidResult = await deidentifyDicomFileInPlace(filePath, createDicomDeidContext(caseId));
+    }
+
+    const storedStats = fs.statSync(filePath);
     const fileSha256 = await computeFileSha256(filePath);
 
     const result = await query(
@@ -228,7 +241,7 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
         userId,
         req.file.originalname,
         req.file.mimetype,
-        req.file.size,
+        storedStats.size,
         fileUrl,
         category,
         description,
@@ -248,6 +261,16 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
     };
 
     if (isDicom) {
+      if (deidResult) {
+        await upsertDicomDeidVault({
+          fileId: fileRecord.id,
+          caseId: fileRecord.case_id,
+          studyInstanceUid: deidResult.remappedStudyUid,
+          mapping: deidResult.mapping,
+          audit: deidResult.audit,
+        });
+      }
+
       await extractAndPersistDicomMetadata({
         fileId: fileRecord.id,
         caseId: fileRecord.case_id,
