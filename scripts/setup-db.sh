@@ -101,6 +101,12 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/019_document_
 echo "  → Running 020_case_analysis_deid_vault.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/020_case_analysis_deid_vault.sql
 
+echo "  → Running 021_file_annotation_team_and_audit.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/021_file_annotation_team_and_audit.sql
+
+echo "  → Running 022_dicom_deid_vault.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/022_dicom_deid_vault.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
