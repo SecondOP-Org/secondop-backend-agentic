@@ -34,12 +34,12 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked to merge SEC-78 and continue to next (SEC-79).
 - Branch/worktree: `sec-79-annotation-angle`.
 - Files changed: `dicomImaging.service.ts` (`angle` type + optional `huStats` in parse/persist).
-- PR: (pending)
-- Checks: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/48 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/45
+- Checks: `npm run lint`, `npm test` (141 passed, 1 skipped), `npm run build`.
 - Deployment: None.
 - Verification: Parser accepts `angle` and optional HU stats payload.
 - Blockers: Waiting on merge approval.
-- Follow-ups: FE clinical W/L + tools PR; persistence polish in P2 annotations.
+- Follow-ups: Persistence polish in P2 annotations (SEC-81).
 
 ## 2026-07-14 - SEC-76 - Whole-study DICOM ingest (folder, zip, DICOMDIR)
 
