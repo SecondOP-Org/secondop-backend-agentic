@@ -4,6 +4,7 @@ import {
   getCaseAnalysisTrace,
   getCaseById,
   queueCaseAnalysis,
+  streamCaseAnalysisProgress,
   submitCase,
 } from '../controllers/case.controller';
 import { query, transaction } from '../database/connection';
@@ -13,6 +14,7 @@ import {
   getLatestAnalysisRunByEngine,
   getLatestShadowResultByCaseId,
 } from '../services/analysisRun.service';
+import { iterateAnalysisProgress } from '../services/analysisProgress.service';
 import { getCaseRunTrace } from '../agentic/observability/analysisObservability.service';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
@@ -45,6 +47,14 @@ jest.mock('../agentic/observability/analysisObservability.service', () => ({
   getCaseRunTrace: jest.fn(),
 }));
 
+jest.mock('../services/analysisProgress.service', () => {
+  const actual = jest.requireActual('../services/analysisProgress.service');
+  return {
+    ...actual,
+    iterateAnalysisProgress: jest.fn(),
+  };
+});
+
 const mockedQuery = query as jest.MockedFunction<typeof query>;
 const mockedTransaction = transaction as jest.MockedFunction<typeof transaction>;
 const mockedAnalysisWorker = analysisWorker as jest.Mocked<typeof analysisWorker>;
@@ -54,11 +64,18 @@ const mockedGetLatestAnalysisRunByEngine =
 const mockedGetLatestShadowResultByCaseId =
   getLatestShadowResultByCaseId as jest.MockedFunction<typeof getLatestShadowResultByCaseId>;
 const mockedGetCaseRunTrace = getCaseRunTrace as jest.MockedFunction<typeof getCaseRunTrace>;
+const mockedIterateAnalysisProgress = iterateAnalysisProgress as jest.MockedFunction<
+  typeof iterateAnalysisProgress
+>;
 
 const createMockResponse = () => {
   const res: any = {};
   res.status = jest.fn().mockReturnValue(res);
   res.json = jest.fn().mockReturnValue(res);
+  res.setHeader = jest.fn().mockReturnValue(res);
+  res.write = jest.fn().mockReturnValue(true);
+  res.end = jest.fn().mockReturnValue(res);
+  res.flushHeaders = jest.fn();
   return res;
 };
 
@@ -579,5 +596,64 @@ describe('Case analysis controllers', () => {
     const err = next.mock.calls[0][0] as AppError;
     expect(err.statusCode).toBe(403);
     expect(err.message).toContain('do not have access');
+  });
+
+  it('streams authorized analysis progress as NDJSON without clinical fields', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any);
+    mockedIterateAnalysisProgress.mockImplementationOnce(async function* () {
+      yield {
+        event: 'queued',
+        runId: 'run-1',
+        caseId: 'case-1',
+        at: '2026-07-14T12:00:00.000Z',
+      };
+      yield {
+        event: 'extracting_reports',
+        runId: 'run-1',
+        caseId: 'case-1',
+        at: '2026-07-14T12:00:01.000Z',
+      };
+    });
+
+    const req = createPatientRequest({}, { caseId: 'case-1' });
+    req.on = jest.fn();
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await streamCaseAnalysisProgress(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.setHeader).toHaveBeenCalledWith(
+      'Content-Type',
+      'application/x-ndjson; charset=utf-8'
+    );
+    expect(res.write).toHaveBeenCalledWith(
+      `${JSON.stringify({
+        event: 'queued',
+        runId: 'run-1',
+        caseId: 'case-1',
+        at: '2026-07-14T12:00:00.000Z',
+      })}\n`
+    );
+    expect(res.write).toHaveBeenCalledWith(
+      expect.stringContaining('"event":"extracting_reports"')
+    );
+    expect(JSON.stringify(res.write.mock.calls)).not.toMatch(/prompt|summary|secret/i);
+    expect(res.end).toHaveBeenCalled();
+  });
+
+  it('rejects unauthorized progress stream access', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [] } as any);
+
+    const req = createPatientRequest({}, { caseId: 'case-1' });
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await streamCaseAnalysisProgress(req, res, next);
+
+    expect(mockedIterateAnalysisProgress).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledTimes(1);
+    expect((next.mock.calls[0][0] as AppError).statusCode).toBe(403);
   });
 });

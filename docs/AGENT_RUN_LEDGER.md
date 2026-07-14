@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-14 - SEC-51 - Real-time case-analysis progress stream
+
+- Status: In Progress.
+- Human approval: User asked to merge SEC-84 and proceed next; DICOM epic SEC-74 closed.
+- Branch/worktree: `sec-51-analysis-progress`.
+- Files changed: `analysisProgress.service.ts`, `GET /cases/:caseId/analysis/progress` NDJSON stream, FE consultation stage UI + Observability/Mission Control labels; polling retained.
+- PR: (pending)
+- Checks: (pending)
+- Deployment: None. Proxy buffering should honor `X-Accel-Buffering: no` for NDJSON.
+- Verification: Safe stages only; polling fallback remains.
+- Blockers: Waiting on merge approval after PR.
+- Follow-ups: Staging proxy stream smoke.
+
 ## 2026-07-14 - SEC-84 - DICOM header PHI de-identification on ingest
 
 - Status: In Review (draft PR).

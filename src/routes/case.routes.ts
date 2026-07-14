@@ -5,6 +5,7 @@ import {
   queueCaseAnalysis,
   getCaseAnalysis,
   getCaseAnalysisTrace,
+  streamCaseAnalysisProgress,
   submitCase,
   getCases,
   getCaseById,
@@ -39,6 +40,7 @@ router.get('/my-cases', authorize('patient'), getCases);
 router.put('/:caseId/intake', authorize('patient'), updateCaseIntake);
 router.post('/:caseId/analysis', authorize('patient'), queueCaseAnalysis);
 router.get('/:caseId/analysis', getCaseAnalysis);
+router.get('/:caseId/analysis/progress', streamCaseAnalysisProgress);
 router.get('/:caseId/analysis/trace', getCaseAnalysisTrace);
 router.post('/:caseId/submit', authorize('patient'), submitCase);
 
