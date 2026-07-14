@@ -34,8 +34,8 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked to proceed to next after SEC-80 merge.
 - Branch/worktree: `sec-81-team-annotations`.
 - Files changed: `021_file_annotation_team_and_audit.sql`, `dicomImaging.service.ts` (shared get/save, author stamp, events), `file.controller.ts`, tests; FE author UI + team toast.
-- PR: (pending)
-- Checks: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/49 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/47
+- Checks: `npm run lint`, `npm test` (144 passed, 1 skipped), `npm run build`; FE lint/build passed.
 - Deployment: None. Apply migration `021` on deploy.
 - Verification: Shared per-file annotations; create/update/delete write `file_annotation_events`.
 - Blockers: Waiting on merge approval.
