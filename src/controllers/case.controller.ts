@@ -38,6 +38,11 @@ import {
 import { generateCaseNumber } from '../utils/caseNumber';
 import { resolveCaseId } from '../utils/caseIdentifier';
 import {
+  paginationMeta,
+  parsePaginationQuery,
+  splitTotalCount,
+} from '../utils/pagination';
+import {
   DOCTOR_INBOX_CASE_STATUSES,
   DEFAULT_TURNAROUND_DAYS,
   isDueToday,
@@ -635,6 +640,7 @@ export const getCases = async (req: AuthRequest, res: Response, next: NextFuncti
   try {
     const userId = req.user!.id;
     const patientId = await getPatientIdForUser(userId);
+    const { page, pageSize, offset } = parsePaginationQuery(req.query);
 
     const result = await query(
       `SELECT c.*,
@@ -645,7 +651,8 @@ export const getCases = async (req: AuthRequest, res: Response, next: NextFuncti
               latest_message.latest_message_preview,
               latest_message.latest_message_created_at,
               latest_message.latest_message_sender_name,
-              COALESCE(latest_message.has_unread_messages, false) AS has_unread_messages
+              COALESCE(latest_message.has_unread_messages, false) AS has_unread_messages,
+              COUNT(*) OVER() AS __total_count
        FROM cases c
        LEFT JOIN case_intake ci ON ci.case_id = c.id
        LEFT JOIN LATERAL (
@@ -683,13 +690,17 @@ export const getCases = async (req: AuthRequest, res: Response, next: NextFuncti
          LIMIT 1
        ) latest_message ON true
        WHERE c.patient_id = $1
-       ORDER BY c.submitted_date DESC`,
-      [patientId, userId]
+       ORDER BY c.submitted_date DESC
+       LIMIT $3 OFFSET $4`,
+      [patientId, userId, pageSize, offset]
     );
+
+    const { rows, total } = splitTotalCount(result.rows as Array<Record<string, unknown>>);
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data: rows,
+      ...paginationMeta(page, pageSize, total),
     });
   } catch (error) {
     next(error);
@@ -881,6 +892,7 @@ const mapDoctorInboxCaseRow = (row: CaseRowWithAiSharing) => {
 export const getDoctorCases = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
+    const { page, pageSize, offset } = parsePaginationQuery(req.query);
 
     const doctorResult = await query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
     if (doctorResult.rows.length === 0) {
@@ -900,7 +912,8 @@ export const getDoctorCases = async (req: AuthRequest, res: Response, next: Next
               ci.current_medications,
               ci.allergies,
               p.first_name as patient_first_name,
-              p.last_name as patient_last_name
+              p.last_name as patient_last_name,
+              COUNT(*) OVER() AS __total_count
        FROM cases c
        JOIN case_assignments ca ON c.id = ca.case_id
        JOIN patients p ON p.id = c.patient_id
@@ -909,13 +922,17 @@ export const getDoctorCases = async (req: AuthRequest, res: Response, next: Next
          AND c.status <> 'draft'
          AND c.status = ANY($2::text[])
        ORDER BY COALESCE(c.due_date, c.submitted_date + ($3::int * INTERVAL '1 day')) ASC NULLS LAST,
-                ca.assigned_date DESC`,
-      [doctorId, DOCTOR_INBOX_CASE_STATUSES, DEFAULT_TURNAROUND_DAYS]
+                ca.assigned_date DESC
+       LIMIT $4 OFFSET $5`,
+      [doctorId, DOCTOR_INBOX_CASE_STATUSES, DEFAULT_TURNAROUND_DAYS, pageSize, offset]
     );
+
+    const { rows, total } = splitTotalCount(result.rows as Array<Record<string, unknown>>);
 
     res.json({
       status: 'success',
-      data: result.rows.map((row: CaseRowWithAiSharing) => mapDoctorInboxCaseRow(row)),
+      data: rows.map((row) => mapDoctorInboxCaseRow(row as CaseRowWithAiSharing)),
+      ...paginationMeta(page, pageSize, total),
     });
   } catch (error) {
     next(error);
