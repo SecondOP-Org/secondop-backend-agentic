@@ -412,7 +412,7 @@ export const getFileAnnotations = async (req: AuthRequest, res: Response, next: 
   try {
     const { fileId } = req.params;
     const file = await getAccessibleFileById(fileId, req.user!.id);
-    const persisted = await getPersistedAnnotations(file.id, req.user!.id);
+    const persisted = await getPersistedAnnotations(file.id);
 
     res.json({
       status: 'success',
