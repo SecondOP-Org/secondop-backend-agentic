@@ -64,6 +64,21 @@ export const upload = multer({
   },
 });
 
+/** PNG captures from the DICOM viewer for opinion PDF key images. */
+export const keyImageUpload = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'image/png' || file.mimetype === 'image/jpeg') {
+      cb(null, true);
+      return;
+    }
+    cb(new AppError('Key images must be PNG or JPEG', 400));
+  },
+  limits: {
+    fileSize: 15 * 1024 * 1024,
+  },
+});
+
 const studyFileFilter = (_req: unknown, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   const extension = path.extname(file.originalname).toLowerCase();
   const mime = file.mimetype.toLowerCase();

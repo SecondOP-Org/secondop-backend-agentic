@@ -19,9 +19,11 @@ import {
   generateDoctorOpinionPdfBuffer,
 } from '../services/doctorOpinionPdf.service';
 import {
+  appendDoctorKeyImage,
   clearDoctorResponseDraft,
   composeDoctorOpinionContent,
   getDoctorResponse,
+  resolveKeyImagesForPdf,
   resolveSpecialistQuestions,
   saveDoctorResponseDraft,
   validateDoctorResponseForSend,
@@ -1033,6 +1035,58 @@ export const saveDoctorResponseDraftHandler = async (
   }
 };
 
+export const uploadDoctorKeyImageHandler = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
+    const file = req.file;
+
+    await ensureDoctorAssignedToCase(caseId, userId);
+
+    if (!file) {
+      throw new AppError('Key image file is required', 400);
+    }
+
+    const seriesUid = typeof req.body.seriesUid === 'string' ? req.body.seriesUid.trim() : '';
+    if (!seriesUid) {
+      throw new AppError('seriesUid is required', 400);
+    }
+
+    const parseOptionalNumber = (value: unknown): number | null => {
+      if (value === undefined || value === null || value === '') {
+        return null;
+      }
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const result = await appendDoctorKeyImage(caseId, userId, {
+      filename: file.filename,
+      mimeType: file.mimetype || 'image/png',
+      seriesUid,
+      seriesDescription:
+        typeof req.body.seriesDescription === 'string' ? req.body.seriesDescription : null,
+      instanceNumber: parseOptionalNumber(req.body.instanceNumber),
+      sopInstanceUid:
+        typeof req.body.sopInstanceUid === 'string' ? req.body.sopInstanceUid : null,
+      sourceFileId: typeof req.body.sourceFileId === 'string' ? req.body.sourceFileId : null,
+      caption: typeof req.body.caption === 'string' ? req.body.caption : undefined,
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: result,
+      message: 'Key image added to doctor response draft',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { caseId } = req.params;
@@ -1087,6 +1141,7 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         submittedDate: row.submitted_date,
         questionAnswers: payload.questionAnswers,
         summary: payload.summary,
+        keyImages: resolveKeyImagesForPdf(payload.keyImages),
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
       };
     } else {
@@ -1180,6 +1235,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         submittedDate: row.submitted_date,
         questionAnswers: payload.questionAnswers,
         summary: payload.summary,
+        keyImages: resolveKeyImagesForPdf(payload.keyImages),
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
       };
     } else {

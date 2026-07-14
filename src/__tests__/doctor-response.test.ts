@@ -9,6 +9,7 @@ import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
 import { generateDoctorOpinionPdf, generateDoctorOpinionPdfBuffer } from '../services/doctorOpinionPdf.service';
 import {
+  formatKeyImageLabel,
   getDoctorResponse,
   resolveSpecialistQuestions,
   saveDoctorResponseDraft,
@@ -223,6 +224,43 @@ describe('doctor response workflow', () => {
       expect(draft.summary).toBe('Existing summary');
     });
 
+    it('preserves keyImages when PUT omits them', async () => {
+      mockedQuery
+        .mockResolvedValueOnce({ rows: [{ id: 'doctor-1' }] } as any)
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              response_draft: {
+                questionAnswers: [],
+                summary: 'Existing summary',
+                keyImages: [
+                  {
+                    id: 'ki-1',
+                    filename: 'key.png',
+                    mimeType: 'image/png',
+                    seriesUid: '1.2.3',
+                    seriesDescription: 'Axial',
+                    instanceNumber: 12,
+                    capturedAt: '2026-07-14T00:00:00.000Z',
+                  },
+                ],
+              },
+            },
+          ],
+        } as any)
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      const draft = await saveDoctorResponseDraft('case-1', 'user-doctor-1', {
+        questionAnswers: [],
+        summary: 'Updated summary',
+      });
+
+      expect(draft.summary).toBe('Updated summary');
+      expect(draft.keyImages).toEqual([
+        expect.objectContaining({ id: 'ki-1', seriesUid: '1.2.3', instanceNumber: 12 }),
+      ]);
+    });
+
     it('saves draft through controller handler', async () => {
       mockedQuery.mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any);
 
@@ -321,6 +359,22 @@ describe('doctor response workflow', () => {
           }
         )
       ).toThrow(AppError);
+    });
+  });
+
+  describe('key image labels', () => {
+    it('formats series and slice identifiers for PDF captions', () => {
+      expect(
+        formatKeyImageLabel({
+          id: 'ki-1',
+          filename: 'key.png',
+          mimeType: 'image/png',
+          seriesUid: '1.2.3',
+          seriesDescription: 'Axial T2',
+          instanceNumber: 42,
+          capturedAt: '2026-07-14T00:00:00.000Z',
+        })
+      ).toBe('Series: Axial T2; slice: 42');
     });
   });
 

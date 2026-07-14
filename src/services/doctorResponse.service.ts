@@ -1,10 +1,16 @@
+import fs from 'fs';
+import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
+import { resolveUploadDir } from '../utils/uploadPath';
 import {
   artifactQuestionsToStrings,
   hydrateCaseAnalysisArtifact,
 } from './analysisArtifact.service';
+import type { DoctorOpinionKeyImage } from './doctorOpinionPdf.service';
 import {
+  DoctorKeyImage,
   DoctorResponseDraft,
   DoctorResponseSendPayload,
   parseDoctorResponseDraft,
@@ -173,6 +179,8 @@ export const saveDoctorResponseDraft = async (
     questionAnswers: Array.from(mergedAnswers.values()),
     summary: parsed.summary !== '' ? parsed.summary : currentDraft.summary,
     status: parsed.status ?? currentDraft.status,
+    // Client owns the full key-image list (append/remove locally, then PUT).
+    keyImages: parsed.keyImages ?? currentDraft.keyImages ?? [],
   };
 
   await query(
@@ -241,4 +249,77 @@ export const composeDoctorOpinionContent = (payload: DoctorResponseSendPayload):
   sections.push(payload.summary.trim());
 
   return sections.join('\n\n');
+};
+
+export const formatKeyImageLabel = (image: DoctorKeyImage): string => {
+  const series = image.seriesDescription?.trim() || image.seriesUid;
+  const slice =
+    image.instanceNumber != null && Number.isFinite(image.instanceNumber)
+      ? String(image.instanceNumber)
+      : 'n/a';
+  const caption = image.caption?.trim();
+  const base = `Series: ${series}; slice: ${slice}`;
+  return caption ? `${base} — ${caption}` : base;
+};
+
+export const resolveKeyImagesForPdf = (
+  keyImages: DoctorKeyImage[] | undefined
+): DoctorOpinionKeyImage[] => {
+  if (!keyImages || keyImages.length === 0) {
+    return [];
+  }
+
+  const uploadDir = resolveUploadDir();
+  return keyImages
+    .map((image) => {
+      const filePath = path.join(uploadDir, path.basename(image.filename));
+      if (!fs.existsSync(filePath)) {
+        return null;
+      }
+      return {
+        filePath,
+        label: formatKeyImageLabel(image),
+      };
+    })
+    .filter((item): item is DoctorOpinionKeyImage => Boolean(item));
+};
+
+export const appendDoctorKeyImage = async (
+  caseId: string,
+  doctorUserId: string,
+  input: {
+    filename: string;
+    mimeType: string;
+    seriesUid: string;
+    seriesDescription?: string | null;
+    instanceNumber?: number | null;
+    sopInstanceUid?: string | null;
+    sourceFileId?: string | null;
+    caption?: string;
+  }
+): Promise<{ draft: DoctorResponseDraft; keyImage: DoctorKeyImage }> => {
+  const existing = await getDoctorResponse(caseId, doctorUserId);
+  const currentDraft = existing.draft || { questionAnswers: [], summary: '', keyImages: [] };
+
+  const keyImage: DoctorKeyImage = {
+    id: uuidv4(),
+    filename: path.basename(input.filename),
+    mimeType: input.mimeType || 'image/png',
+    seriesUid: input.seriesUid,
+    seriesDescription: input.seriesDescription ?? null,
+    instanceNumber: input.instanceNumber ?? null,
+    sopInstanceUid: input.sopInstanceUid ?? null,
+    sourceFileId: input.sourceFileId ?? null,
+    caption: input.caption,
+    capturedAt: new Date().toISOString(),
+  };
+
+  const nextDraft = await saveDoctorResponseDraft(caseId, doctorUserId, {
+    questionAnswers: currentDraft.questionAnswers,
+    summary: currentDraft.summary,
+    status: currentDraft.status,
+    keyImages: [...(currentDraft.keyImages || []), keyImage],
+  });
+
+  return { draft: nextDraft, keyImage };
 };

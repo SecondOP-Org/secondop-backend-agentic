@@ -7,10 +7,25 @@ export const doctorQuestionAnswerSchema = z.object({
   answer: z.string(),
 });
 
+export const doctorKeyImageSchema = z.object({
+  id: z.string().min(1),
+  filename: z.string().min(1),
+  mimeType: z.string().default('image/png'),
+  seriesUid: z.string().min(1),
+  seriesDescription: z.string().nullable().optional(),
+  instanceNumber: z.number().nullable().optional(),
+  sopInstanceUid: z.string().nullable().optional(),
+  sourceFileId: z.string().nullable().optional(),
+  caption: z.string().optional(),
+  capturedAt: z.string().min(1),
+});
+
 export const doctorResponseDraftSchema = z.object({
   questionAnswers: z.array(doctorQuestionAnswerSchema).default([]),
   summary: z.string().default(''),
   status: z.string().optional(),
+  // Optional so PUT drafts that omit keyImages do not wipe captures.
+  keyImages: z.array(doctorKeyImageSchema).optional(),
 });
 
 export const doctorResponseSendSchema = doctorResponseDraftSchema.extend({
@@ -26,6 +41,7 @@ export const doctorResponseSendSchema = doctorResponseDraftSchema.extend({
 });
 
 export type DoctorQuestionAnswer = z.infer<typeof doctorQuestionAnswerSchema>;
+export type DoctorKeyImage = z.infer<typeof doctorKeyImageSchema>;
 export type DoctorResponseDraft = z.infer<typeof doctorResponseDraftSchema>;
 export type DoctorResponseSendPayload = z.infer<typeof doctorResponseSendSchema>;
 
