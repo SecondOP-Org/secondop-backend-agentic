@@ -10,6 +10,7 @@ import {
 } from '../services/analysisArtifact.service';
 import { toLegacyExecutionMode } from '../agentic/core/executionMode';
 import { getLatestAnalysisRun, getLatestAnalysisRunByEngine, getLatestShadowResultByCaseId } from '../services/analysisRun.service';
+import { iterateAnalysisProgress } from '../services/analysisProgress.service';
 import { getCaseRunTrace } from '../agentic/observability/analysisObservability.service';
 import { analysisWorker } from '../services/analysisWorker.service';
 import { getImagingStudiesForCase } from '../services/dicomImaging.service';
@@ -492,6 +493,50 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const streamCaseAnalysisProgress = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const caseId = await resolveCaseId(req.params.caseId);
+    const userId = req.user!.id;
+    const userType = req.user!.type;
+    const runId = typeof req.query.runId === 'string' ? req.query.runId : undefined;
+
+    await ensureCaseAccess(caseId, userId, userType);
+
+    res.status(200);
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as Response & { flushHeaders?: () => void }).flushHeaders === 'function') {
+      (res as Response & { flushHeaders: () => void }).flushHeaders();
+    }
+
+    let clientClosed = false;
+    req.on('close', () => {
+      clientClosed = true;
+    });
+
+    for await (const event of iterateAnalysisProgress({ caseId, runId })) {
+      if (clientClosed) {
+        break;
+      }
+      res.write(`${JSON.stringify(event)}\n`);
+    }
+
+    res.end();
+  } catch (error) {
+    if (!res.headersSent) {
+      next(error);
+      return;
+    }
+    res.end();
   }
 };
 
