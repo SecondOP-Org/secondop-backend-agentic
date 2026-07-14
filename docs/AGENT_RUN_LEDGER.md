@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Pending (implement from `DOCTOR_PDF_REDESIGN_TODO.md` + AGENTS.md workflow).
 - Branch/worktree: `sec-86-doctor-pdf-redesign`.
 - Files changed: `src/services/doctorOpinionPdf.service.ts`; preview/send wiring in `case.controller.ts`; `assets/secondop-logo.png`; PDF unit tests; TODO acceptance checkboxes.
-- PR: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/55 (draft)
 - Checks: `npm run lint`; `npm test` (173 passed, 1 skipped); `npm run build`.
 - Deployment: None.
 - Verification: Preview sets `isDraft`; send sets `signedAt` + no watermark; summary-first navy/cream layout.
