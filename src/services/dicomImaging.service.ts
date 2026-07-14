@@ -19,6 +19,20 @@ export interface DicomAnnotationPayload {
     min: number;
     max: number;
   };
+  createdByUserId?: string;
+  createdByName?: string;
+  createdAt?: string;
+  updatedByUserId?: string;
+  updatedAt?: string;
+}
+
+export type AnnotationAuditAction = 'created' | 'updated' | 'deleted';
+
+export interface AnnotationAuditEvent {
+  annotationId: string;
+  action: AnnotationAuditAction;
+  before: DicomAnnotationPayload | null;
+  after: DicomAnnotationPayload | null;
 }
 
 export interface DicomViewportPayload {
@@ -401,6 +415,7 @@ export const parseDicomAnnotations = (input: unknown): DicomAnnotationPayload[] 
           }
         : undefined;
 
+    // Author metadata is server-stamped on save; ignore client-supplied values.
     return {
       id: annotation.id.trim(),
       type: annotation.type,
@@ -411,6 +426,96 @@ export const parseDicomAnnotations = (input: unknown): DicomAnnotationPayload[] 
       huStats,
     };
   });
+};
+
+const geometryKey = (annotation: DicomAnnotationPayload): string =>
+  JSON.stringify({
+    type: annotation.type,
+    points: annotation.points,
+    text: annotation.text ?? null,
+    color: annotation.color,
+    measurement: annotation.measurement ?? null,
+    huStats: annotation.huStats ?? null,
+  });
+
+export const buildSharedAnnotationState = (
+  previous: DicomAnnotationPayload[],
+  incoming: DicomAnnotationPayload[],
+  actorUserId: string,
+  actorName: string,
+  nowIso: string
+): { annotations: DicomAnnotationPayload[]; events: AnnotationAuditEvent[] } => {
+  const previousById = new Map(previous.map((item) => [item.id, item]));
+  const incomingIds = new Set(incoming.map((item) => item.id));
+  const annotations: DicomAnnotationPayload[] = [];
+  const events: AnnotationAuditEvent[] = [];
+
+  for (const item of incoming) {
+    const prior = previousById.get(item.id);
+    if (!prior) {
+      const created: DicomAnnotationPayload = {
+        ...item,
+        createdByUserId: actorUserId,
+        createdByName: actorName,
+        createdAt: nowIso,
+        updatedByUserId: actorUserId,
+        updatedAt: nowIso,
+      };
+      annotations.push(created);
+      events.push({ annotationId: item.id, action: 'created', before: null, after: created });
+      continue;
+    }
+
+    if (geometryKey(prior) === geometryKey(item)) {
+      annotations.push(prior);
+      continue;
+    }
+
+    const updated: DicomAnnotationPayload = {
+      ...item,
+      createdByUserId: prior.createdByUserId || actorUserId,
+      createdByName: prior.createdByName || actorName,
+      createdAt: prior.createdAt || nowIso,
+      updatedByUserId: actorUserId,
+      updatedAt: nowIso,
+    };
+    annotations.push(updated);
+    events.push({ annotationId: item.id, action: 'updated', before: prior, after: updated });
+  }
+
+  for (const prior of previous) {
+    if (!incomingIds.has(prior.id)) {
+      events.push({ annotationId: prior.id, action: 'deleted', before: prior, after: null });
+    }
+  }
+
+  return { annotations, events };
+};
+
+export const resolveAnnotationActorName = async (userId: string): Promise<string> => {
+  const result = await query(
+    `SELECT u.email,
+            NULLIF(TRIM(CONCAT(COALESCE(d.first_name, ''), ' ', COALESCE(d.last_name, ''))), '') AS doctor_name,
+            NULLIF(TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))), '') AS patient_name
+     FROM users u
+     LEFT JOIN doctors d ON d.user_id = u.id
+     LEFT JOIN patients p ON p.user_id = u.id
+     WHERE u.id = $1
+     LIMIT 1`,
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    return 'Unknown user';
+  }
+
+  const row = result.rows[0] as {
+    email: string;
+    doctor_name: string | null;
+    patient_name: string | null;
+  };
+
+  return row.doctor_name || row.patient_name || row.email || 'Unknown user';
 };
 
 export const parseDicomViewport = (input: unknown): DicomViewportPayload | null => {
@@ -442,8 +547,7 @@ export const parseDicomViewport = (input: unknown): DicomViewportPayload | null 
 };
 
 export const getPersistedAnnotations = async (
-  fileId: string,
-  savedBy: string
+  fileId: string
 ): Promise<PersistedAnnotationRecord | null> => {
   const result = await query(
     `SELECT file_id,
@@ -453,9 +557,8 @@ export const getPersistedAnnotations = async (
             updated_at
      FROM file_annotations
      WHERE file_id = $1
-       AND saved_by = $2
      LIMIT 1`,
-    [fileId, savedBy]
+    [fileId]
   );
 
   if (result.rows.length === 0) {
@@ -497,19 +600,48 @@ export const savePersistedAnnotations = async ({
   annotations: DicomAnnotationPayload[];
   viewport: DicomViewportPayload | null;
 }): Promise<PersistedAnnotationRecord> => {
+  const existing = await getPersistedAnnotations(fileId);
+  const actorName = await resolveAnnotationActorName(savedBy);
+  const nowIso = new Date().toISOString();
+  const { annotations: stamped, events } = buildSharedAnnotationState(
+    existing?.annotations || [],
+    annotations,
+    savedBy,
+    actorName,
+    nowIso
+  );
+
   const result = await query(
     `INSERT INTO file_annotations (file_id, case_id, saved_by, sop_instance_uid, annotations_json, viewport_json)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
-     ON CONFLICT (file_id, saved_by)
+     ON CONFLICT (file_id)
      DO UPDATE SET
        case_id = EXCLUDED.case_id,
+       saved_by = EXCLUDED.saved_by,
        sop_instance_uid = EXCLUDED.sop_instance_uid,
        annotations_json = EXCLUDED.annotations_json,
        viewport_json = EXCLUDED.viewport_json,
        updated_at = CURRENT_TIMESTAMP
      RETURNING file_id, annotations_json, viewport_json, sop_instance_uid, updated_at`,
-    [fileId, caseId, savedBy, sopInstanceUid || null, JSON.stringify(annotations), JSON.stringify(viewport)]
+    [fileId, caseId, savedBy, sopInstanceUid || null, JSON.stringify(stamped), JSON.stringify(viewport)]
   );
+
+  for (const event of events) {
+    await query(
+      `INSERT INTO file_annotation_events (
+         file_id, case_id, annotation_id, actor_user_id, action, before_json, after_json
+       ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)`,
+      [
+        fileId,
+        caseId,
+        event.annotationId,
+        savedBy,
+        event.action,
+        event.before ? JSON.stringify(event.before) : null,
+        event.after ? JSON.stringify(event.after) : null,
+      ]
+    );
+  }
 
   return {
     fileId: result.rows[0].file_id,
