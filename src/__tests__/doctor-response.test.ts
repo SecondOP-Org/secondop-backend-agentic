@@ -69,6 +69,7 @@ describe('doctor response workflow', () => {
       filename: 'opinion.pdf',
       originalName: 'SecondOp-Opinion-SO1234.pdf',
       size: 1024,
+      reportId: 'report-test-001',
     });
     mockedGenerateDoctorOpinionPdfBuffer.mockResolvedValue(Buffer.from('%PDF-1.4 test'));
   });
@@ -424,7 +425,12 @@ describe('doctor response workflow', () => {
       await previewDoctorOpinion(req, res, next);
 
       expect(next).not.toHaveBeenCalled();
-      expect(mockedGenerateDoctorOpinionPdfBuffer).toHaveBeenCalled();
+      expect(mockedGenerateDoctorOpinionPdfBuffer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isDraft: true,
+          summary: 'Overall summary',
+        })
+      );
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Disposition',
@@ -517,6 +523,8 @@ describe('doctor response workflow', () => {
             expect.objectContaining({ questionId: 'sq-1', answer: 'Answer 1' }),
           ],
           summary: 'Overall summary',
+          isDraft: false,
+          signedAt: expect.any(String),
         })
       );
       expect(mockedQuery).toHaveBeenCalledWith(

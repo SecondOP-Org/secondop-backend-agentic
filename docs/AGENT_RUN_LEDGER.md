@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-14 - SEC-86 - Redesign doctor opinion PDF
+
+- Status: PR created / needs merge approval.
+- Human approval: Pending (implement from `DOCTOR_PDF_REDESIGN_TODO.md` + AGENTS.md workflow).
+- Branch/worktree: `sec-86-doctor-pdf-redesign`.
+- Files changed: `src/services/doctorOpinionPdf.service.ts`; preview/send wiring in `case.controller.ts`; `assets/secondop-logo.png`; PDF unit tests; TODO acceptance checkboxes.
+- PR: (pending)
+- Checks: `npm run lint`; `npm test` (173 passed, 1 skipped); `npm run build`.
+- Deployment: None.
+- Verification: Preview sets `isDraft`; send sets `signedAt` + no watermark; summary-first navy/cream layout.
+- Blockers: None.
+- Follow-ups: Human visual review of a generated PDF before merge; optional HTML→PDF later if design outgrows PDFKit.
+
 ## 2026-07-14 - SEC-11 - Paginate unbounded list endpoints
 
 - Status: Merging.
