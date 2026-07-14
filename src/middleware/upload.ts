@@ -63,3 +63,38 @@ export const upload = multer({
     fileSize: parseInt(process.env.MAX_FILE_SIZE || '52428800'), // 50MB default
   },
 });
+
+const studyFileFilter = (_req: unknown, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const extension = path.extname(file.originalname).toLowerCase();
+  const mime = file.mimetype.toLowerCase();
+  const isZip =
+    mime === 'application/zip' ||
+    mime === 'application/x-zip-compressed' ||
+    mime === 'multipart/x-zip' ||
+    extension === '.zip';
+  const isLikelyDicom =
+    mime === 'application/dicom' ||
+    mime === 'application/x-dicom' ||
+    mime === 'application/octet-stream' ||
+    extension === '.dcm' ||
+    extension === '.dicom' ||
+    extension === '' ||
+    path.basename(file.originalname).toUpperCase() === 'DICOMDIR';
+
+  if (isZip || isLikelyDicom) {
+    cb(null, true);
+    return;
+  }
+
+  cb(new AppError('Imaging study upload accepts .zip or DICOM files only', 400));
+};
+
+/** Dedicated multer config for whole-study ingest (zip or many DICOM instances). */
+export const studyUpload = multer({
+  storage,
+  fileFilter: studyFileFilter,
+  limits: {
+    fileSize: parseInt(process.env.MAX_STUDY_SIZE || String(1024 * 1024 * 1024), 10),
+    files: parseInt(process.env.MAX_STUDY_FILES || '2000', 10),
+  },
+});
