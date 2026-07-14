@@ -9,6 +9,11 @@ export interface DoctorOpinionQuestionAnswer {
   answer: string;
 }
 
+export interface DoctorOpinionKeyImage {
+  filePath: string;
+  label: string;
+}
+
 export interface DoctorOpinionPdfInput {
   caseTitle: string;
   caseNumber: string;
@@ -21,6 +26,7 @@ export interface DoctorOpinionPdfInput {
   questionAnswers?: DoctorOpinionQuestionAnswer[];
   summary?: string;
   aiAssistedReview?: boolean;
+  keyImages?: DoctorOpinionKeyImage[];
 }
 
 export interface DoctorOpinionPdfFile {
@@ -197,6 +203,34 @@ const renderDoctorOpinionPdf = (
   } else if (legacyResponse) {
     drawSectionHeader(doc, 'Clinical Opinion');
     drawBodyParagraph(doc, legacyResponse);
+  }
+
+  const keyImages = (input.keyImages || []).filter((image) => {
+    try {
+      return Boolean(image.filePath) && fs.existsSync(image.filePath);
+    } catch (_error) {
+      return false;
+    }
+  });
+
+  if (keyImages.length > 0) {
+    drawSectionHeader(doc, 'Key Images');
+    keyImages.forEach((image, index) => {
+      ensureSpace(doc, 220);
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(BODY_COLOR).text(`Image ${index + 1}`);
+      doc.font('Helvetica').fontSize(10).fillColor(MUTED_COLOR).text(image.label);
+      doc.moveDown(0.25);
+      try {
+        const maxWidth = doc.page.width - PAGE_MARGIN * 2;
+        doc.image(image.filePath, {
+          fit: [maxWidth, 280],
+          align: 'center',
+        });
+      } catch (_error) {
+        doc.font('Helvetica').fontSize(10).fillColor(MUTED_COLOR).text('(Unable to embed image file)');
+      }
+      doc.moveDown(0.75);
+    });
   }
 
   drawSectionHeader(doc, 'Specialist Attestation');

@@ -18,6 +18,7 @@ import {
   sendDoctorOpinion,
   getDoctorResponseDraft,
   saveDoctorResponseDraftHandler,
+  uploadDoctorKeyImageHandler,
   previewDoctorOpinion,
   startCaseReviewHandler,
 } from '../controllers/case.controller';
@@ -26,6 +27,7 @@ import {
   getCaseInternalNotesHandler,
 } from '../controllers/caseTeam.controller';
 import { authenticate, authorize } from '../middleware/auth';
+import { keyImageUpload } from '../middleware/upload';
 
 const router = Router();
 
@@ -51,6 +53,12 @@ router.get('/:caseId/internal-notes', authorize('doctor'), getCaseInternalNotesH
 router.post('/:caseId/internal-notes', authorize('doctor'), createCaseInternalNoteHandler);
 router.get('/:caseId/doctor-response', authorize('doctor'), getDoctorResponseDraft);
 router.put('/:caseId/doctor-response', authorize('doctor'), saveDoctorResponseDraftHandler);
+router.post(
+  '/:caseId/doctor-response/key-images',
+  authorize('doctor'),
+  keyImageUpload.single('file'),
+  uploadDoctorKeyImageHandler
+);
 router.post('/:caseId/doctor-opinion/preview', authorize('doctor'), previewDoctorOpinion);
 router.post('/:caseId/doctor-opinion', authorize('doctor'), sendDoctorOpinion);
 
