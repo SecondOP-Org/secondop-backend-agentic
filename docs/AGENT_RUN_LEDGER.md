@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-14 - SEC-76 - Whole-study DICOM ingest (folder, zip, DICOMDIR)
+
+- Status: In Progress → draft PR.
+- Human approval: User approved merge of SEC-75 and asked to proceed to next (SEC-76).
+- Branch/worktree: `sec-76-whole-study-ingest`.
+- Files changed: `imagingStudyIngest.service.ts`, `dicomMagic`/`dicomdir`/`zipExtract` utils, `upload-study` route + study multer, `.env.example`, tests, `yauzl` dependency.
+- PR: (opening)
+- Checks: `npm run lint`, targeted ingest/magic tests, `npm run build`.
+- Deployment: None. Set `MAX_STUDY_SIZE` / `MAX_STUDY_FILES` in staging if defaults need override.
+- Verification: Magic-positive files collected; junk skipped; zip extract with zip-slip guards.
+- Blockers: None for draft PR.
+- Follow-ups: Chunked/resumable multi-GB PET; object storage when volume pressure rises; SEC-77 wire viewer to real studies.
+
 ## 2026-07-13 - (no Linear) - Presidio production-grade durable vault
 
 - Status: In Review (draft PR).
