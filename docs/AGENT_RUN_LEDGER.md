@@ -28,18 +28,31 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-14 - SEC-11 - Paginate unbounded list endpoints
+
+- Status: Merging.
+- Human approval: User asked to merge SEC-14 and SEC-11 and proceed.
+- Branch/worktree: `sec-11-paginate-list-endpoints`.
+- Files changed: `src/utils/pagination.ts`; `getCases`/`getDoctorCases`/`getFiles`/`getMessages` return `page`/`pageSize`/`total`; FE `fetchAllPages` for case/message lists.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/54; FE https://github.com/SecondOP-Org/secondop-frontend/pull/51
+- Checks: BE lint/test/build; FE lint/build.
+- Deployment: None.
+- Verification: Default pageSize 50 (max 100); `data` array shape preserved; FE aggregates pages for inbox/chat.
+- Blockers: Rebased onto main after SEC-14 merge (ledger conflict).
+- Follow-ups: UI page controls if product wants partial lists instead of client-side aggregation.
+
 ## 2026-07-14 - SEC-14 - Guard unsupported LangChain runtime at startup
 
-- Status: In Progress.
-- Human approval: User asked for SEC-14 then SEC-11.
+- Status: Done (merged).
+- Human approval: User asked to merge SEC-14 and SEC-11 and proceed.
 - Branch/worktree: `sec-14-langchain-runtime-guard`.
 - Files changed: `src/config/agenticRuntime.ts`, `src/server.ts` startup assert, adapter/orchestration shared helpers, tests, `.env.example`, `docs/LANGGRAPH_RUNTIME.md`.
-- PR: (pending)
-- Checks: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/53 (merged)
+- Checks: lint/test (164 passed, 1 skipped)/build.
 - Deployment: None.
 - Verification: Unsupported `AGENTIC_RUNTIME` fails startup; `native`/`langchain` preserved; langchain fallback policy logged explicitly.
 - Blockers: None.
-- Follow-ups: SEC-11 pagination after this PR is ready.
+- Follow-ups: None.
 
 ## 2026-07-14 - SEC-51 - Real-time case-analysis progress stream
 

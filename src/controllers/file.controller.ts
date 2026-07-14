@@ -23,6 +23,11 @@ import {
 } from '../services/dicomDeidentification.service';
 import { computeFileSha256 } from '../services/fileHash.service';
 import {
+  paginationMeta,
+  parsePaginationQuery,
+  splitTotalCount,
+} from '../utils/pagination';
+import {
   invalidateCaseAnalysisAfterPdfChange,
   isImageMedicalFile,
   isPdfMedicalFile,
@@ -325,18 +330,9 @@ export const getFiles = async (req: AuthRequest, res: Response, next: NextFuncti
   try {
     const { caseId } = req.query;
     const userId = req.user!.id;
+    const { page, pageSize, offset } = parsePaginationQuery(req.query);
     const params: unknown[] = [userId];
-    let queryStr =
-      `SELECT DISTINCT mf.*,
-              di.dicom_extraction_status,
-              di.dicom_extraction_error
-       FROM medical_files mf
-       JOIN patients p ON p.id = mf.patient_id
-       LEFT JOIN cases c ON c.id = mf.case_id
-       LEFT JOIN case_assignments ca ON ca.case_id = c.id
-       LEFT JOIN doctors d ON d.id = ca.doctor_id
-       LEFT JOIN dicom_instances di ON di.file_id = mf.id
-       WHERE (p.user_id = $1 OR d.user_id = $1)`;
+    let innerWhere = 'WHERE (p.user_id = $1 OR d.user_id = $1)';
 
     if (caseId && typeof caseId !== 'string') {
       throw new AppError('caseId must be a string', 400);
@@ -344,16 +340,38 @@ export const getFiles = async (req: AuthRequest, res: Response, next: NextFuncti
 
     if (caseId) {
       params.push(caseId);
-      queryStr += ` AND mf.case_id = $${params.length}`;
+      innerWhere += ` AND mf.case_id = $${params.length}`;
     }
 
-    queryStr += ' ORDER BY mf.created_at DESC';
+    params.push(pageSize, offset);
+    const limitIdx = params.length - 1;
+    const offsetIdx = params.length;
+
+    // DISTINCT in a subquery avoids join fan-out before LIMIT/OFFSET + total count.
+    const queryStr = `
+      SELECT paged.*, COUNT(*) OVER() AS __total_count
+      FROM (
+        SELECT DISTINCT mf.*,
+               di.dicom_extraction_status,
+               di.dicom_extraction_error
+        FROM medical_files mf
+        JOIN patients p ON p.id = mf.patient_id
+        LEFT JOIN cases c ON c.id = mf.case_id
+        LEFT JOIN case_assignments ca ON ca.case_id = c.id
+        LEFT JOIN doctors d ON d.id = ca.doctor_id
+        LEFT JOIN dicom_instances di ON di.file_id = mf.id
+        ${innerWhere}
+      ) paged
+      ORDER BY paged.created_at DESC
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
 
     const result = await query(queryStr, params);
+    const { rows, total } = splitTotalCount(result.rows as Array<Record<string, unknown>>);
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data: rows,
+      ...paginationMeta(page, pageSize, total),
     });
   } catch (error) {
     next(error);

@@ -4,6 +4,11 @@ import path from 'path';
 import { query } from '../database/connection';
 import { AuthRequest } from '../middleware/auth';
 import { AppError } from '../middleware/errorHandler';
+import {
+  paginationMeta,
+  parsePaginationQuery,
+  splitTotalCount,
+} from '../utils/pagination';
 
 const assertCaseAccess = async (caseId: string, userId: string): Promise<void> => {
   const accessResult = await query(
@@ -98,13 +103,15 @@ export const getMessages = async (req: AuthRequest, res: Response, next: NextFun
   try {
     const { caseId } = req.params;
     await assertCaseAccess(caseId, req.user!.id);
+    const { page, pageSize, offset } = parsePaginationQuery(req.query);
 
     const result = await query(
       `SELECT m.*, 
               u1.email as sender_email,
               u2.email as receiver_email,
               COALESCE(p1.first_name || ' ' || p1.last_name, d1.first_name || ' ' || d1.last_name, u1.email) as sender_name,
-              COALESCE(p2.first_name || ' ' || p2.last_name, d2.first_name || ' ' || d2.last_name, u2.email) as receiver_name
+              COALESCE(p2.first_name || ' ' || p2.last_name, d2.first_name || ' ' || d2.last_name, u2.email) as receiver_name,
+              COUNT(*) OVER() AS __total_count
        FROM messages m
        JOIN users u1 ON m.sender_id = u1.id
        JOIN users u2 ON m.receiver_id = u2.id
@@ -113,13 +120,17 @@ export const getMessages = async (req: AuthRequest, res: Response, next: NextFun
        LEFT JOIN patients p2 ON p2.user_id = u2.id
        LEFT JOIN doctors d2 ON d2.user_id = u2.id
        WHERE m.case_id = $1
-       ORDER BY m.created_at ASC`,
-      [caseId]
+       ORDER BY m.created_at ASC
+       LIMIT $2 OFFSET $3`,
+      [caseId, pageSize, offset]
     );
+
+    const { rows, total } = splitTotalCount(result.rows as Array<Record<string, unknown>>);
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data: rows,
+      ...paginationMeta(page, pageSize, total),
     });
   } catch (error) {
     next(error);
