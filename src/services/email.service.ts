@@ -11,6 +11,14 @@ export type SendEmailInput = {
 
 let transporter: nodemailer.Transporter<SMTPTransport.SentMessageInfo> | null = null;
 
+/** Keep SMTP attempts short so auth APIs never stall behind mail delivery. */
+const SMTP_CONNECTION_TIMEOUT_MS = Number.parseInt(
+  process.env.SMTP_CONNECTION_TIMEOUT_MS || '8000',
+  10
+);
+const SMTP_SOCKET_TIMEOUT_MS = Number.parseInt(process.env.SMTP_SOCKET_TIMEOUT_MS || '10000', 10);
+const SMTP_SEND_TIMEOUT_MS = Number.parseInt(process.env.SMTP_SEND_TIMEOUT_MS || '12000', 10);
+
 export const isEmailConfigured = (): boolean => {
   return Boolean(process.env.SMTP_HOST?.trim() && process.env.EMAIL_FROM?.trim());
 };
@@ -39,6 +47,9 @@ const getTransporter = () => {
       port,
       secure,
       auth: user ? { user, pass: pass || '' } : undefined,
+      connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+      greetingTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+      socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
     });
   }
 
@@ -48,6 +59,24 @@ const getTransporter = () => {
 /** Test helper — resets cached transporter. */
 export const resetEmailTransporterForTests = (): void => {
   transporter = null;
+};
+
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
 };
 
 export const sendEmail = async (input: SendEmailInput): Promise<boolean> => {
@@ -61,13 +90,17 @@ export const sendEmail = async (input: SendEmailInput): Promise<boolean> => {
   }
 
   try {
-    await transport.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: input.to,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-    });
+    await withTimeout(
+      transport.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: input.to,
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      }),
+      SMTP_SEND_TIMEOUT_MS,
+      'SMTP sendMail'
+    );
     logger.info('Email sent', { to: input.to, subject: input.subject });
     return true;
   } catch (error) {
@@ -78,6 +111,20 @@ export const sendEmail = async (input: SendEmailInput): Promise<boolean> => {
     });
     return false;
   }
+};
+
+/**
+ * Queue outbound email without blocking the caller.
+ * Auth endpoints must return before SMTP completes.
+ */
+export const queueEmail = (input: SendEmailInput): void => {
+  void sendEmail(input).catch((error) => {
+    logger.error('Queued email failed', {
+      to: input.to,
+      subject: input.subject,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 };
 
 export const buildWelcomeVerifyEmail = (input: {

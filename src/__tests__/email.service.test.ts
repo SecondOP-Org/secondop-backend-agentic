@@ -2,6 +2,7 @@ import {
   buildPasswordResetEmail,
   buildWelcomeVerifyEmail,
   isEmailConfigured,
+  queueEmail,
   resetEmailTransporterForTests,
   sendEmail,
 } from '../services/email.service';
@@ -89,5 +90,26 @@ describe('email.service', () => {
         subject: 'Test',
       })
     );
+  });
+
+  it('queueEmail does not reject the caller when SMTP hangs', async () => {
+    process.env.SMTP_HOST = 'smtp.example.com';
+    process.env.EMAIL_FROM = 'noreply@secondop.com';
+    process.env.SMTP_SEND_TIMEOUT_MS = '20';
+    sendMail.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve({ messageId: 'late' }), 200))
+    );
+
+    expect(() =>
+      queueEmail({
+        to: 'a@example.com',
+        subject: 'Test',
+        text: 'hi',
+        html: '<p>hi</p>',
+      })
+    ).not.toThrow();
+
+    // Allow the background timeout path to settle.
+    await new Promise((resolve) => setTimeout(resolve, 60));
   });
 });
