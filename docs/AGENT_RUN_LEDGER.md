@@ -34,12 +34,12 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Pending.
 - Branch/worktree: `sec-92-untitled-series-fallback`.
 - Files changed: `src/services/dicomImaging.service.ts` (seriesDescription null when tag absent).
-- PR: (pending)
-- Checks: pending.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/59 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/60 (draft)
+- Checks: lint; dicom tests; build.
 - Deployment: None.
 - Verification: API no longer injects literal "Untitled Series"; FE builds modality+count labels.
 - Blockers: None.
-- Follow-ups: Pair with FE SEC-92 (series-level case detail list).
+- Follow-ups: Merge FE+BE; deploy BE so new studies omit the placeholder (FE also ignores existing "Untitled Series").
 
 ## 2026-07-14 - SEC-90 - Imaging upload feedback (errors, phases, cancel)
 
