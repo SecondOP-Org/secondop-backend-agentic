@@ -6,6 +6,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { query, transaction } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
+import {
+  buildPasswordResetEmail,
+  buildWelcomeVerifyEmail,
+  getAppPublicUrl,
+  sendEmail,
+} from '../services/email.service';
 import logger from '../utils/logger';
 
 // Helper function to generate JWT token
@@ -109,6 +115,34 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     logger.info(`User registered: ${result.email}`);
 
+    // Best-effort welcome + email verification (does not block registration).
+    let emailVerificationSent = false;
+    const verifyToken = uuidv4();
+    const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    try {
+      await query(
+        `INSERT INTO otp_verifications (user_id, email, otp_code, purpose, expires_at)
+         VALUES ($1, $2, $3, 'email_verify', $4)`,
+        [result.id, result.email, hashSecret(verifyToken), verifyExpiresAt]
+      );
+      const verifyUrl = `${getAppPublicUrl()}/verify-email?token=${encodeURIComponent(verifyToken)}`;
+      const mail = buildWelcomeVerifyEmail({
+        firstName: String(firstName),
+        verifyUrl,
+      });
+      emailVerificationSent = await sendEmail({
+        to: result.email,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+      });
+    } catch (emailError) {
+      logger.error('Failed to queue welcome/verify email after register', {
+        email: result.email,
+        error: emailError instanceof Error ? emailError.message : String(emailError),
+      });
+    }
+
     res.status(201).json({
       status: 'success',
       message: 'User registered successfully',
@@ -121,6 +155,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         },
         token,
         refreshToken,
+        emailVerificationSent,
       },
     });
   } catch (error) {
@@ -360,12 +395,13 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
       throw new AppError('Email is required', 400);
     }
 
+    const genericMessage = 'If the email exists, a reset link has been sent';
     const result = await query('SELECT id FROM users WHERE email = $1', [email]);
 
     if (result.rows.length === 0) {
       res.json({
         status: 'success',
-        message: 'If the email exists, a reset link has been sent',
+        message: genericMessage,
       });
       return;
     }
@@ -375,21 +411,75 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
     await query(
+      `UPDATE otp_verifications
+       SET is_used = true
+       WHERE user_id = $1 AND purpose = 'password_reset' AND is_used = false`,
+      [userId]
+    );
+
+    await query(
       `INSERT INTO otp_verifications (user_id, email, otp_code, purpose, expires_at)
        VALUES ($1, $2, $3, 'password_reset', $4)`,
       [userId, email, hashSecret(resetToken), expiresAt]
     );
 
+    const resetUrl = `${getAppPublicUrl()}/reset-password?token=${encodeURIComponent(resetToken)}`;
+    const mail = buildPasswordResetEmail({ resetUrl });
+    await sendEmail({
+      to: email,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+    });
+
     logger.info(`Password reset requested for ${email}`);
 
     res.json({
       status: 'success',
-      message: 'If the email exists, a reset link has been sent',
+      message: genericMessage,
     });
     return;
   } catch (error) {
     next(error);
     return;
+  }
+};
+
+export const verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.body;
+
+    if (!token || typeof token !== 'string') {
+      throw new AppError('Verification token is required', 400);
+    }
+
+    const result = await query(
+      `SELECT id, user_id FROM otp_verifications
+       WHERE otp_code = $1 AND purpose = 'email_verify' AND is_used = false AND expires_at > NOW()`,
+      [hashSecret(token)]
+    );
+
+    if (result.rows.length === 0) {
+      throw new AppError('Invalid or expired verification token', 401);
+    }
+
+    const { id: verificationId, user_id: userId } = result.rows[0];
+
+    await query('UPDATE users SET is_verified = true WHERE id = $1', [userId]);
+    await query('UPDATE otp_verifications SET is_used = true WHERE id = $1', [verificationId]);
+    await query(
+      `UPDATE otp_verifications
+       SET is_used = true
+       WHERE user_id = $1 AND purpose = 'email_verify' AND is_used = false`,
+      [userId]
+    );
+
+    res.json({
+      status: 'success',
+      message: 'Email verified successfully',
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
