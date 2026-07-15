@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Pending.
 - Branch/worktree: `sec-96-email-delivery`.
 - Files changed: `email.service.ts`, auth controller/routes, migration `023_widen_otp_code.sql`, `.env.example`, tests.
-- PR: (draft; link after open); FE companion includes forgot/reset/verify pages (+ SEC-95 signup base).
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/61 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/64 (draft; includes SEC-95 signup).
 - Checks: lint; email + auth-security tests; build.
 - Deployment: Requires `SMTP_*`, `EMAIL_FROM`, `APP_PUBLIC_URL` on Railway; run migration 023.
 - Verification: With SMTP configured, register sends welcome/verify; forgot-password sends reset link; `/auth/verify-email` marks verified.
