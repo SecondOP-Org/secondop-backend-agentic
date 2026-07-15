@@ -79,7 +79,18 @@ export const keyImageUpload = multer({
   },
 });
 
+/**
+ * Folder uploads (`files`) often include hospital-CD sidecars (.jpg/.txt/HTML viewers)
+ * and vendor extensions (.ima/.img). Rejecting any one of them aborts the whole multipart
+ * request. Accept all parts for `files` and let ingest skip non-DICOM (same as zip extract).
+ * The `archive` field remains zip-only.
+ */
 const studyFileFilter = (_req: unknown, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  if (file.fieldname === 'files') {
+    cb(null, true);
+    return;
+  }
+
   const extension = path.extname(file.originalname).toLowerCase();
   const mime = file.mimetype.toLowerCase();
   const isZip =
@@ -87,21 +98,13 @@ const studyFileFilter = (_req: unknown, file: Express.Multer.File, cb: multer.Fi
     mime === 'application/x-zip-compressed' ||
     mime === 'multipart/x-zip' ||
     extension === '.zip';
-  const isLikelyDicom =
-    mime === 'application/dicom' ||
-    mime === 'application/x-dicom' ||
-    mime === 'application/octet-stream' ||
-    extension === '.dcm' ||
-    extension === '.dicom' ||
-    extension === '' ||
-    path.basename(file.originalname).toUpperCase() === 'DICOMDIR';
 
-  if (isZip || isLikelyDicom) {
+  if (isZip) {
     cb(null, true);
     return;
   }
 
-  cb(new AppError('Imaging study upload accepts .zip or DICOM files only', 400));
+  cb(new AppError('Imaging study upload accepts a .zip archive or a folder of DICOM files', 400));
 };
 
 /** Dedicated multer config for whole-study ingest (zip or many DICOM instances). */
