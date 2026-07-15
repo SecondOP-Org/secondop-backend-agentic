@@ -133,6 +133,15 @@ const isDicomUpload = (file: Express.Multer.File): boolean => {
 };
 
 export const uploadImagingStudy = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const abortController = new AbortController();
+  const onClientGone = () => {
+    if (!res.writableEnded) {
+      abortController.abort();
+    }
+  };
+  req.on('aborted', onClientGone);
+  res.on('close', onClientGone);
+
   try {
     const { caseId, description } = req.body;
     const userId = req.user!.id;
@@ -144,6 +153,7 @@ export const uploadImagingStudy = async (req: AuthRequest, res: Response, next: 
     const patientId = await findAccessibleCasePatientId(caseId, userId);
     const uploadedFiles = (req.files as Express.Multer.File[] | undefined) || [];
     const singleFile = req.file;
+    const ingestOptions = { signal: abortController.signal };
 
     if (singleFile) {
       const extension = path.extname(singleFile.originalname).toLowerCase();
@@ -156,13 +166,16 @@ export const uploadImagingStudy = async (req: AuthRequest, res: Response, next: 
         throw new AppError('Single-file study upload must be a .zip archive', 400);
       }
 
-      const result = await ingestImagingStudyFromZip({
-        caseId,
-        patientId,
-        userId,
-        zipPath: singleFile.path,
-        description: typeof description === 'string' ? description : undefined,
-      });
+      const result = await ingestImagingStudyFromZip(
+        {
+          caseId,
+          patientId,
+          userId,
+          zipPath: singleFile.path,
+          description: typeof description === 'string' ? description : undefined,
+        },
+        ingestOptions
+      );
 
       res.status(201).json({
         status: 'success',
@@ -172,13 +185,16 @@ export const uploadImagingStudy = async (req: AuthRequest, res: Response, next: 
     }
 
     if (uploadedFiles.length > 0) {
-      const result = await ingestImagingStudyFromFiles({
-        caseId,
-        patientId,
-        userId,
-        files: uploadedFiles,
-        description: typeof description === 'string' ? description : undefined,
-      });
+      const result = await ingestImagingStudyFromFiles(
+        {
+          caseId,
+          patientId,
+          userId,
+          files: uploadedFiles,
+          description: typeof description === 'string' ? description : undefined,
+        },
+        ingestOptions
+      );
 
       res.status(201).json({
         status: 'success',
@@ -190,6 +206,9 @@ export const uploadImagingStudy = async (req: AuthRequest, res: Response, next: 
     throw new AppError('No imaging study files uploaded', 400);
   } catch (error) {
     next(error);
+  } finally {
+    req.off('aborted', onClientGone);
+    res.off('close', onClientGone);
   }
 };
 

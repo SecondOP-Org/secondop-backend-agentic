@@ -15,10 +15,40 @@ import {
 import { isDicomMagicFile } from '../utils/dicomMagic';
 import { listFilesFromDicomdir } from '../utils/dicomdir';
 import { extractZipArchive } from '../utils/zipExtract';
-import { resolveUploadDir } from '../utils/uploadPath';
+import { resolveUploadDir, resolveStoredFilePath } from '../utils/uploadPath';
 
 export const DEFAULT_MAX_STUDY_BYTES = 1024 * 1024 * 1024; // 1 GiB
 export const DEFAULT_MAX_STUDY_FILES = 2000;
+
+export const NO_DICOM_FOUND_MESSAGE =
+  "We couldn't find any scan images in what you uploaded. Try the folder from your hospital CD or portal download.";
+
+export const CORRUPT_DICOM_MESSAGE =
+  'Those scan images appear to be damaged or unreadable.';
+
+export const UPLOAD_CANCELLED_MESSAGE = 'Upload was cancelled.';
+
+const LIKELY_DICOM_EXTENSIONS = new Set(['', '.dcm', '.dicom', '.ima', '.img']);
+const OBVIOUS_NON_DICOM_EXTENSIONS = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.bmp',
+  '.txt',
+  '.html',
+  '.htm',
+  '.xml',
+  '.pdf',
+  '.exe',
+  '.dll',
+  '.js',
+  '.css',
+  '.ini',
+  '.inf',
+  '.url',
+  '.lnk',
+]);
 
 export interface IngestedStudyFile {
   id: string;
@@ -33,13 +63,25 @@ export interface IngestedStudyFile {
   created_at: string;
 }
 
+export interface ImagingStudyFileFailure {
+  fileName: string;
+  reason: string;
+}
+
 export interface ImagingStudyIngestResult {
   files: IngestedStudyFile[];
   studies: Awaited<ReturnType<typeof getImagingStudiesForCase>>;
   skippedNonDicom: number;
   totalBytes: number;
+  /** @deprecated Prefer `ingested` — kept for older clients. */
   instanceCount: number;
+  ingested: number;
+  failed: ImagingStudyFileFailure[];
   source: 'zip' | 'files';
+}
+
+export interface ImagingStudyIngestOptions {
+  signal?: AbortSignal;
 }
 
 interface PersistInstanceInput {
@@ -57,6 +99,31 @@ const getMaxStudyBytes = (): number =>
 
 const getMaxStudyFiles = (): number =>
   Number.parseInt(process.env.MAX_STUDY_FILES || String(DEFAULT_MAX_STUDY_FILES), 10);
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+
+const isLikelyDicomPath = (filePath: string): boolean => {
+  const baseName = path.basename(filePath);
+  if (baseName.toUpperCase() === 'DICOMDIR') {
+    return true;
+  }
+  const extension = path.extname(baseName).toLowerCase();
+  if (OBVIOUS_NON_DICOM_EXTENSIONS.has(extension)) {
+    return false;
+  }
+  return LIKELY_DICOM_EXTENSIONS.has(extension) || extension === '';
+};
 
 const walkFilesRecursive = async (rootDir: string): Promise<string[]> => {
   const discovered: string[] = [];
@@ -85,7 +152,12 @@ const findDicomdir = async (rootDir: string): Promise<string | null> => {
 
 export const collectDicomInstancePaths = async (
   rootDir: string
-): Promise<{ instancePaths: string[]; skippedNonDicom: number; usedDicomdir: boolean }> => {
+): Promise<{
+  instancePaths: string[];
+  skippedNonDicom: number;
+  unreadableCount: number;
+  usedDicomdir: boolean;
+}> => {
   const dicomdirPath = await findDicomdir(rootDir);
   let candidatePaths: string[] = [];
   let usedDicomdir = false;
@@ -106,6 +178,7 @@ export const collectDicomInstancePaths = async (
 
   const instancePaths: string[] = [];
   let skippedNonDicom = 0;
+  let unreadableCount = 0;
 
   for (const candidate of candidatePaths) {
     const base = path.basename(candidate).toUpperCase();
@@ -117,16 +190,20 @@ export const collectDicomInstancePaths = async (
     try {
       const isDicom = await isDicomMagicFile(candidate);
       if (!isDicom) {
-        skippedNonDicom += 1;
+        if (isLikelyDicomPath(candidate)) {
+          unreadableCount += 1;
+        } else {
+          skippedNonDicom += 1;
+        }
         continue;
       }
       instancePaths.push(candidate);
     } catch {
-      skippedNonDicom += 1;
+      unreadableCount += 1;
     }
   }
 
-  return { instancePaths, skippedNonDicom, usedDicomdir };
+  return { instancePaths, skippedNonDicom, unreadableCount, usedDicomdir };
 };
 
 const persistDicomInstance = async ({
@@ -205,17 +282,23 @@ const persistDicomInstance = async ({
   return fileRecord;
 };
 
-const assertStudyLimits = async (instancePaths: string[]) => {
+const assertStudyLimits = async (
+  instancePaths: string[],
+  unreadableCount: number
+): Promise<number> => {
   const maxFiles = getMaxStudyFiles();
   const maxBytes = getMaxStudyBytes();
 
   if (instancePaths.length === 0) {
-    throw new AppError('No DICOM instances found in the uploaded study', 400);
+    if (unreadableCount > 0) {
+      throw new AppError(CORRUPT_DICOM_MESSAGE, 400);
+    }
+    throw new AppError(NO_DICOM_FOUND_MESSAGE, 400);
   }
 
   if (instancePaths.length > maxFiles) {
     throw new AppError(
-      `Study exceeds maximum instance count (${instancePaths.length} > ${maxFiles})`,
+      `Too many scan images: received ${instancePaths.length}, maximum is ${maxFiles}.`,
       400
     );
   }
@@ -228,7 +311,7 @@ const assertStudyLimits = async (instancePaths: string[]) => {
 
   if (totalBytes > maxBytes) {
     throw new AppError(
-      `Study exceeds maximum size (${totalBytes} bytes > ${maxBytes} bytes)`,
+      `Upload too large: received ${formatBytes(totalBytes)}, maximum is ${formatBytes(maxBytes)}.`,
       400
     );
   }
@@ -243,63 +326,144 @@ const cleanupDir = async (dirPath: string | null) => {
   await fs.rm(dirPath, { recursive: true, force: true }).catch(() => undefined);
 };
 
-export const ingestImagingStudyFromZip = async (input: {
+const rollbackIngestedFiles = async (files: IngestedStudyFile[]) => {
+  for (const file of files) {
+    try {
+      const filePath = resolveStoredFilePath(file.file_url);
+      await fs.unlink(filePath).catch(() => undefined);
+      await query('DELETE FROM medical_files WHERE id = $1', [file.id]);
+    } catch {
+      // Best-effort cleanup; do not mask the original abort/error.
+    }
+  }
+};
+
+const throwIfAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) {
+    throw new AppError(UPLOAD_CANCELLED_MESSAGE, 400);
+  }
+};
+
+const ingestInstancePaths = async (input: {
   caseId: string;
   patientId: string;
   userId: string;
-  zipPath: string;
+  workDir: string;
+  instancePaths: string[];
+  skippedNonDicom: number;
+  unreadableCount: number;
   description?: string;
+  source: 'zip' | 'files';
+  signal?: AbortSignal;
 }): Promise<ImagingStudyIngestResult> => {
-  const workDir = path.join(resolveUploadDir(), 'tmp', `study-${uuidv4()}`);
-  try {
-    await extractZipArchive(input.zipPath, workDir);
-    const { instancePaths, skippedNonDicom } = await collectDicomInstancePaths(workDir);
-    const totalBytes = await assertStudyLimits(instancePaths);
-    const deidContext = createDicomDeidContext(input.caseId);
+  const totalBytes = await assertStudyLimits(input.instancePaths, input.unreadableCount);
+  const deidContext = createDicomDeidContext(input.caseId);
 
-    const files: IngestedStudyFile[] = [];
-    for (const instancePath of instancePaths) {
-      const relative = path.relative(workDir, instancePath);
-      files.push(
-        await persistDicomInstance({
-          caseId: input.caseId,
-          patientId: input.patientId,
-          userId: input.userId,
-          sourcePath: instancePath,
-          displayName: relative || path.basename(instancePath),
-          description: input.description,
-          deidContext,
-        })
-      );
+  const files: IngestedStudyFile[] = [];
+  const failed: ImagingStudyFileFailure[] = [];
+
+  try {
+    for (const instancePath of input.instancePaths) {
+      throwIfAborted(input.signal);
+      const relative = path.relative(input.workDir, instancePath);
+      const displayName = relative || path.basename(instancePath);
+      try {
+        files.push(
+          await persistDicomInstance({
+            caseId: input.caseId,
+            patientId: input.patientId,
+            userId: input.userId,
+            sourcePath: instancePath,
+            displayName,
+            description: input.description,
+            deidContext,
+          })
+        );
+      } catch {
+        failed.push({
+          fileName: displayName,
+          reason: "Couldn't read this image",
+        });
+      }
+    }
+
+    throwIfAborted(input.signal);
+
+    if (files.length === 0) {
+      throw new AppError(CORRUPT_DICOM_MESSAGE, 400);
     }
 
     const studies = await getImagingStudiesForCase(input.caseId);
     return {
       files,
       studies,
-      skippedNonDicom,
+      skippedNonDicom: input.skippedNonDicom,
       totalBytes,
       instanceCount: files.length,
-      source: 'zip',
+      ingested: files.length,
+      failed,
+      source: input.source,
     };
+  } catch (error) {
+    if (error instanceof AppError && error.message === UPLOAD_CANCELLED_MESSAGE) {
+      await rollbackIngestedFiles(files);
+    }
+    throw error;
+  }
+};
+
+export const ingestImagingStudyFromZip = async (
+  input: {
+    caseId: string;
+    patientId: string;
+    userId: string;
+    zipPath: string;
+    description?: string;
+  },
+  options: ImagingStudyIngestOptions = {}
+): Promise<ImagingStudyIngestResult> => {
+  const workDir = path.join(resolveUploadDir(), 'tmp', `study-${uuidv4()}`);
+  try {
+    throwIfAborted(options.signal);
+    await extractZipArchive(input.zipPath, workDir);
+    throwIfAborted(options.signal);
+    const { instancePaths, skippedNonDicom, unreadableCount } =
+      await collectDicomInstancePaths(workDir);
+    return await ingestInstancePaths({
+      caseId: input.caseId,
+      patientId: input.patientId,
+      userId: input.userId,
+      workDir,
+      instancePaths,
+      skippedNonDicom,
+      unreadableCount,
+      description: input.description,
+      source: 'zip',
+      signal: options.signal,
+    });
   } finally {
     await cleanupDir(workDir);
     await fs.unlink(input.zipPath).catch(() => undefined);
   }
 };
 
-export const ingestImagingStudyFromFiles = async (input: {
-  caseId: string;
-  patientId: string;
-  userId: string;
-  files: Express.Multer.File[];
-  description?: string;
-}): Promise<ImagingStudyIngestResult> => {
+export const ingestImagingStudyFromFiles = async (
+  input: {
+    caseId: string;
+    patientId: string;
+    userId: string;
+    files: Express.Multer.File[];
+    description?: string;
+  },
+  options: ImagingStudyIngestOptions = {}
+): Promise<ImagingStudyIngestResult> => {
   const workDir = path.join(resolveUploadDir(), 'tmp', `study-${uuidv4()}`);
   try {
+    throwIfAborted(options.signal);
     await fs.mkdir(workDir, { recursive: true });
 
     for (const file of input.files) {
+      throwIfAborted(options.signal);
       const relativeName = (file.originalname || file.filename).replace(/^[/\\]+/, '');
       if (relativeName.includes('..')) {
         throw new AppError('Invalid file path in study upload', 400);
@@ -312,35 +476,20 @@ export const ingestImagingStudyFromFiles = async (input: {
       });
     }
 
-    const { instancePaths, skippedNonDicom } = await collectDicomInstancePaths(workDir);
-    const totalBytes = await assertStudyLimits(instancePaths);
-    const deidContext = createDicomDeidContext(input.caseId);
-
-    const files: IngestedStudyFile[] = [];
-    for (const instancePath of instancePaths) {
-      const relative = path.relative(workDir, instancePath);
-      files.push(
-        await persistDicomInstance({
-          caseId: input.caseId,
-          patientId: input.patientId,
-          userId: input.userId,
-          sourcePath: instancePath,
-          displayName: relative || path.basename(instancePath),
-          description: input.description,
-          deidContext,
-        })
-      );
-    }
-
-    const studies = await getImagingStudiesForCase(input.caseId);
-    return {
-      files,
-      studies,
+    const { instancePaths, skippedNonDicom, unreadableCount } =
+      await collectDicomInstancePaths(workDir);
+    return await ingestInstancePaths({
+      caseId: input.caseId,
+      patientId: input.patientId,
+      userId: input.userId,
+      workDir,
+      instancePaths,
       skippedNonDicom,
-      totalBytes,
-      instanceCount: files.length,
+      unreadableCount,
+      description: input.description,
       source: 'files',
-    };
+      signal: options.signal,
+    });
   } finally {
     await cleanupDir(workDir);
   }

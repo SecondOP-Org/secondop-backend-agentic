@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-14 - SEC-90 - Imaging upload feedback (errors, phases, cancel)
+
+- Status: PR created / needs merge approval.
+- Human approval: Pending.
+- Branch/worktree: `sec-90-imaging-upload-feedback`.
+- Files changed: `src/utils/zipExtract.ts`; `src/services/imagingStudyIngest.service.ts`; `src/controllers/file.controller.ts`; zip/collect unit tests; ledger.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/58 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/58 (draft)
+- Checks: `npm run lint`; `npm test` (178 passed, 1 skipped); `npm run build`.
+- Deployment: None.
+- Verification: Corrupt zip → AppError 400; distinct no-DICOM vs corrupt messages; ingest returns `ingested`/`failed[]`; client disconnect aborts mid-ingest and rolls back persisted files.
+- Blockers: None.
+- Follow-ups: Human merge approval; deploy BE before/with FE so new result shape and 400 messages are live together.
+
 ## 2026-07-14 - SEC-86 - Redesign doctor opinion PDF
 
 - Status: PR created / needs merge approval.
