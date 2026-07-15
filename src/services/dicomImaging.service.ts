@@ -328,7 +328,8 @@ export const getImagingStudiesForCase = async (caseId: string) => {
     if (!series) {
       series = {
         seriesUid,
-        seriesDescription: row.series_description || 'Untitled Series',
+        // Leave null when DICOM SeriesDescription is absent — FE builds modality+count labels.
+        seriesDescription: row.series_description || null,
         modality: row.modality,
         bodyPartExamined: row.body_part_examined,
         instanceCount: 0,
