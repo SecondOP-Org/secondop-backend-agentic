@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Pending.
 - Branch/worktree: `sec-94-imaging-honest-skips`.
 - Files changed: `src/services/imagingStudyIngest.service.ts`, `src/__tests__/imaging-study-collect.test.ts`.
-- PR: (draft; link after open); FE companion `sec-94-imaging-patient-card-thumbs-skips`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/60 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/62 (draft)
 - Checks: lint; `imaging-study-collect` tests; build.
 - Deployment: None.
 - Verification: Every non-ingested file under the upload root is returned in `skipped[]` with reason (`not-dicom` | `index-file` | `unreadable`); `skippedNonDicom` equals `skipped.length`.
