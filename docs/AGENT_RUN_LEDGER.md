@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-14 - Deploy SEC-86 doctor PDF redesign
+
+- Status: Done.
+- Human approval: User asked to deploy backend after confirming SEC-86 was merged but not live.
+- Branch/worktree: `main` @ `f3244eb`.
+- Files changed: none (deploy only); set `BACKEND_GIT_SHA=f3244eb…` on staging/production.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/55 (already merged).
+- Checks: Staging + production `/health` 200; `/version` gitSha `f3244eb…`.
+- Deployment: Railway staging `secondop-backend-staging` + production `secondop-backend` via `railway up`.
+- Verification: Both report `f3244eb0eeb26e6f9f2d9fc62567708fcd5bbcd7`.
+- Blockers: None. No new migrations for SEC-86.
+- Follow-ups: Optional visual spot-check of preview vs final doctor opinion PDF.
+
 ## 2026-07-14 - SEC-86 - Redesign doctor opinion PDF
 
 - Status: PR created / needs merge approval.
