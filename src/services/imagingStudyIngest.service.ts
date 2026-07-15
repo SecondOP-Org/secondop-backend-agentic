@@ -68,9 +68,19 @@ export interface ImagingStudyFileFailure {
   reason: string;
 }
 
+export type ImagingStudySkipReason = 'not-dicom' | 'index-file' | 'unreadable';
+
+export interface ImagingStudySkippedFile {
+  fileName: string;
+  reason: ImagingStudySkipReason;
+}
+
 export interface ImagingStudyIngestResult {
   files: IngestedStudyFile[];
   studies: Awaited<ReturnType<typeof getImagingStudiesForCase>>;
+  /** Every non-ingested file under the upload root with a reason. */
+  skipped: ImagingStudySkippedFile[];
+  /** Back-compat: count of skipped entries (never silently zero when files were excluded). */
   skippedNonDicom: number;
   totalBytes: number;
   /** @deprecated Prefer `ingested` — kept for older clients. */
@@ -125,6 +135,43 @@ const isLikelyDicomPath = (filePath: string): boolean => {
   return LIKELY_DICOM_EXTENSIONS.has(extension) || extension === '';
 };
 
+const isIndexOrSidecarFile = (filePath: string): boolean => {
+  const base = path.basename(filePath).toUpperCase();
+  const extension = path.extname(base).toLowerCase();
+  if (base === 'DICOMDIR' || base.startsWith('.')) {
+    return true;
+  }
+  if (base === 'DESKTOP.INI' || base === 'THUMBS.DB' || base === 'DS_STORE') {
+    return true;
+  }
+  if (base.startsWith('README') || base.startsWith('LICENSE')) {
+    return true;
+  }
+  if (filePath.includes(`${path.sep}__MACOSX${path.sep}`) || filePath.includes('/__MACOSX/')) {
+    return true;
+  }
+  if (extension === '.ini' || extension === '.inf' || extension === '.url' || extension === '.lnk') {
+    return true;
+  }
+  return false;
+};
+
+const classifySkippedFile = (
+  filePath: string,
+  options?: { unreadable?: boolean }
+): ImagingStudySkipReason => {
+  if (options?.unreadable) {
+    return 'unreadable';
+  }
+  if (isIndexOrSidecarFile(filePath)) {
+    return 'index-file';
+  }
+  if (isLikelyDicomPath(filePath)) {
+    return 'unreadable';
+  }
+  return 'not-dicom';
+};
+
 const walkFilesRecursive = async (rootDir: string): Promise<string[]> => {
   const discovered: string[] = [];
 
@@ -154,10 +201,12 @@ export const collectDicomInstancePaths = async (
   rootDir: string
 ): Promise<{
   instancePaths: string[];
+  skipped: ImagingStudySkippedFile[];
   skippedNonDicom: number;
   unreadableCount: number;
   usedDicomdir: boolean;
 }> => {
+  const allFiles = await walkFilesRecursive(rootDir);
   const dicomdirPath = await findDicomdir(rootDir);
   let candidatePaths: string[] = [];
   let usedDicomdir = false;
@@ -173,37 +222,57 @@ export const collectDicomInstancePaths = async (
   }
 
   if (!usedDicomdir) {
-    candidatePaths = await walkFilesRecursive(rootDir);
+    candidatePaths = allFiles;
   }
 
   const instancePaths: string[] = [];
-  let skippedNonDicom = 0;
-  let unreadableCount = 0;
+  const skippedByPath = new Map<string, ImagingStudySkipReason>();
 
   for (const candidate of candidatePaths) {
     const base = path.basename(candidate).toUpperCase();
     if (base === 'DICOMDIR' || base.startsWith('.')) {
-      skippedNonDicom += 1;
+      skippedByPath.set(path.resolve(candidate), 'index-file');
       continue;
     }
 
     try {
       const isDicom = await isDicomMagicFile(candidate);
       if (!isDicom) {
-        if (isLikelyDicomPath(candidate)) {
-          unreadableCount += 1;
-        } else {
-          skippedNonDicom += 1;
-        }
+        skippedByPath.set(
+          path.resolve(candidate),
+          classifySkippedFile(candidate, { unreadable: isLikelyDicomPath(candidate) })
+        );
         continue;
       }
       instancePaths.push(candidate);
     } catch {
-      unreadableCount += 1;
+      skippedByPath.set(path.resolve(candidate), 'unreadable');
     }
   }
 
-  return { instancePaths, skippedNonDicom, unreadableCount, usedDicomdir };
+  // Account for every file on disk that was not ingested (e.g. README next to a DICOMDIR study).
+  const ingested = new Set(instancePaths.map((item) => path.resolve(item)));
+  for (const filePath of allFiles) {
+    const resolved = path.resolve(filePath);
+    if (ingested.has(resolved) || skippedByPath.has(resolved)) {
+      continue;
+    }
+    skippedByPath.set(resolved, classifySkippedFile(filePath));
+  }
+
+  const skipped: ImagingStudySkippedFile[] = [...skippedByPath.entries()].map(([resolved, reason]) => ({
+    fileName: path.relative(rootDir, resolved) || path.basename(resolved),
+    reason,
+  }));
+  const unreadableCount = skipped.filter((item) => item.reason === 'unreadable').length;
+
+  return {
+    instancePaths,
+    skipped,
+    skippedNonDicom: skipped.length,
+    unreadableCount,
+    usedDicomdir,
+  };
 };
 
 const persistDicomInstance = async ({
@@ -350,7 +419,7 @@ const ingestInstancePaths = async (input: {
   userId: string;
   workDir: string;
   instancePaths: string[];
-  skippedNonDicom: number;
+  skipped: ImagingStudySkippedFile[];
   unreadableCount: number;
   description?: string;
   source: 'zip' | 'files';
@@ -361,6 +430,7 @@ const ingestInstancePaths = async (input: {
 
   const files: IngestedStudyFile[] = [];
   const failed: ImagingStudyFileFailure[] = [];
+  const skipped = [...input.skipped];
 
   try {
     for (const instancePath of input.instancePaths) {
@@ -384,6 +454,7 @@ const ingestInstancePaths = async (input: {
           fileName: displayName,
           reason: "Couldn't read this image",
         });
+        skipped.push({ fileName: displayName, reason: 'unreadable' });
       }
     }
 
@@ -397,7 +468,8 @@ const ingestInstancePaths = async (input: {
     return {
       files,
       studies,
-      skippedNonDicom: input.skippedNonDicom,
+      skipped,
+      skippedNonDicom: skipped.length,
       totalBytes,
       instanceCount: files.length,
       ingested: files.length,
@@ -427,15 +499,14 @@ export const ingestImagingStudyFromZip = async (
     throwIfAborted(options.signal);
     await extractZipArchive(input.zipPath, workDir);
     throwIfAborted(options.signal);
-    const { instancePaths, skippedNonDicom, unreadableCount } =
-      await collectDicomInstancePaths(workDir);
+    const { instancePaths, skipped, unreadableCount } = await collectDicomInstancePaths(workDir);
     return await ingestInstancePaths({
       caseId: input.caseId,
       patientId: input.patientId,
       userId: input.userId,
       workDir,
       instancePaths,
-      skippedNonDicom,
+      skipped,
       unreadableCount,
       description: input.description,
       source: 'zip',
@@ -476,15 +547,14 @@ export const ingestImagingStudyFromFiles = async (
       });
     }
 
-    const { instancePaths, skippedNonDicom, unreadableCount } =
-      await collectDicomInstancePaths(workDir);
+    const { instancePaths, skipped, unreadableCount } = await collectDicomInstancePaths(workDir);
     return await ingestInstancePaths({
       caseId: input.caseId,
       patientId: input.patientId,
       userId: input.userId,
       workDir,
       instancePaths,
-      skippedNonDicom,
+      skipped,
       unreadableCount,
       description: input.description,
       source: 'files',

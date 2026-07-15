@@ -19,14 +19,14 @@ describe('collectDicomInstancePaths', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec76-dicom-'));
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sec94-dicom-'));
   });
 
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('keeps magic-positive files and skips junk', async () => {
+  it('keeps magic-positive files and skips junk with reasons', async () => {
     await writeFakeDicom(path.join(tempDir, 'SERIES', 'I001'));
     await writeFakeDicom(path.join(tempDir, 'SERIES', 'I002'));
     await fs.writeFile(path.join(tempDir, 'readme.txt'), 'not dicom');
@@ -34,7 +34,12 @@ describe('collectDicomInstancePaths', () => {
     const result = await collectDicomInstancePaths(tempDir);
 
     expect(result.instancePaths).toHaveLength(2);
-    expect(result.skippedNonDicom).toBeGreaterThanOrEqual(1);
+    expect(result.skipped.length).toBeGreaterThanOrEqual(1);
+    expect(result.skippedNonDicom).toBe(result.skipped.length);
+    expect(result.skipped.some((item) => /readme/i.test(item.fileName))).toBe(true);
+    expect(result.skipped.find((item) => /readme/i.test(item.fileName))?.reason).toBe(
+      'index-file'
+    );
     expect(result.unreadableCount).toBe(0);
     expect(result.usedDicomdir).toBe(false);
   });
@@ -47,7 +52,34 @@ describe('collectDicomInstancePaths', () => {
 
     expect(result.instancePaths).toHaveLength(0);
     expect(result.unreadableCount).toBe(1);
-    expect(result.skippedNonDicom).toBe(1);
+    expect(result.skipped).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fileName: 'broken.dcm', reason: 'unreadable' }),
+        expect.objectContaining({ fileName: 'preview.jpg', reason: 'not-dicom' }),
+      ])
+    );
+    expect(result.skippedNonDicom).toBe(2);
+  });
+
+  it('reports index/sidecar files even when DICOMDIR drives candidates', async () => {
+    await writeFakeDicom(path.join(tempDir, 'IMAGES', 'I001'));
+    // Minimal DICOMDIR that lists only I001 — plus sidecars that must still be reported.
+    const dicomdir = Buffer.alloc(256, 0);
+    dicomdir.write('DICM', 128, 'ascii');
+    await fs.writeFile(path.join(tempDir, 'DICOMDIR'), dicomdir);
+    await fs.writeFile(path.join(tempDir, 'README.TXT'), 'readme');
+    await fs.writeFile(path.join(tempDir, 'desktop.ini'), '[.ShellClassInfo]');
+
+    const result = await collectDicomInstancePaths(tempDir);
+
+    const reasonsByName = Object.fromEntries(
+      result.skipped.map((item) => [path.basename(item.fileName).toUpperCase(), item.reason])
+    );
+    expect(reasonsByName.DICOMDIR).toBe('index-file');
+    expect(reasonsByName['README.TXT']).toBe('index-file');
+    expect(reasonsByName['DESKTOP.INI']).toBe('index-file');
+    expect(result.skippedNonDicom).toBe(result.skipped.length);
+    expect(result.skippedNonDicom).toBeGreaterThanOrEqual(3);
   });
 });
 
