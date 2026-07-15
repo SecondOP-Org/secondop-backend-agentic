@@ -10,7 +10,8 @@ import {
   buildPasswordResetEmail,
   buildWelcomeVerifyEmail,
   getAppPublicUrl,
-  sendEmail,
+  isEmailConfigured,
+  queueEmail,
 } from '../services/email.service';
 import logger from '../utils/logger';
 
@@ -115,8 +116,8 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     logger.info(`User registered: ${result.email}`);
 
-    // Best-effort welcome + email verification (does not block registration).
-    let emailVerificationSent = false;
+    // Persist verify token synchronously; SMTP must not block the HTTP response.
+    let emailVerificationQueued = false;
     const verifyToken = uuidv4();
     const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     try {
@@ -125,17 +126,20 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
          VALUES ($1, $2, $3, 'email_verify', $4)`,
         [result.id, result.email, hashSecret(verifyToken), verifyExpiresAt]
       );
-      const verifyUrl = `${getAppPublicUrl()}/verify-email?token=${encodeURIComponent(verifyToken)}`;
-      const mail = buildWelcomeVerifyEmail({
-        firstName: String(firstName),
-        verifyUrl,
-      });
-      emailVerificationSent = await sendEmail({
-        to: result.email,
-        subject: mail.subject,
-        text: mail.text,
-        html: mail.html,
-      });
+      if (isEmailConfigured()) {
+        const verifyUrl = `${getAppPublicUrl()}/verify-email?token=${encodeURIComponent(verifyToken)}`;
+        const mail = buildWelcomeVerifyEmail({
+          firstName: String(firstName),
+          verifyUrl,
+        });
+        queueEmail({
+          to: result.email,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+        });
+        emailVerificationQueued = true;
+      }
     } catch (emailError) {
       logger.error('Failed to queue welcome/verify email after register', {
         email: result.email,
@@ -155,7 +159,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         },
         token,
         refreshToken,
-        emailVerificationSent,
+        emailVerificationSent: emailVerificationQueued,
       },
     });
   } catch (error) {
@@ -425,7 +429,7 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     const resetUrl = `${getAppPublicUrl()}/reset-password?token=${encodeURIComponent(resetToken)}`;
     const mail = buildPasswordResetEmail({ resetUrl });
-    await sendEmail({
+    queueEmail({
       to: email,
       subject: mail.subject,
       text: mail.text,

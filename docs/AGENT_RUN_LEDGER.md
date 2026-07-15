@@ -28,18 +28,31 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
-## 2026-07-15 - SEC-96 - Email delivery (welcome/verify + password reset)
+## 2026-07-15 - SEC-97 - Signup timeout from blocking SMTP
 
 - Status: PR created / needs merge approval.
 - Human approval: Pending.
+- Branch/worktree: `sec-97-signup-smtp-timeout`.
+- Files changed: `email.service.ts` (SMTP timeouts + `queueEmail`), `auth.controller.ts` (register/forgot-password non-blocking), tests, `.env.example`.
+- PR: (pending link).
+- Checks: lint; email + auth-security tests; build.
+- Deployment: Backend-only; no migration.
+- Verification: Signup returns before SMTP completes; FE no longer hits 30s timeout when Gmail hangs.
+- Blockers: Needs merge + Railway deploy to fix production signup.
+- Follow-ups: Confirm Gmail delivery from Railway; consider Resend/SES if SMTP remains blocked.
+
+## 2026-07-15 - SEC-96 - Email delivery (welcome/verify + password reset)
+
+- Status: Merged and deployed (`ea1e27c`).
+- Human approval: Approved (prior session).
 - Branch/worktree: `sec-96-email-delivery`.
 - Files changed: `email.service.ts`, auth controller/routes, migration `023_widen_otp_code.sql`, `.env.example`, tests.
-- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/61 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/64 (draft; includes SEC-95 signup).
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/61; FE https://github.com/SecondOP-Org/secondop-frontend/pull/64 (includes SEC-95 signup).
 - Checks: lint; email + auth-security tests; build.
-- Deployment: Requires `SMTP_*`, `EMAIL_FROM`, `APP_PUBLIC_URL` on Railway; run migration 023.
-- Verification: With SMTP configured, register sends welcome/verify; forgot-password sends reset link; `/auth/verify-email` marks verified.
-- Blockers: Production SMTP credentials not set by this PR.
-- Follow-ups: Configure Resend/SES SMTP in staging/prod; optional harden verify-before-login later.
+- Deployment: Requires `SMTP_*`, `EMAIL_FROM`, `APP_PUBLIC_URL` on Railway; migration 023 applied.
+- Verification: With SMTP configured, register queues welcome/verify; forgot-password queues reset link; `/auth/verify-email` marks verified.
+- Blockers: None for merge; SEC-97 addresses signup timeout when SMTP hangs.
+- Follow-ups: Confirm delivery from Railway; optional harden verify-before-login later.
 
 ## 2026-07-15 - SEC-94 - Honest server-side imaging skip reporting
 
