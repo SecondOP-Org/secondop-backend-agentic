@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Pending.
 - Branch/worktree: `sec-97-signup-smtp-timeout`.
 - Files changed: `email.service.ts` (SMTP timeouts + `queueEmail`), `auth.controller.ts` (register/forgot-password non-blocking), tests, `.env.example`.
-- PR: (pending link).
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/62 (draft)
 - Checks: lint; email + auth-security tests; build.
 - Deployment: Backend-only; no migration.
 - Verification: Signup returns before SMTP completes; FE no longer hits 30s timeout when Gmail hangs.
