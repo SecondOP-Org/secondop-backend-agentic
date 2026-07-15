@@ -1170,11 +1170,14 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
               d.first_name as doctor_first_name,
               d.last_name as doctor_last_name,
               d.specialty as doctor_specialty,
-              d.license_number as doctor_license_number
+              d.license_number as doctor_license_number,
+              ci.age_at_submission as patient_age,
+              ci.sex as patient_sex
        FROM cases c
        JOIN patients p ON p.id = c.patient_id
        JOIN case_assignments ca ON ca.case_id = c.id
        JOIN doctors d ON d.id = ca.doctor_id
+       LEFT JOIN case_intake ci ON ci.case_id = c.id
        WHERE c.id = $1 AND d.user_id = $2
        LIMIT 1`,
       [caseId, userId]
@@ -1187,6 +1190,10 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
     const row = caseResult.rows[0];
     const patientName = `${row.patient_first_name || ''} ${row.patient_last_name || ''}`.trim() || 'Patient';
     const doctorName = `${row.doctor_first_name || ''} ${row.doctor_last_name || ''}`.trim() || 'Specialist';
+    const patientAge =
+      row.patient_age == null || Number.isNaN(Number(row.patient_age))
+        ? null
+        : Number(row.patient_age);
 
     let pdfInput: Parameters<typeof generateDoctorOpinionPdfBuffer>[0];
 
@@ -1205,6 +1212,9 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         summary: payload.summary,
         keyImages: resolveKeyImagesForPdf(payload.keyImages),
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+        patientAge,
+        patientSex: row.patient_sex || null,
+        isDraft: true,
       };
     } else {
       const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
@@ -1222,6 +1232,9 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         submittedDate: row.submitted_date,
         clinicalResponse: content,
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+        patientAge,
+        patientSex: row.patient_sex || null,
+        isDraft: true,
       };
     }
 
@@ -1258,11 +1271,14 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
               d.first_name as doctor_first_name,
               d.last_name as doctor_last_name,
               d.specialty as doctor_specialty,
-              d.license_number as doctor_license_number
+              d.license_number as doctor_license_number,
+              ci.age_at_submission as patient_age,
+              ci.sex as patient_sex
        FROM cases c
        JOIN patients p ON p.id = c.patient_id
        JOIN case_assignments ca ON ca.case_id = c.id
        JOIN doctors d ON d.id = ca.doctor_id
+       LEFT JOIN case_intake ci ON ci.case_id = c.id
        WHERE c.id = $1 AND d.user_id = $2
        LIMIT 1`,
       [caseId, userId]
@@ -1276,6 +1292,11 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
     const resolvedQuestions = resolveSpecialistQuestions(row);
     const patientName = `${row.patient_first_name || ''} ${row.patient_last_name || ''}`.trim() || 'Patient';
     const doctorName = `${row.doctor_first_name || ''} ${row.doctor_last_name || ''}`.trim() || 'Specialist';
+    const patientAge =
+      row.patient_age == null || Number.isNaN(Number(row.patient_age))
+        ? null
+        : Number(row.patient_age);
+    const signedAt = new Date().toISOString();
 
     let content: string;
     let nextStatus: string;
@@ -1299,6 +1320,10 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         summary: payload.summary,
         keyImages: resolveKeyImagesForPdf(payload.keyImages),
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+        patientAge,
+        patientSex: row.patient_sex || null,
+        isDraft: false,
+        signedAt,
       };
     } else {
       const legacyContent = typeof req.body.content === 'string' ? req.body.content : '';
@@ -1320,6 +1345,10 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         clinicalResponse: content,
         submittedDate: row.submitted_date,
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
+        patientAge,
+        patientSex: row.patient_sex || null,
+        isDraft: false,
+        signedAt,
       };
     }
 
