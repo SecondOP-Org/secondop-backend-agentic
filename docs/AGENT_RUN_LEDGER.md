@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-15 - SEC-94 - Honest server-side imaging skip reporting
+
+- Status: PR created / needs merge approval.
+- Human approval: Pending.
+- Branch/worktree: `sec-94-imaging-honest-skips`.
+- Files changed: `src/services/imagingStudyIngest.service.ts`, `src/__tests__/imaging-study-collect.test.ts`.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/60 (draft); FE https://github.com/SecondOP-Org/secondop-frontend/pull/62 (draft)
+- Checks: lint; `imaging-study-collect` tests; build.
+- Deployment: None.
+- Verification: Every non-ingested file under the upload root is returned in `skipped[]` with reason (`not-dicom` | `index-file` | `unreadable`); `skippedNonDicom` equals `skipped.length`.
+- Blockers: None.
+- Follow-ups: Merge FE+BE; smoke PET/CT upload summary shows DICOMDIR/README/desktop.ini skips.
+
 ## 2026-07-15 - SEC-92 - Stop Untitled Series fallback in study grouping
 
 - Status: PR created / needs merge approval.
