@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-15 - SEC-96 - Email delivery (welcome/verify + password reset)
+
+- Status: PR created / needs merge approval.
+- Human approval: Pending.
+- Branch/worktree: `sec-96-email-delivery`.
+- Files changed: `email.service.ts`, auth controller/routes, migration `023_widen_otp_code.sql`, `.env.example`, tests.
+- PR: (draft; link after open); FE companion includes forgot/reset/verify pages (+ SEC-95 signup base).
+- Checks: lint; email + auth-security tests; build.
+- Deployment: Requires `SMTP_*`, `EMAIL_FROM`, `APP_PUBLIC_URL` on Railway; run migration 023.
+- Verification: With SMTP configured, register sends welcome/verify; forgot-password sends reset link; `/auth/verify-email` marks verified.
+- Blockers: Production SMTP credentials not set by this PR.
+- Follow-ups: Configure Resend/SES SMTP in staging/prod; optional harden verify-before-login later.
+
 ## 2026-07-15 - SEC-94 - Honest server-side imaging skip reporting
 
 - Status: PR created / needs merge approval.
