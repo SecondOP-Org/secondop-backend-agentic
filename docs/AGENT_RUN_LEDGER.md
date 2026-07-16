@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Pending.
 - Branch/worktree: `sec-100-docs-spine`.
 - Files changed: `ARCHITECTURE.md`, `README.md`, `QUICKSTART.md`, `docs/decisions/*`, `src/*/README.md`, `scripts/setup-db.sh`, `scripts/seed-db.sh`, `.env.example` (`PORT=8081`, `DB_PASSWORD=postgres`), `src/server.ts` default port; removed root `*_TODO.md` / Presidio / Option A specs.
-- PR: (pending push)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/63 (draft); FE companion https://github.com/SecondOP-Org/secondop-frontend/pull/66
 - Checks: lint; full jest (171 passed; local env can pollute gateway/worker tests); quickstart verified (Postgres compose, migrate, seed, API `:8081`, seeded logins, FE proxy).
 - Deployment: Docs + local-dev defaults only; no migration; no production PORT change required.
 - Verification: Followed root/workspace quickstart path; patient + doctor login 200 on `:8081`.
