@@ -28,18 +28,32 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-16 - SEC-103 - Production Phoenix tracing
+
+- Status: In progress / deploying.
+- Human approval: Explicit request to enable Phoenix in production.
+- Branch/worktree: `sec-103-phoenix-production`.
+- Files changed: add `@arizeai/phoenix-otel` + `@opentelemetry/api`; `docs/PHOENIX_TRACING.md`.
+- Infra: Railway service `secondop-phoenix` + Postgres `Postgres-I7v9`; backend `PHOENIX_*` env set.
+- PR: (pending)
+- Checks: deps resolve locally; Phoenix UI HTTP 200; backend health 200 after redeploy.
+- Deployment: Phoenix UI https://secondop-phoenix-production.up.railway.app ; backend redeploy after merge.
+- Verification: pending analysis run span in project `secondop-agent-analysis`.
+- Blockers: none.
+- Follow-ups: staging mirror; rotate admin password / API keys if leaked in tooling logs.
+
 ## 2026-07-16 - SEC-100 - Workspace onboarding documentation spine
 
-- Status: PR created / needs merge approval.
-- Human approval: Pending.
-- Branch/worktree: `sec-100-docs-spine`.
+- Status: Merged + production deployed.
+- Human approval: Merge and deploy approved.
+- Branch/worktree: `sec-100-docs-spine` → `main` (`aa09140`).
 - Files changed: `ARCHITECTURE.md`, `README.md`, `QUICKSTART.md`, `docs/decisions/*`, `src/*/README.md`, `scripts/setup-db.sh`, `scripts/seed-db.sh`, `.env.example` (`PORT=8081`, `DB_PASSWORD=postgres`), `src/server.ts` default port; removed root `*_TODO.md` / Presidio / Option A specs.
-- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/63 (draft); FE companion https://github.com/SecondOP-Org/secondop-frontend/pull/66
-- Checks: lint; full jest (171 passed; local env can pollute gateway/worker tests); quickstart verified (Postgres compose, migrate, seed, API `:8081`, seeded logins, FE proxy).
-- Deployment: Docs + local-dev defaults only; no migration; no production PORT change required.
-- Verification: Followed root/workspace quickstart path; patient + doctor login 200 on `:8081`.
-- Blockers: Phase 3 AI dir collapse blocked on shadow-parity decision ([SEC-102](https://linear.app/secondop/issue/SEC-102)).
-- Follow-ups: FE hygiene [SEC-101](https://linear.app/secondop/issue/SEC-101); workspace root `README.md` lives outside this git repo (SecondOP-Agentic folder).
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/63 (merged); FE companion https://github.com/SecondOP-Org/secondop-frontend/pull/66 (merged).
+- Checks: lint; CI green; quickstart verified locally.
+- Deployment: Railway production `secondop-backend` SUCCESS (`ee132684…`); FE Vercel production https://secondop.in auto-deploy after merge. No migrations.
+- Verification: Prod `/health` + `/version` HTTP 200; FE `secondop.in` serves app shell.
+- Blockers: none for this issue.
+- Follow-ups: [SEC-102](https://linear.app/secondop/issue/SEC-102) shadow-parity gate; consider syncing Railway `BACKEND_GIT_SHA` with deploy SHA (env currently may lag).
 
 ## 2026-07-15 - SEC-97 - Signup timeout from blocking SMTP
 
