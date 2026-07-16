@@ -7,7 +7,10 @@ set -e
 
 # Load environment variables
 if [ -f .env ]; then
-  export $(cat .env | grep -v '^#' | xargs)
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
 fi
 
 # Default values
@@ -15,6 +18,7 @@ DB_NAME=${DB_NAME:-secondop_db}
 DB_USER=${DB_USER:-postgres}
 DB_HOST=${DB_HOST:-localhost}
 DB_PORT=${DB_PORT:-5432}
+export PGPASSWORD="${DB_PASSWORD:-postgres}"
 
 echo "🏥 SecondOp Database Setup"
 echo "=========================="
@@ -24,7 +28,7 @@ echo "Host: $DB_HOST:$DB_PORT"
 echo ""
 
 # Check if PostgreSQL is running
-if ! pg_isready -h $DB_HOST -p $DB_PORT > /dev/null 2>&1; then
+if ! pg_isready -h "$DB_HOST" -p "$DB_PORT" > /dev/null 2>&1; then
   echo "❌ Error: PostgreSQL is not running on $DB_HOST:$DB_PORT"
   exit 1
 fi
@@ -33,8 +37,8 @@ echo "✅ PostgreSQL is running"
 
 # Create database if it doesn't exist
 echo "📦 Creating database..."
-psql -h $DB_HOST -p $DB_PORT -U $DB_USER -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
-  psql -h $DB_HOST -p $DB_PORT -U $DB_USER -c "CREATE DATABASE $DB_NAME"
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME"
 
 echo "✅ Database created/verified"
 
