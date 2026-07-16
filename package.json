@@ -24,7 +24,7 @@
     "db:migrate:development": "bash scripts/with-env.sh .env.development npm run db:migrate",
     "db:migrate:test": "bash scripts/with-env.sh .env.test npm run db:migrate",
     "db:migrate:production": "bash scripts/with-env.sh .env.production npm run db:migrate",
-    "db:seed": "psql -d $DB_NAME -f scripts/seed-data.sql",
+    "db:seed": "bash scripts/seed-db.sh",
     "db:cleanup-patient-cases": "psql -d $DB_NAME -f scripts/cleanup-patient-cases.sql",
     "db:seed:development": "bash scripts/with-env.sh .env.development npm run db:seed",
     "db:seed:test": "bash scripts/with-env.sh .env.test npm run db:seed",
