@@ -62,11 +62,13 @@ describe('analysis run metadata persistence', () => {
       promptTokens: 1200,
       completionTokens: 300,
       totalTokens: 1500,
+      criticScore: 91,
+      contractPass: true,
     });
 
     expect(mockedQuery).toHaveBeenCalledWith(
-      expect.stringContaining('latency_ms'),
-      expect.arrayContaining(['run-1', 'gpt-4.1-mini', 'gpt-4.1-mini', 1200, 300, 1500])
+      expect.stringContaining('critic_score'),
+      expect.arrayContaining(['run-1', 'gpt-4.1-mini', 'gpt-4.1-mini', 1200, 300, 1500, 91, true])
     );
   });
 

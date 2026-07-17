@@ -28,6 +28,8 @@ export interface AnalysisRun {
   completion_tokens: number | null;
   total_tokens: number | null;
   estimated_cost_usd: number | null;
+  critic_score: number | null;
+  contract_pass: boolean | null;
   created_at: Date;
 }
 
@@ -81,12 +83,14 @@ export interface AnalysisRunCompletionMetadata {
   completionTokens?: number | null;
   totalTokens?: number | null;
   estimatedCostUsd?: number | null;
+  criticScore?: number | null;
+  contractPass?: boolean | null;
 }
 
 const ANALYSIS_RUN_SELECT_FIELDS = `
   id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, error_message,
   pipeline_version, model_version, prompt_version, latency_ms, prompt_tokens, completion_tokens,
-  total_tokens, estimated_cost_usd, created_at
+  total_tokens, estimated_cost_usd, critic_score, contract_pass, created_at
 `;
 
 const toNullableNumber = (value: unknown): number | null => {
@@ -125,6 +129,13 @@ const mapAnalysisRunRow = (row: Record<string, unknown>): AnalysisRun => {
     completion_tokens: toNullableNumber(row.completion_tokens),
     total_tokens: toNullableNumber(row.total_tokens),
     estimated_cost_usd: toNullableNumber(row.estimated_cost_usd),
+    critic_score: toNullableNumber(row.critic_score),
+    contract_pass:
+      typeof row.contract_pass === 'boolean'
+        ? row.contract_pass
+        : row.contract_pass === null || row.contract_pass === undefined
+          ? null
+          : Boolean(row.contract_pass),
     created_at: row.created_at as Date,
   };
 };
@@ -281,6 +292,8 @@ export const markAnalysisRunSucceeded = async (
          completion_tokens = $7,
          total_tokens = $8,
          estimated_cost_usd = $9,
+         critic_score = $10,
+         contract_pass = $11,
          latency_ms = CASE
            WHEN started_at IS NULL THEN NULL
            ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)) * 1000))
@@ -299,6 +312,8 @@ export const markAnalysisRunSucceeded = async (
       metadata.completionTokens ?? null,
       metadata.totalTokens ?? null,
       metadata.estimatedCostUsd ?? null,
+      metadata.criticScore ?? null,
+      metadata.contractPass ?? null,
     ]
   );
 };

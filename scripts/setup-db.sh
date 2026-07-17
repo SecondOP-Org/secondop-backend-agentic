@@ -113,6 +113,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/022_dicom_dei
 echo "  → Running 023_widen_otp_code.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/023_widen_otp_code.sql
 
+echo "  → Running 024_analysis_run_online_evals.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/024_analysis_run_online_evals.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
