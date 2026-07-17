@@ -47,7 +47,11 @@ describe('Case analysis agent orchestrator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedInsertAnalysisEvent.mockResolvedValue(undefined as any);
-    mockedMarkAnalysisRunSucceeded.mockResolvedValue(undefined as any);
+    mockedMarkAnalysisRunSucceeded.mockResolvedValue({
+      latencyMs: 1000,
+      attentionReason: null,
+      caseId: 'case-1',
+    } as any);
     mockedInsertCaseAnalysisArtifact.mockResolvedValue(undefined as any);
     mockedQuery.mockResolvedValue({ rows: [] } as any);
   });
@@ -161,6 +165,7 @@ describe('Case analysis agent orchestrator', () => {
       totalTokens: null,
       contractPass: true,
       criticScore: null,
+      confidenceScore: 0.55,
     });
 
     expect(mockedInsertCaseAnalysisArtifact).toHaveBeenCalledTimes(5);

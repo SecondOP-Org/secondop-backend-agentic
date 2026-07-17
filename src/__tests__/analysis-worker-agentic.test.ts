@@ -43,6 +43,9 @@ jest.mock('../agentic/orchestration/runAgenticCaseAnalysis', () => ({
   runAgenticCaseAnalysis: jest.fn(),
 }));
 
+jest.mock('../services/analysisAttention.service', () => ({
+  emitPerCaseLatencyWarnIfNeeded: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('../services/analysisRun.service', () => ({
   createAnalysisRun: jest.fn(),
   getLatestActiveAnalysisRun: jest.fn(),
@@ -84,7 +87,11 @@ describe('Analysis worker agentic modes', () => {
     mockedQuery.mockResolvedValue({ rows: [] } as any);
     mockedGetLatestActiveAnalysisRun.mockResolvedValue(null as any);
     mockedMarkAnalysisRunProcessing.mockResolvedValue(true as any);
-    mockedMarkAnalysisRunSucceeded.mockResolvedValue(undefined as any);
+    mockedMarkAnalysisRunSucceeded.mockResolvedValue({
+      latencyMs: 1000,
+      attentionReason: null,
+      caseId: 'case-1',
+    } as any);
     mockedMarkAnalysisRunFailed.mockResolvedValue(undefined as any);
     mockedInsertCaseAnalysisArtifact.mockResolvedValue(undefined as any);
     mockedRunCaseAnalysis.mockResolvedValue({ caseId: 'case-1' } as any);
