@@ -452,6 +452,7 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
           error: null,
           analysisRunId: null,
           attentionReason: null,
+          analysisRetrying: false,
           observations: null,
           aiAnalysisSharedWithSpecialists: false,
         },
@@ -460,6 +461,12 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
     }
 
     const latestRun = await getLatestAnalysisRun(caseId);
+    const analysisRetrying =
+      row.analysis_status === 'processing' &&
+      ((latestRun?.attempt_count ?? 1) > 1 ||
+        (typeof row.analysis_error === 'string' &&
+          row.analysis_error.toLowerCase().startsWith('retrying analysis')));
+
     const artifact = hydrateCaseAnalysisArtifact({
       artifact: row.analysis_artifact,
       summary: row.analysis_summary,
@@ -478,9 +485,11 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
       summary: artifact ? artifact.structured_summary.chief_concern || row.analysis_summary : row.analysis_summary,
       analysisQuestions: artifact ? artifactQuestionsToStrings(artifact) : row.analysis_questions,
       artifact,
-      error: row.analysis_error,
+      // Hide raw retry diagnostics from patients; terminal errors stay for ops/debug but FE maps them.
+      error: analysisRetrying ? null : row.analysis_error,
       analysisRunId: latestRun?.id || null,
       attentionReason: latestRun?.attention_reason || null,
+      analysisRetrying,
       observations,
     };
 
