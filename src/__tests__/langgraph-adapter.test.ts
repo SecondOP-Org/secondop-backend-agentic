@@ -1,5 +1,6 @@
 jest.mock('../agentic/observability/eventEmitter', () => ({
   emitAgenticStepEvent: jest.fn().mockResolvedValue(undefined),
+  runWithinAgenticStepSpan: jest.fn((_input: unknown, fn: () => Promise<unknown>) => fn()),
 }));
 
 jest.mock('../database/connection', () => ({

@@ -23,6 +23,8 @@ export interface AgentContext {
   maxCharsPerFile: number;
   maxTotalChars: number;
   emitEvent: (event: AgentEvent) => Promise<void>;
+  /** Nest LLM/tool child spans under the currently started baseline step span. */
+  runWithinActiveStep: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
 export interface AgentStep<Input, Output> {

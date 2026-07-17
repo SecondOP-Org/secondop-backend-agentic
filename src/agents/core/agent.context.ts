@@ -14,16 +14,27 @@ interface CreateAgentContextOptions {
 
 export const createAgentContext = (options: CreateAgentContextOptions): AgentContext => {
   const stepSpanMap = new Map<string, SpanHandle>();
+  let activeStepKey: string | null = null;
 
   const emitEvent = async (event: AgentEvent): Promise<void> => {
     const stepSpanKey = `${event.stepName}:${event.startedAt.toISOString()}`;
     if (event.stepStatus === 'started') {
-      const span = startPhoenixSpan(`baseline.step.${event.stepName}`, {
-        caseId: options.caseId,
-        runId: options.runId,
-        executionMode: options.executionMode,
-      });
+      const span = startPhoenixSpan(
+        `baseline.step.${event.stepName}`,
+        {
+          caseId: options.caseId,
+          runId: options.runId,
+          mode: options.executionMode,
+          executionMode: options.executionMode,
+          step: event.stepName,
+          rationale: event.metadata?.rationale ?? null,
+          plannerTokenUsage: event.metadata?.plannerTokenUsage ?? null,
+        },
+        // Pipeline steps are tools; synthesis/final persist remain AGENT-ish via name.
+        event.stepName === 'clinical-synthesis' || event.stepName === 'persist-results' ? 'AGENT' : 'TOOL'
+      );
       stepSpanMap.set(stepSpanKey, span);
+      activeStepKey = stepSpanKey;
     }
 
     const errorText =
@@ -35,6 +46,9 @@ export const createAgentContext = (options: CreateAgentContextOptions): AgentCon
       engine: 'baseline',
       executionMode: options.executionMode,
       legacyExecutionMode: toLegacyExecutionMode(options.executionMode),
+      caseId: options.caseId,
+      runId: options.runId,
+      mode: options.executionMode,
       ...(event.metadata || {}),
     };
 
@@ -48,6 +62,9 @@ export const createAgentContext = (options: CreateAgentContextOptions): AgentCon
       if (event.stepStatus !== 'started') {
         span.end(event.stepStatus === 'failed' ? 'ERROR' : 'OK', event.errorMessage);
         stepSpanMap.delete(stepSpanKey);
+        if (activeStepKey === stepSpanKey) {
+          activeStepKey = null;
+        }
       }
     }
 
@@ -63,11 +80,23 @@ export const createAgentContext = (options: CreateAgentContextOptions): AgentCon
     });
   };
 
+  const runWithinActiveStep = async <T>(fn: () => Promise<T>): Promise<T> => {
+    if (!activeStepKey) {
+      return fn();
+    }
+    const span = stepSpanMap.get(activeStepKey);
+    if (!span) {
+      return fn();
+    }
+    return span.run(fn);
+  };
+
   return {
     caseId: options.caseId,
     runId: options.runId,
     maxCharsPerFile: options.maxCharsPerFile,
     maxTotalChars: options.maxTotalChars,
     emitEvent,
+    runWithinActiveStep,
   };
 };

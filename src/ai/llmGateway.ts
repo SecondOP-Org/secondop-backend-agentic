@@ -1,4 +1,15 @@
+/**
+ * LLM gateway — OpenAI / LiteLLM client factory.
+ *
+ * PHI RULE (spans): NEVER attach prompt or completion message bodies to Phoenix/OTel spans.
+ * Attribute allowlist only: model names, token counts, latency, cost, ids/workflow purpose.
+ * Clinical text stays in application memory and audited DB paths — not in traces.
+ */
 import OpenAI from 'openai';
+import {
+  estimateTokenCostUsd,
+  startPhoenixSpan,
+} from '../observability/phoenix.service';
 
 export type LlmGatewayMode = 'direct' | 'litellm';
 
@@ -92,6 +103,69 @@ export const validateConfiguredModelAliases = (): void => {
     .forEach(validateLiteLlmModelAlias);
 };
 
+const resolveLlmPurpose = (
+  params: OpenAI.Chat.Completions.ChatCompletionCreateParams
+): string => {
+  const metadata = (params as { metadata?: Record<string, string> }).metadata;
+  const workflow = metadata?.workflow?.trim();
+  if (workflow) {
+    return workflow.replace(/[^a-zA-Z0-9._-]/g, '_');
+  }
+  return 'chat';
+};
+
+const instrumentChatCompletions = (client: OpenAI): OpenAI => {
+  const originalCreate = client.chat.completions.create.bind(client.chat.completions);
+
+  client.chat.completions.create = (async (
+    params: OpenAI.Chat.Completions.ChatCompletionCreateParams,
+    options?: OpenAI.RequestOptions
+  ) => {
+    const purpose = resolveLlmPurpose(params);
+    const requestModel = typeof params.model === 'string' ? params.model : String(params.model);
+    const startedAt = Date.now();
+    const span = startPhoenixSpan(
+      `llm.${purpose}`,
+      {
+        'gen_ai.request.model': requestModel,
+        'gen_ai.operation.name': 'chat',
+        purpose,
+      },
+      'LLM'
+    );
+
+    try {
+      const result = await span.run(() => originalCreate(params as any, options));
+      const usage = (result as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } })
+        ?.usage;
+      const promptTokens = Number(usage?.prompt_tokens || 0);
+      const completionTokens = Number(usage?.completion_tokens || 0);
+      const totalTokens = Number(usage?.total_tokens || promptTokens + completionTokens);
+      const responseModel =
+        typeof (result as { model?: string })?.model === 'string'
+          ? (result as { model: string }).model
+          : requestModel;
+
+      span.addAttributes({
+        'gen_ai.response.model': responseModel,
+        'gen_ai.usage.prompt_tokens': promptTokens,
+        'gen_ai.usage.completion_tokens': completionTokens,
+        'gen_ai.usage.total_tokens': totalTokens,
+        latency_ms: Date.now() - startedAt,
+        estimated_cost_usd: estimateTokenCostUsd(promptTokens, completionTokens),
+      });
+      span.end('OK');
+      return result;
+    } catch (error) {
+      span.addAttributes({ latency_ms: Date.now() - startedAt });
+      span.end('ERROR', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  }) as typeof client.chat.completions.create;
+
+  return client;
+};
+
 export const getOpenAIClient = (options?: { optional?: boolean }): OpenAI | null => {
   const mode = normalizeMode(process.env.LLM_GATEWAY_MODE);
   const clientKey = [
@@ -114,7 +188,7 @@ export const getOpenAIClient = (options?: { optional?: boolean }): OpenAI | null
       throw new Error('OPENAI_API_KEY is not configured.');
     }
 
-    cachedClient = new OpenAI({ apiKey });
+    cachedClient = instrumentChatCompletions(new OpenAI({ apiKey }));
     cachedClientKey = clientKey;
     return cachedClient;
   }
@@ -123,7 +197,7 @@ export const getOpenAIClient = (options?: { optional?: boolean }): OpenAI | null
   const apiKey = requireEnv('LLM_GATEWAY_API_KEY');
   validateConfiguredModelAliases();
 
-  cachedClient = new OpenAI({ apiKey, baseURL });
+  cachedClient = instrumentChatCompletions(new OpenAI({ apiKey, baseURL }));
   cachedClientKey = clientKey;
   return cachedClient;
 };

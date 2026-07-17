@@ -22,7 +22,7 @@ export const runAgentPipeline = async <Output>(options: AgentPipelineOptions<Out
     });
 
     try {
-      state = await step.run(state, options.context);
+      state = await options.context.runWithinActiveStep(() => step.run(state, options.context));
 
       await options.context.emitEvent({
         stepName: step.name,

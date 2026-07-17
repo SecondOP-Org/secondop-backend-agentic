@@ -4,6 +4,7 @@ import {
   defaultMedicalDisclaimer,
 } from '../services/analysisArtifact.service';
 import { ExtractedReport } from '../services/reportExtraction.service';
+import { incrementGroundingRejects } from '../observability/phoenix.service';
 
 export const AI_CONTRACT_DISCLAIMER =
   'AI-generated support content; licensed clinician review required.';
@@ -265,6 +266,9 @@ export const enforceCaseAnalysisContract = (
 ): void => {
   const result = validateCaseAnalysisContract(artifact, options);
   if (!result.passed) {
+    if (result.violations.some((violation) => violation.includes('not grounded in extracted report text'))) {
+      incrementGroundingRejects({ reason: 'evidence_ungrounded' });
+    }
     throw new CaseAnalysisContractError(result.violations);
   }
 };
