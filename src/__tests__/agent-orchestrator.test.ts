@@ -113,6 +113,20 @@ describe('Case analysis agent orchestrator', () => {
         reports,
         model: 'gpt-4.1-mini',
       }),
+      artifactDeidentified: buildCaseAnalysisArtifact({
+        structuredSummary: {
+          chief_concern: 'Chest pressure',
+          key_report_findings: 'Clinical report text',
+          red_flags_to_discuss: 'Worsening dyspnea',
+          follow_up_discussion_points: 'Urgent cardiology follow-up',
+          limitations_caveats: 'Needs clinician confirmation',
+        },
+        specialistQuestions: ['What immediate tests are most important?', 'Is imaging urgently indicated?', 'What treatment should be prioritized now?'],
+        uncertaintyFlags: ['Needs clinician confirmation'],
+        confidenceScore: 0.55,
+        reports,
+        model: 'gpt-4.1-mini',
+      }),
       model: 'gpt-4.1-mini',
     });
 

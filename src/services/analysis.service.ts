@@ -38,10 +38,21 @@ export interface CaseIntakeData {
 export interface CaseAnalysisResult {
   summary: string;
   topQuestions: string[];
+  /** Clinician-facing artifact (re-identified). Persist this. */
   artifact: CaseAnalysisArtifact;
+  /**
+   * Tokenized twin validated against de-identified reports.
+   * Contract/grounding checks must use this when DEID is active.
+   * Re-identification is the last transform before persistence.
+   */
+  artifactDeidentified: CaseAnalysisArtifact;
   model: string;
   usage?: TokenUsageMetrics;
 }
+
+/** Artifact to use for contract/grounding checks against de-identified reports. */
+export const resolveContractCheckArtifact = (analysis: CaseAnalysisResult): CaseAnalysisArtifact =>
+  analysis.artifactDeidentified ?? analysis.artifact;
 
 const timeoutMs = parseInt(process.env.OPENAI_TIMEOUT_MS || '60000', 10);
 const getModelName = (): string => process.env.OPENAI_MODEL || 'gpt-4.1-mini';
@@ -381,13 +392,14 @@ export const generateCaseAnalysis = async (
   // Prefer in-memory map; fall back to durable sealed vault (crash/retry safety).
   tokenMapping = await resolveTokenMapping(runId, tokenMapping);
 
-  // Re-identify for clinician-facing artifact; model only ever saw tokens.
+  // Re-identify LAST for clinician-facing persistence; keep validated twin for contract checks.
   const clinicianFacing = reidentifyArtifact(validated.artifact, tokenMapping);
 
   return {
     summary: clinicianFacing.summary,
     topQuestions: clinicianFacing.topQuestions,
     artifact: clinicianFacing.artifact,
+    artifactDeidentified: validated.artifact,
     model: selectedModel,
     usage: usageMetrics,
   };

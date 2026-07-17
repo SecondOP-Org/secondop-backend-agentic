@@ -1,5 +1,6 @@
 import { AgenticError, AgenticFinalArtifact, AgenticLoopState } from '../core/types';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
+import { resolveContractCheckArtifact } from '../../services/analysis.service';
 
 export class FinalizerAgent {
   public finalize(state: AgenticLoopState): AgenticFinalArtifact {
@@ -16,7 +17,8 @@ export class FinalizerAgent {
     }
 
     try {
-      enforceCaseAnalysisContract(state.analysis.artifact, { reports: state.reports });
+      // Ground against de-identified reports using the tokenized twin — never the re-identified artifact.
+      enforceCaseAnalysisContract(resolveContractCheckArtifact(state.analysis), { reports: state.reports });
     } catch (error) {
       if (error instanceof CaseAnalysisContractError) {
         throw new AgenticError('validation_error', error.message);
@@ -24,6 +26,7 @@ export class FinalizerAgent {
       throw error;
     }
 
+    // Persist clinician-facing (re-identified) artifact.
     return {
       summary: state.analysis.summary,
       questions: state.analysis.topQuestions,

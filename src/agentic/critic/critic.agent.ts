@@ -5,6 +5,7 @@ import {
   validateLowConfidenceUncertainty,
   validateQuestionContract,
 } from '../../evals/contractChecks';
+import { resolveContractCheckArtifact } from '../../services/analysis.service';
 
 const caveatPattern = /(may|might|possible|uncertain|cannot\s+exclude|limited|caveat)/i;
 
@@ -13,10 +14,14 @@ export class CriticAgent {
     const questionViolations = validateQuestionContract(artifact.questions);
     const hasObservations = artifact.observations.length > 0;
     const hasCaveatLanguage = caveatPattern.test(artifact.summary);
-    const evidenceViolations = validateEvidenceGrounding(artifact.artifact, state.reports);
+    // Ground evidence against de-identified reports using the tokenized twin when present.
+    const contractArtifact = state.analysis
+      ? resolveContractCheckArtifact(state.analysis)
+      : artifact.artifact;
+    const evidenceViolations = validateEvidenceGrounding(contractArtifact, state.reports);
     const lowConfidenceHasUncertaintyFlags = validateLowConfidenceUncertainty(
-      artifact.artifact.confidence_score,
-      collectUncertaintySignals(artifact.artifact)
+      contractArtifact.confidence_score,
+      collectUncertaintySignals(contractArtifact)
     );
 
     const checks = {
@@ -24,7 +29,7 @@ export class CriticAgent {
       hasUniqueQuestions: new Set(artifact.questions.map((question) => question.toLowerCase())).size === artifact.questions.length,
       hasObservations,
       hasCaveatLanguage,
-      hasEvidenceRefs: (artifact.artifact.evidence_refs || []).length > 0,
+      hasEvidenceRefs: (contractArtifact.evidence_refs || []).length > 0,
       evidenceRefsCoverSummary: !evidenceViolations.some((violation) =>
         violation.includes('cover all populated summary sections')
       ),

@@ -26,7 +26,20 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Verification:
 - Blockers:
 - Follow-ups:
-``` 
+```
+
+## 2026-07-16 - SEC-106 - Agentic finalize de-id twin (P0 prod fix)
+
+- Status: Implementing; awaiting PR + human merge/deploy approval.
+- Human approval: User authorized P0 production fix + observability epic (Section 1 first).
+- Branch/worktree: `sec-106-agentic-finalize-deid-twin`.
+- Files changed: `analysis.service.ts` (return `artifactDeidentified`), `finalizer.agent.ts`, `critic.agent.ts`, baseline `question-guard.agent.ts` + `persist-results.agent.ts`, `question_guard.tool.ts` (twin sync), `agentic-finalize-deid-twin.test.ts`, `e2e-smoke.mjs` (`E2E_REQUIRE_AGENTIC_DEID`), fixtures.
+- PR: (pending)
+- Checks: `npx tsc --noEmit`; `npm test` (191 passed); `npm run lint`; `npm run eval:harness`.
+- Deployment: Needs human approval; prod agentic is down until this ships. Re-verify case `5151f76c-…` after deploy.
+- Verification: Unit regression asserts old grounding failure; twin path passes finalize with re-identified persistence.
+- Blockers: Prod verify blocked on merge/deploy approval.
+- Follow-ups: SEC-107 OpenInference spans → SEC-108 online evals → SEC-110 ops → SEC-109 shadow parity → SEC-111 edit distance.
 
 ## 2026-07-16 - SEC-105 - Service Health dashboard
 

@@ -2,6 +2,7 @@ import { query } from '../../database/connection';
 import { markAnalysisRunSucceeded } from '../../services/analysisRun.service';
 import { clearDeidVault } from '../../services/deidVault.service';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
+import { resolveContractCheckArtifact } from '../../services/analysis.service';
 import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
@@ -15,7 +16,8 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
 
     try {
       if (input.analysis.artifact) {
-        enforceCaseAnalysisContract(input.analysis.artifact, { reports: input.reports });
+        // Validate tokenized twin against de-identified reports; persist clinician-facing artifact below.
+        enforceCaseAnalysisContract(resolveContractCheckArtifact(input.analysis), { reports: input.reports });
       }
 
       await query(
