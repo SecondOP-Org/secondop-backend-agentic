@@ -1,5 +1,6 @@
 import { query } from '../../database/connection';
 import { markAnalysisRunSucceeded } from '../../services/analysisRun.service';
+import { emitPerCaseLatencyWarnIfNeeded } from '../../services/analysisAttention.service';
 import { clearDeidVault } from '../../services/deidVault.service';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 import { resolveContractCheckArtifact } from '../../services/analysis.service';
@@ -51,7 +52,7 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         ]
       );
 
-      await markAnalysisRunSucceeded(context.runId, {
+      const succeedMeta = await markAnalysisRunSucceeded(context.runId, {
         model: input.analysis.model,
         modelVersion: input.analysis.model,
         promptTokens: input.analysis.usage?.promptTokens ?? null,
@@ -59,6 +60,13 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         totalTokens: input.analysis.usage?.totalTokens ?? null,
         criticScore: onlineEvals.criticScore,
         contractPass: onlineEvals.contractPass,
+        confidenceScore: input.analysis.artifact?.confidence_score ?? null,
+      });
+      await emitPerCaseLatencyWarnIfNeeded({
+        runId: context.runId,
+        caseId: context.caseId,
+        latencyMs: succeedMeta.latencyMs,
+        attentionReason: succeedMeta.attentionReason,
       });
 
       // Clinician artifact is persisted with real values; drop sealed map to minimize PHI retention.

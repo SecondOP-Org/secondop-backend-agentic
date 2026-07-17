@@ -451,6 +451,8 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
           artifact: null,
           error: null,
           analysisRunId: null,
+          attentionReason: null,
+          analysisRetrying: false,
           observations: null,
           aiAnalysisSharedWithSpecialists: false,
         },
@@ -459,6 +461,12 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
     }
 
     const latestRun = await getLatestAnalysisRun(caseId);
+    const analysisRetrying =
+      row.analysis_status === 'processing' &&
+      ((latestRun?.attempt_count ?? 1) > 1 ||
+        (typeof row.analysis_error === 'string' &&
+          row.analysis_error.toLowerCase().startsWith('retrying analysis')));
+
     const artifact = hydrateCaseAnalysisArtifact({
       artifact: row.analysis_artifact,
       summary: row.analysis_summary,
@@ -477,8 +485,11 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
       summary: artifact ? artifact.structured_summary.chief_concern || row.analysis_summary : row.analysis_summary,
       analysisQuestions: artifact ? artifactQuestionsToStrings(artifact) : row.analysis_questions,
       artifact,
-      error: row.analysis_error,
+      // Hide raw retry diagnostics from patients; terminal errors stay for ops/debug but FE maps them.
+      error: analysisRetrying ? null : row.analysis_error,
       analysisRunId: latestRun?.id || null,
+      attentionReason: latestRun?.attention_reason || null,
+      analysisRetrying,
       observations,
     };
 
@@ -768,6 +779,7 @@ export const getCaseById = async (req: AuthRequest, res: Response, next: NextFun
     );
     const assignedDoctors = await fetchAssignedDoctors(caseId);
     const imagingStudies = await getImagingStudiesForCase(caseId);
+    const latestRun = await getLatestAnalysisRun(caseId);
 
     const caseRow = sanitizeCaseRowForViewer(
       caseResult.rows[0] as CaseRowWithAiSharing,
@@ -780,6 +792,11 @@ export const getCaseById = async (req: AuthRequest, res: Response, next: NextFun
       files: filesResult.rows,
       imagingStudies,
       assigned_doctors: assignedDoctors,
+      analysis_attention_reason:
+        userType === 'doctor' &&
+        (caseResult.rows[0] as CaseRowWithAiSharing).share_ai_analysis_with_specialists === false
+          ? null
+          : latestRun?.attention_reason || null,
     };
 
     if (userType === 'doctor') {

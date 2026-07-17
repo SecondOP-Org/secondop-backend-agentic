@@ -269,6 +269,8 @@ describe('Case analysis controllers', () => {
           }),
           error: null,
           analysisRunId: 'run-2',
+          attentionReason: null,
+          analysisRetrying: false,
           observations: ['Chief Concern: Example concern', 'Red Flags To Discuss: Severe pain worsening'],
         }),
       })
@@ -451,6 +453,8 @@ describe('Case analysis controllers', () => {
         artifact: null,
         error: 'No extractable text found in uploaded PDF reports.',
         analysisRunId: 'run-3',
+        attentionReason: null,
+        analysisRetrying: false,
         observations: null,
       },
     });
@@ -589,6 +593,8 @@ describe('Case analysis controllers', () => {
         artifact: null,
         error: null,
         analysisRunId: null,
+        attentionReason: null,
+        analysisRetrying: false,
         observations: null,
         aiAnalysisSharedWithSpecialists: false,
       },

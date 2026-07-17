@@ -28,6 +28,32 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-124 - Patient-facing analysis failure UX (PC4)
+
+- Status: Draft PR pending.
+- Human approval: User ordered PC1→PC2→PC4→PC3.
+- Branch/worktree: `sec-124-patient-failure-ux` (BE stacked on SEC-122).
+- Files changed: `getCaseAnalysis` adds `analysisRetrying` (hides retry raw error); FE friendly fail + Try again + Continue without AI; retrying copy while processing.
+- PR: (pending)
+- Checks: BE/FE build.
+- Deployment: After PC1+PC2 for retrying flag accuracy.
+- Verification: Terminal fail never shows raw typed error; mid-retry shows longer-than-usual.
+- Blockers: Human merge approval.
+- Follow-ups: SEC-123 per-case latency span/log.
+
+## 2026-07-17 - SEC-122 - Per-case attention_reason + doctor banner + ops (PC2)
+
+- Status: Draft PR pending human merge approval.
+- Human approval: User ordered PC1→PC2→PC4→PC3.
+- Branch/worktree: `sec-122-attention-reason` (stacked on SEC-121).
+- Files changed: migration `027_analysis_run_attention_reason.sql`, `analysisAttention.service.ts`, `markAnalysisRunSucceeded/Failed` attention writes, case APIs (`attentionReason` / `analysis_attention_reason`), `GET /admin/analysis-runs`, FE doctor banner + Analysis Observability column/filter + `/admin/analysis-attention` fleet view.
+- PR: (pending)
+- Checks: attention unit tests + lint + tsc; FE lint/build.
+- Deployment: Needs migrations 026+027; depends on SEC-121 for `retried`.
+- Verification: low_confidence banner on doctor case; ops fleet filterable by attention_reason.
+- Blockers: Merge/deploy need human approval; prefer merge SEC-121 first.
+- Follow-ups: SEC-124 patient failure UX; SEC-123 per-case latency span/log.
+
 ## 2026-07-17 - SEC-121 - Bounded automatic retry on transient analysis failure (PC1)
 
 - Status: Draft PR pending human merge approval.

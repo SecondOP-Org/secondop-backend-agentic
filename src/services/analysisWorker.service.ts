@@ -48,6 +48,7 @@ import {
   classifyAnalysisFailure,
   getRetryBackoffSeconds,
 } from './analysisFailureClassifier.service';
+import { emitPerCaseLatencyWarnIfNeeded } from './analysisAttention.service';
 
 const fireAnalysisAlerts = (params: {
   runId: string;
@@ -409,11 +410,19 @@ class AnalysisWorker {
         });
         attachOnlineEvalSpanAttributes(agenticRunSpan, onlineEvals);
 
-        await markAnalysisRunSucceeded(runId, {
+        const succeedMeta = await markAnalysisRunSucceeded(runId, {
           ...buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics),
           estimatedCostUsd,
           criticScore: onlineEvals.criticScore,
           contractPass: onlineEvals.contractPass,
+          confidenceScore: agenticResult.artifact.artifact?.confidence_score ?? null,
+        });
+        await emitPerCaseLatencyWarnIfNeeded({
+          runId,
+          caseId,
+          latencyMs: succeedMeta.latencyMs,
+          attentionReason: succeedMeta.attentionReason,
+          runSpan: agenticRunSpan,
         });
 
         await query(
@@ -641,11 +650,19 @@ class AnalysisWorker {
               });
               attachOnlineEvalSpanAttributes(agenticRunSpan, shadowOnlineEvals);
 
-              await markAnalysisRunSucceeded(agenticRun.id, {
+              const shadowSucceed = await markAnalysisRunSucceeded(agenticRun.id, {
                 ...buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics),
                 estimatedCostUsd,
                 criticScore: shadowOnlineEvals.criticScore,
                 contractPass: shadowOnlineEvals.contractPass,
+                confidenceScore: agenticResult.artifact.artifact?.confidence_score ?? null,
+              });
+              await emitPerCaseLatencyWarnIfNeeded({
+                runId: agenticRun.id,
+                caseId,
+                latencyMs: shadowSucceed.latencyMs,
+                attentionReason: shadowSucceed.attentionReason,
+                runSpan: agenticRunSpan,
               });
               await clearDeidVault(agenticRun.id);
 
