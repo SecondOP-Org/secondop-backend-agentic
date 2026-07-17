@@ -105,9 +105,29 @@ const createDoctorRequest = (body: any = {}, params: any = {}, queryParams: any 
   } as unknown as AuthRequest;
 };
 
+const createOperatorRequest = (body: any = {}, params: any = {}, queryParams: any = {}): AuthRequest => {
+  return {
+    body,
+    params,
+    query: queryParams,
+    user: {
+      id: 'operator-user',
+      email: 'operator@example.com',
+      type: 'doctor',
+    },
+  } as unknown as AuthRequest;
+};
+
 describe('Case analysis controllers', () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env = {
+      ...originalEnv,
+      NODE_ENV: 'test',
+      COMMAND_CENTER_OPERATOR_EMAILS: 'operator@example.com',
+    };
     mockedGetLatestAnalysisRun.mockResolvedValue(null);
     mockedGetLatestAnalysisRunByEngine.mockResolvedValue(null);
     mockedGetLatestShadowResultByCaseId.mockResolvedValue(null);
@@ -120,6 +140,10 @@ describe('Case analysis controllers', () => {
       runTokenUsageByRunId: {},
       selectedRunTokenUsage: null,
     });
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   it('creates a draft case with intake data', async () => {
@@ -251,7 +275,35 @@ describe('Case analysis controllers', () => {
     );
   });
 
-  it('returns agentic debug fields when includeAgentic=true', async () => {
+  it('rejects agentic debug fields for non-operator (SEC-110)', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            analysis_status: 'succeeded',
+            analysis_summary: 'Chief Concern\nPossible myocarditis',
+            analysis_questions: ['Q1', 'Q2', 'Q3'],
+            analysis_artifact: null,
+            analysis_model: 'gpt-4.1-mini',
+            analysis_error: null,
+            share_ai_analysis_with_specialists: true,
+          },
+        ],
+      } as any);
+    mockedGetLatestAnalysisRun.mockResolvedValueOnce({ id: 'run-baseline' } as any);
+
+    const req = createPatientRequest({}, { caseId: 'case-1' }, { includeAgentic: 'true' });
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await getCaseAnalysis(req, res, next);
+
+    expect(res.json).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+  });
+
+  it('returns agentic debug fields when includeAgentic=true for operator (SEC-110)', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
       .mockResolvedValueOnce({
@@ -292,7 +344,7 @@ describe('Case analysis controllers', () => {
       },
     } as any);
 
-    const req = createPatientRequest({}, { caseId: 'case-1' }, { includeAgentic: 'true' });
+    const req = createOperatorRequest({}, { caseId: 'case-1' }, { includeAgentic: 'true' });
     const res = createMockResponse();
     const next = jest.fn();
 
@@ -319,8 +371,6 @@ describe('Case analysis controllers', () => {
   });
 
   it('returns analysis trace payload for observability', async () => {
-    mockedQuery.mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any);
-
     mockedGetCaseRunTrace.mockResolvedValueOnce({
       runs: [{ id: 'run-1', status: 'succeeded' }],
       selectedRunId: 'run-1',
@@ -329,7 +379,8 @@ describe('Case analysis controllers', () => {
       artifacts: [{ artifact_type: 'final', stage_name: 'persist-results' }],
     } as any);
 
-    const req = createPatientRequest({}, { caseId: 'case-1' }, { runId: 'run-1' });
+    // Controller itself is ops-facing; route middleware enforceOperator (tested separately).
+    const req = createOperatorRequest({}, { caseId: 'case-1' }, { runId: 'run-1' });
     const res = createMockResponse();
     const next = jest.fn();
 

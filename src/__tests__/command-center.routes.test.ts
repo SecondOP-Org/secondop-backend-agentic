@@ -80,6 +80,25 @@ describe('command-center operator authorization', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
   });
 
+  it('denies patient access to analysis trace route middleware (SEC-110)', () => {
+    const next = jest.fn();
+    authorizeCommandCenterOperator(
+      {
+        requestId: 'trace-patient',
+        user: { id: 'user-patient-1', email: 'patient@example.com', type: 'patient' },
+      } as AuthRequest,
+      {} as never,
+      next
+    );
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
+  });
+
+  it('allows operator access to analysis trace route middleware (SEC-110)', () => {
+    const next = jest.fn();
+    authorizeCommandCenterOperator(createOperatorRequest(), {} as never, next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
   it('rejects authenticated users outside the operator allowlist', () => {
     const next = jest.fn();
 

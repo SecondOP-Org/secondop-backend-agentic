@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { query, transaction } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
+import { isCommandCenterOperator } from '../middleware/commandCenterAuth';
 import { extractObservationsFromSummary } from '../services/analysis.service';
 import {
   artifactQuestionsToStrings,
@@ -480,6 +481,10 @@ export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: Nex
     };
 
     if (includeAgentic) {
+      if (!isCommandCenterOperator(req.user)) {
+        throw new AppError('Insufficient command-center permissions', 403);
+      }
+
       const latestAgenticRun = await getLatestAnalysisRunByEngine(caseId, "agentic");
       const latestShadow = await getLatestShadowResultByCaseId(caseId);
 
@@ -547,12 +552,10 @@ export const streamCaseAnalysisProgress = async (
 
 export const getCaseAnalysisTrace = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    // Operator-only via authorizeCommandCenterOperator on the route (SEC-110).
+    // Do not require case ownership — ops must inspect any case by id.
     const caseId = await resolveCaseId(req.params.caseId);
-    const userId = req.user!.id;
-    const userType = req.user!.type;
     const runId = typeof req.query.runId === "string" ? req.query.runId : undefined;
-
-    await ensureCaseAccess(caseId, userId, userType);
 
     const trace = await getCaseRunTrace(caseId, runId);
 

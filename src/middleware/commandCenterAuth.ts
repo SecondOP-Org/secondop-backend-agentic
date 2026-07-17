@@ -10,6 +10,23 @@ const parseCsv = (value: string | undefined): string[] => {
     .filter(Boolean);
 };
 
+/** True when the authenticated user is on the command-center operator allowlist. */
+export const isCommandCenterOperator = (user: AuthRequest['user']): boolean => {
+  if (!user) {
+    return false;
+  }
+
+  const allowedIds = parseCsv(process.env.COMMAND_CENTER_OPERATOR_USER_IDS);
+  const allowedEmails = parseCsv(process.env.COMMAND_CENTER_OPERATOR_EMAILS);
+  if (allowedIds.length === 0 && allowedEmails.length === 0) {
+    return false;
+  }
+
+  const userId = user.id.toLowerCase();
+  const userEmail = user.email.toLowerCase();
+  return allowedIds.includes(userId) || allowedEmails.includes(userEmail);
+};
+
 export const authorizeCommandCenterOperator = (
   req: AuthRequest,
   _res: Response,
@@ -21,8 +38,6 @@ export const authorizeCommandCenterOperator = (
 
   const allowedIds = parseCsv(process.env.COMMAND_CENTER_OPERATOR_USER_IDS);
   const allowedEmails = parseCsv(process.env.COMMAND_CENTER_OPERATOR_EMAILS);
-  const userId = req.user.id.toLowerCase();
-  const userEmail = req.user.email.toLowerCase();
 
   if (allowedIds.length === 0 && allowedEmails.length === 0) {
     logger.warn('Command-center access denied because no operator allowlist is configured', {
@@ -32,7 +47,7 @@ export const authorizeCommandCenterOperator = (
     return next(new AppError('Command-center operator access is not configured', 403));
   }
 
-  if (!allowedIds.includes(userId) && !allowedEmails.includes(userEmail)) {
+  if (!isCommandCenterOperator(req.user)) {
     logger.warn('Command-center access denied for non-operator user', {
       userId: req.user.id,
       requestId: req.requestId,
