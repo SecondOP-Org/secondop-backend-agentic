@@ -59,6 +59,7 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         totalTokens: input.analysis.usage?.totalTokens ?? null,
         criticScore: onlineEvals.criticScore,
         contractPass: onlineEvals.contractPass,
+        confidenceScore: input.analysis.artifact?.confidence_score ?? null,
       });
 
       // Clinician artifact is persisted with real values; drop sealed map to minimize PHI retention.

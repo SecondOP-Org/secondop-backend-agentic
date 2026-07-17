@@ -8,6 +8,7 @@ import {
 } from '../controllers/commandCenter.controller';
 import { getServiceHealth } from '../controllers/serviceHealth.controller';
 import { getShadowParity } from '../controllers/shadowParity.controller';
+import { getFleetAnalysisRuns } from '../controllers/fleetAnalysisRuns.controller';
 import { authenticate } from '../middleware/auth';
 import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
 
@@ -35,3 +36,9 @@ export const shadowParityRouter = Router();
 shadowParityRouter.use(authenticate);
 shadowParityRouter.use(authorizeCommandCenterOperator);
 shadowParityRouter.get('/', getShadowParity);
+
+/** Sibling admin route: fleet runs needing attention (SEC-122). */
+export const fleetAnalysisRunsRouter = Router();
+fleetAnalysisRunsRouter.use(authenticate);
+fleetAnalysisRunsRouter.use(authorizeCommandCenterOperator);
+fleetAnalysisRunsRouter.get('/', getFleetAnalysisRuns);

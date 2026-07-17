@@ -94,7 +94,7 @@ export const getCaseRunTrace = async (caseId: string, runId?: string) => {
   const runsResult = await query(
     `SELECT id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, error_message,
             pipeline_version, model_version, prompt_version, latency_ms, prompt_tokens, completion_tokens,
-            total_tokens, estimated_cost_usd, created_at
+            total_tokens, estimated_cost_usd, attempt_count, attention_reason, created_at
      FROM case_analysis_runs
      WHERE case_id = $1
      ORDER BY created_at DESC

@@ -38,6 +38,7 @@ import practiceRoutes from './routes/practice.routes';
 import commandCenterRoutes, {
   serviceHealthRouter,
   shadowParityRouter,
+  fleetAnalysisRunsRouter,
 } from './routes/commandCenter.routes';
 import aiGatewayRoutes from './routes/aiGateway.routes';
 import presidioRoutes from './routes/presidio.routes';
@@ -175,6 +176,7 @@ app.use(`/api/${API_VERSION}/practices`, practiceRoutes);
 app.use(`/api/${API_VERSION}/admin/command-center`, commandCenterRoutes);
 app.use(`/api/${API_VERSION}/admin/service-health`, serviceHealthRouter);
 app.use(`/api/${API_VERSION}/admin/shadow-parity`, shadowParityRouter);
+app.use(`/api/${API_VERSION}/admin/analysis-runs`, fleetAnalysisRunsRouter);
 app.use(`/api/${API_VERSION}/ai-gateway`, aiGatewayRoutes);
 app.use(`/api/${API_VERSION}/presidio`, presidioRoutes);
 
