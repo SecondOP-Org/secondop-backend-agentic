@@ -28,6 +28,7 @@ import {
   getCaseInternalNotesHandler,
 } from '../controllers/caseTeam.controller';
 import { authenticate, authorize } from '../middleware/auth';
+import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
 import { keyImageUpload } from '../middleware/upload';
 
 const router = Router();
@@ -41,7 +42,8 @@ router.put('/:caseId/intake', authorize('patient'), updateCaseIntake);
 router.post('/:caseId/analysis', authorize('patient'), queueCaseAnalysis);
 router.get('/:caseId/analysis', getCaseAnalysis);
 router.get('/:caseId/analysis/progress', streamCaseAnalysisProgress);
-router.get('/:caseId/analysis/trace', getCaseAnalysisTrace);
+// Ops-only: full run internals / shadow artifacts (SEC-110).
+router.get('/:caseId/analysis/trace', authorizeCommandCenterOperator, getCaseAnalysisTrace);
 router.post('/:caseId/submit', authorize('patient'), submitCase);
 
 // Doctor routes

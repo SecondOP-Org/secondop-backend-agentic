@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-110 - Admin-gate analysis observability
+
+- Status: Implementing; draft PR pending human merge approval.
+- Human approval: User ordered A1 (SEC-110) first in consolidated backlog.
+- Branch/worktree: `sec-110-admin-gate-observability`.
+- Files changed: `commandCenterAuth.ts` (`isCommandCenterOperator`), `case.routes.ts` (operator on `/analysis/trace`), `case.controller.ts` (`includeAgentic` operator-only; trace without case ownership), role tests.
+- PR: (pending)
+- Checks: lint; targeted jest (case-analysis + command-center routes) pass.
+- Deployment: None yet.
+- Verification: Patient + non-allowlist → 403 on middleware; patient `includeAgentic` → 403; operator trace/includeAgentic → success.
+- Blockers: None for code; merge/deploy need human approval.
+- Follow-ups: SEC-112 SLO webhook alerts → SEC-109 shadow-parity → SEC-117 imaging UX.
+
 ## 2026-07-16 - SEC-107 - OpenInference span enrichment
 
 - Status: Implementing; awaiting PR + human merge approval.
