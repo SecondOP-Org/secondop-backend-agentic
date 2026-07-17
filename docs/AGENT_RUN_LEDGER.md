@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ``` 
 
+## 2026-07-16 - SEC-105 - Service Health dashboard
+
+- Status: Implementing; awaiting PR + human merge approval.
+- Human approval: User approved plan implementation.
+- Branch/worktree: `sec-105-service-health-dashboard`.
+- Files changed: `serviceHealth.service.ts`, controller, command-center route mount, tests, `.env.example`; FE dashboard + routes (sibling repo).
+- PR: (pending)
+- Checks: `npm test -- --testPathPattern=service-health` passed.
+- Deployment: Do not set Railway `SERVICE_HEALTH_TARGETS` until merge approval; defaults cover production surfaces.
+- Verification: Operator opens `/admin/service-health` after deploy.
+- Blockers: Merge/deploy approval.
+- Follow-ups: Optional Railway `SERVICE_HEALTH_TARGETS` for staging FE URL; prefer private Presidio DNS later.
+
 ## 2026-07-16 - SEC-103 - Production Phoenix tracing
 
 - Status: In progress / deploying.
