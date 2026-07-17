@@ -1,4 +1,4 @@
-import { emitAgenticStepEvent } from '../observability/eventEmitter';
+import { emitAgenticStepEvent, runWithinAgenticStepSpan } from '../observability/eventEmitter';
 import { persistAgenticStageArtifact } from '../observability/artifactPersistence';
 import { assertActionAllowed, assertRefinementBudget, assertStepBudget } from './policy';
 import {
@@ -60,14 +60,16 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
 
     try {
       if (action === 'FINALIZE') {
-        const artifact = input.finalizer.finalize(state);
-        const criticScore = await input.critic.evaluate(artifact, state);
+        await runWithinAgenticStepSpan({ stepName, startedAt }, async () => {
+          const artifact = input.finalizer.finalize(state);
+          const criticScore = await input.critic.evaluate(artifact, state);
 
-        state = {
-          ...state,
-          finalArtifact: artifact,
-          criticScore,
-        };
+          state = {
+            ...state,
+            finalArtifact: artifact,
+            criticScore,
+          };
+        });
 
         await emitAgenticStepEvent({
           context: input.context,
@@ -76,9 +78,9 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
           startedAt,
           completedAt: new Date(),
           metadata: {
-            passed: criticScore.passed,
-            score: criticScore.score,
-            reasons: criticScore.reasons,
+            passed: state.criticScore?.passed,
+            score: state.criticScore?.score,
+            reasons: state.criticScore?.reasons,
             plannerTokenUsage: decision.usage || null,
           },
         });
@@ -93,21 +95,24 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
           usage: decision.usage,
         });
 
-        if (criticScore.passed) {
+        if (state.criticScore?.passed) {
           return {
             state,
             history,
           };
         }
 
-        if (!criticScore.needsRefinement) {
-          throw new AgenticError('validation_error', `Critic rejected final output: ${criticScore.reasons.join(' ')}`);
+        if (!state.criticScore?.needsRefinement) {
+          throw new AgenticError(
+            'validation_error',
+            `Critic rejected final output: ${(state.criticScore?.reasons || []).join(' ')}`
+          );
         }
 
         state = {
           ...state,
           refinementCount: state.refinementCount + 1,
-          criticFeedback: criticScore.reasons.join(' '),
+          criticFeedback: (state.criticScore?.reasons || []).join(' '),
           finalArtifact: null,
         };
 
@@ -116,7 +121,7 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
       }
 
       const tool = input.tools[action as Exclude<AgenticAction, 'FINALIZE'>];
-      state = await tool(input.context, state);
+      state = await runWithinAgenticStepSpan({ stepName, startedAt }, () => tool(input.context, state));
 
       await emitAgenticStepEvent({
         context: input.context,

@@ -28,18 +28,31 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-16 - SEC-107 - OpenInference span enrichment
+
+- Status: Implementing; awaiting PR + human merge approval.
+- Human approval: User asked to start next after SEC-106 deploy.
+- Branch/worktree: `sec-107-openinference-span-enrichment`.
+- Files changed: `phoenix.service.ts` (kind + nesting + counters), `eventEmitter.ts`, `agent.context.ts`, `runtime.ts`, `agent.orchestrator.ts`, `analysisWorker.service.ts`, `llmGateway.ts` (LLM child spans, PHI allowlist), `deidentification.service.ts` / `contractChecks.ts` counters, tests.
+- PR: (pending)
+- Checks: `tsc`, `npm test` (194), `lint`, `build`.
+- Deployment: None yet.
+- Verification: Unit test asserts CHAIN→TOOL→LLM nesting and `openinference.span.kind`; disabled path no-ops.
+- Blockers: None.
+- Follow-ups: SEC-108 online evals; sync Phoenix UI check after deploy.
+
 ## 2026-07-16 - SEC-106 - Agentic finalize de-id twin (P0 prod fix)
 
-- Status: Implementing; awaiting PR + human merge/deploy approval.
-- Human approval: User authorized P0 production fix + observability epic (Section 1 first).
-- Branch/worktree: `sec-106-agentic-finalize-deid-twin`.
+- Status: Merged + deployed to Railway production and staging.
+- Human approval: User approved merge and deploy.
+- Branch/worktree: `sec-106-agentic-finalize-deid-twin` → `main` (`e7b39f0`).
 - Files changed: `analysis.service.ts` (return `artifactDeidentified`), `finalizer.agent.ts`, `critic.agent.ts`, baseline `question-guard.agent.ts` + `persist-results.agent.ts`, `question_guard.tool.ts` (twin sync), `agentic-finalize-deid-twin.test.ts`, `e2e-smoke.mjs` (`E2E_REQUIRE_AGENTIC_DEID`), fixtures.
-- PR: (pending)
-- Checks: `npx tsc --noEmit`; `npm test` (191 passed); `npm run lint`; `npm run eval:harness`.
-- Deployment: Needs human approval; prod agentic is down until this ships. Re-verify case `5151f76c-…` after deploy.
-- Verification: Unit regression asserts old grounding failure; twin path passes finalize with re-identified persistence.
-- Blockers: Prod verify blocked on merge/deploy approval.
-- Follow-ups: SEC-107 OpenInference spans → SEC-108 online evals → SEC-110 ops → SEC-109 shadow parity → SEC-111 edit distance.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/66
+- Checks: `npx tsc --noEmit`; `npm test` (191 passed); `npm run lint`; `npm run eval:harness`; CI green on PR.
+- Deployment: Railway production `secondop-backend` `c51d23f1…` SUCCESS (commit `e7b39f0`); staging `secondop-backend-staging` redeployed SUCCESS. No migrations. `/health` 200. `/version` `gitSha` may lag via stale `BACKEND_GIT_SHA` env.
+- Verification: Deployment meta confirms SEC-106 commit live. Manual re-run on case `5151f76c-…` still recommended for end-to-end confirm.
+- Blockers: None for merge/deploy.
+- Follow-ups: SEC-107 OpenInference spans → SEC-108 online evals → SEC-110 ops → SEC-109 shadow parity → SEC-111 edit distance; optionally sync Railway `BACKEND_GIT_SHA`.
 
 ## 2026-07-16 - SEC-105 - Service Health dashboard
 

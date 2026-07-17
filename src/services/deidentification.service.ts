@@ -8,6 +8,10 @@ import {
 } from './presidio.client';
 import { getPresidioConfig } from './presidioConfig.service';
 import { MEDICAL_AD_HOC_RECOGNIZERS } from './presidioRecognizers';
+import {
+  incrementFailClosed,
+  incrementPhiEntitiesDetected,
+} from '../observability/phoenix.service';
 
 /** token → original PHI value. Server-side only; never log or return to clients. */
 export type DeidentificationMapping = Record<string, string>;
@@ -283,6 +287,7 @@ export const deidentifyText = async (text: string): Promise<DeidentificationResu
   }
 
   if (!config.reversibleKeyConfigured) {
+    incrementFailClosed({ reason: 'missing_reversible_key' });
     throw new Error(
       'DEID_ENABLED=true requires DEID_REVERSIBLE_KEY so token maps can be sealed for crash-safe re-identification.'
     );
@@ -343,6 +348,8 @@ export const deidentifyText = async (text: string): Promise<DeidentificationResu
       entityTypes: audit.entities.map((entity) => entity.entityType),
     });
 
+    incrementPhiEntitiesDetected(audit.entityCount, { operator: 'token_replace' });
+
     return {
       deidentifiedText: tokenized.text,
       mapping: tokenized.mapping,
@@ -361,6 +368,8 @@ export const deidentifyText = async (text: string): Promise<DeidentificationResu
     logger.error('De-identification failed closed; analysis halted', {
       error: message,
     });
+
+    incrementFailClosed({ reason: 'presidio_unavailable' });
 
     throw new Error(
       `De-identification unavailable; analysis halted to avoid sending raw PHI to the model. ${message}`

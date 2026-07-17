@@ -2,6 +2,7 @@ import { runAgenticRuntime } from '../agentic/core/runtime';
 
 jest.mock('../agentic/observability/eventEmitter', () => ({
   emitAgenticStepEvent: jest.fn().mockResolvedValue(undefined),
+  runWithinAgenticStepSpan: jest.fn((_input: unknown, fn: () => Promise<unknown>) => fn()),
 }));
 
 jest.mock('../services/caseAnalysisRunArtifact.service', () => {
