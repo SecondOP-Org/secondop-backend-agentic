@@ -181,6 +181,8 @@ export const saveDoctorResponseDraft = async (
     status: parsed.status ?? currentDraft.status,
     // Client owns the full key-image list (append/remove locally, then PUT).
     keyImages: parsed.keyImages ?? currentDraft.keyImages ?? [],
+    // Client owns the AI-draft baseline map (captured on Insert AI draft).
+    aiDraftBaselines: parsed.aiDraftBaselines ?? currentDraft.aiDraftBaselines,
   };
 
   await query(
@@ -319,6 +321,7 @@ export const appendDoctorKeyImage = async (
     summary: currentDraft.summary,
     status: currentDraft.status,
     keyImages: [...(currentDraft.keyImages || []), keyImage],
+    aiDraftBaselines: currentDraft.aiDraftBaselines,
   });
 
   return { draft: nextDraft, keyImage };

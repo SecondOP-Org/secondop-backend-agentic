@@ -26,6 +26,8 @@ export const doctorResponseDraftSchema = z.object({
   status: z.string().optional(),
   // Optional so PUT drafts that omit keyImages do not wipe captures.
   keyImages: z.array(doctorKeyImageSchema).optional(),
+  /** Pure AI draft text per questionId, captured when the doctor clicks Insert AI draft (SEC-111). */
+  aiDraftBaselines: z.record(z.string()).optional(),
 });
 
 export const doctorResponseSendSchema = doctorResponseDraftSchema.extend({
