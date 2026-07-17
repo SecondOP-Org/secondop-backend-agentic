@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User ordered PC1→PC2→PC4→PC3 per-case resilience spec.
 - Branch/worktree: `sec-121-analysis-transient-retry`.
 - Files changed: migration `026_analysis_run_attempt_count.sql`, `analysisFailureClassifier.service.ts`, `analysisRun.service.ts` (`prepareAnalysisRunForRetry`, `attempt_count`), `analysisWorker.service.ts` (requeue with backoff, keep case `processing`), Phoenix `retries_total`, classifier unit tests; db migrate scripts.
-- PR: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/76
 - Checks: classifier unit tests + lint + `tsc` build locally.
 - Deployment: None yet; needs migration 026 on deploy.
 - Verification: RETRYABLE (Presidio/de-id outage, timeout) requeues up to 2 retries; TERMINAL (validation/grounding) does not; patient status stays `processing` while retrying.
