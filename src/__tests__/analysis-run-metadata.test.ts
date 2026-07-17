@@ -54,9 +54,13 @@ describe('analysis run metadata persistence', () => {
   });
 
   it('persists token and latency metadata on success', async () => {
-    mockedQuery.mockResolvedValueOnce({ rows: [] } as any);
+    mockedQuery
+      .mockResolvedValueOnce({
+        rows: [{ latency_ms: 1200, attempt_count: 1, case_id: 'case-1' }],
+      } as any)
+      .mockResolvedValueOnce({ rows: [] } as any);
 
-    await markAnalysisRunSucceeded('run-1', {
+    const result = await markAnalysisRunSucceeded('run-1', {
       model: 'gpt-4.1-mini',
       modelVersion: 'gpt-4.1-mini',
       promptTokens: 1200,
@@ -64,12 +68,15 @@ describe('analysis run metadata persistence', () => {
       totalTokens: 1500,
       criticScore: 91,
       contractPass: true,
+      confidenceScore: 0.95,
     });
 
     expect(mockedQuery).toHaveBeenCalledWith(
       expect.stringContaining('critic_score'),
       expect.arrayContaining(['run-1', 'gpt-4.1-mini', 'gpt-4.1-mini', 1200, 300, 1500, 91, true])
     );
+    expect(result.latencyMs).toBe(1200);
+    expect(result.caseId).toBe('case-1');
   });
 
   it('persists error_message on failure', async () => {
