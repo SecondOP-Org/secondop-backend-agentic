@@ -1,14 +1,22 @@
-# 2026-07 — Doctor opinion PDF redesign (open)
+# 2026-07 — Doctor opinion PDF redesign
 
-**Status:** Open design note (generator works; branding/layout TBD)  
-**Related:** [SEC-100](https://linear.app/secondop/issue/SEC-100)
+**Status:** Verified implemented (SEC-86 / SEC-115)  
+**Related:** [SEC-86](https://linear.app/secondop/issue/SEC-86), [SEC-115](https://linear.app/secondop/issue/SEC-115)
 
 ## Context
 
-`src/services/doctorOpinionPdf.service.ts` produces a working attested PDF, but visual design (brand navy/cream, logo letterhead, summary-first layout, e-signature block, footer metadata) still needs a dedicated implementation ticket.
+`src/services/doctorOpinionPdf.service.ts` produces the branded attested PDF:
 
-## Pointer
+- Navy `#223B6C` + cream `#FAF9F6`
+- Logo letterhead (`assets/secondop-logo.png`)
+- Summary-first (`Clinical Impression`)
+- Electronic signature block
+- Draft watermark on preview
 
-Do not treat the old root TODO as an active checklist in the repo root — track remaining PDF redesign work in Linear when prioritized.
+## Verification (SEC-115)
 
-Supersedes root `DOCTOR_PDF_REDESIGN_TODO.md` (removed). Full prior checklist lived in that file’s git history.
+- Unit tests: `src/__tests__/doctorOpinionPdf.service.test.ts` (pass)
+- Sanitized sample: `docs/evidence/sec-115-doctor-opinion-sample.pdf`
+- Notes: `docs/evidence/README-SEC-115.md`
+
+Staging/prod visual smoke remains part of the next batch deploy checklist.
