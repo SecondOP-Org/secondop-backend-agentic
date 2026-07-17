@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-109 - Shadow-parity report
+
+- Status: Implementing; draft PR pending human merge approval.
+- Human approval: User ordered B1 after SEC-112 deploy.
+- Branch/worktree: `sec-109-shadow-parity-report` (BE + FE).
+- Files changed: `shadowParity.service.ts`, controller/route mount, FE dashboard `/admin/shadow-parity`, unit tests.
+- PR: (pending)
+- Checks: (pending)
+- Deployment: None yet.
+- Verification: Aggregation unit tests; operator-gated endpoint.
+- Blockers: None for code; merge/deploy need human approval. SEC-102 remains decision-blocked until enough shadow pairs + human review of verdict.
+- Follow-ups: SEC-117 imaging UX; human SEC-102 promotion decision.
+
 ## 2026-07-17 - SEC-112 - SLO / fail-closed webhook alerts
 
 - Status: Implementing; draft PR pending human merge approval.

@@ -7,6 +7,7 @@ import {
   getSummary,
 } from '../controllers/commandCenter.controller';
 import { getServiceHealth } from '../controllers/serviceHealth.controller';
+import { getShadowParity } from '../controllers/shadowParity.controller';
 import { authenticate } from '../middleware/auth';
 import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
 
@@ -28,3 +29,9 @@ export const serviceHealthRouter = Router();
 serviceHealthRouter.use(authenticate);
 serviceHealthRouter.use(authorizeCommandCenterOperator);
 serviceHealthRouter.get('/', getServiceHealth);
+
+/** Sibling admin route: shadow baseline vs agentic parity (SEC-109). */
+export const shadowParityRouter = Router();
+shadowParityRouter.use(authenticate);
+shadowParityRouter.use(authorizeCommandCenterOperator);
+shadowParityRouter.get('/', getShadowParity);
