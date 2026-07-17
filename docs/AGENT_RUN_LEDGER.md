@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-112 - SLO / fail-closed webhook alerts
+
+- Status: Implementing; draft PR pending human merge approval.
+- Human approval: User ordered A2 after SEC-110 deploy.
+- Branch/worktree: `sec-112-slo-alerting-webhook`.
+- Files changed: `analysisAlerting.service.ts`, `analysisWorker.service.ts` (terminal hooks), `.env.example` (`ALERT_WEBHOOK_URL`), unit tests.
+- PR: (pending)
+- Checks: (pending)
+- Deployment: None yet; set `ALERT_WEBHOOK_URL` on Railway after merge.
+- Verification: Unit tests for thresholds + fail-closed immediate post.
+- Blockers: None for code; merge/deploy + webhook secret need human approval.
+- Follow-ups: SEC-109 shadow-parity report.
+
 ## 2026-07-17 - SEC-110 - Admin-gate analysis observability
 
 - Status: Implementing; draft PR pending human merge approval.

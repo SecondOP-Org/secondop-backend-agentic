@@ -28,6 +28,21 @@ import {
   insertCaseAnalysisArtifact,
 } from './caseAnalysisRunArtifact.service';
 import { clearDeidVault } from './deidVault.service';
+import { notifyAnalysisRunTerminal } from './analysisAlerting.service';
+
+const fireAnalysisAlerts = (params: {
+  runId: string;
+  caseId: string;
+  errorMessage?: string | null;
+}): void => {
+  void notifyAnalysisRunTerminal(params).catch((alertError) => {
+    logger.warn('Analysis alerting failed', {
+      runId: params.runId,
+      caseId: params.caseId,
+      error: alertError instanceof Error ? alertError.message : String(alertError),
+    });
+  });
+};
 
 const maxCharsPerFile = parseInt(process.env.ANALYSIS_MAX_CHARS_PER_FILE || '12000', 10);
 const maxTotalChars = parseInt(process.env.ANALYSIS_MAX_TOTAL_CHARS || '30000', 10);
@@ -330,6 +345,7 @@ class AnalysisWorker {
         });
 
         logger.info(`Agentic analysis completed for case ${caseId} (run ${runId}, mode ${mode})`);
+        fireAnalysisAlerts({ runId, caseId });
       });
 
       agenticRunSpan.end('OK');
@@ -365,6 +381,7 @@ class AnalysisWorker {
       agenticRunSpan.addAttributes({ latency_ms: Date.now() - runStartedAt });
       agenticRunSpan.end('ERROR', errorMessage);
       logger.error(`Agentic mode failed for case ${caseId}: ${errorMessage}`);
+      fireAnalysisAlerts({ runId, caseId, errorMessage });
       throw error;
     }
   }
@@ -433,6 +450,7 @@ class AnalysisWorker {
         });
 
         logger.info(`Baseline analysis completed for case ${caseId} (run ${runId})`);
+        fireAnalysisAlerts({ runId, caseId });
 
         if (!shouldRunShadowAgentic(mode)) {
           return;
@@ -523,6 +541,7 @@ class AnalysisWorker {
           agenticRunSpan.addAttributes({ latency_ms: Date.now() - agenticStartedAt });
           agenticRunSpan.end('ERROR', agenticMessage);
           logger.error(`Agentic shadow mode failed for case ${caseId}: ${agenticMessage}`);
+          fireAnalysisAlerts({ runId: agenticRun.id, caseId, errorMessage: agenticMessage });
         }
 
         if (pipelineState.analysis) {
@@ -558,6 +577,7 @@ class AnalysisWorker {
       }
 
       logger.error(`Analysis failed for case ${caseId} (run ${runId}): ${message}`);
+      fireAnalysisAlerts({ runId, caseId, errorMessage: message });
       throw error;
     }
   }
