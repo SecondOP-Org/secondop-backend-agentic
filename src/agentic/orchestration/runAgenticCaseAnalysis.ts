@@ -112,6 +112,8 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
 
     return {
       artifact: runtimeResult.state.finalArtifact,
+      analysis: runtimeResult.state.analysis,
+      reports: runtimeResult.state.reports,
       criticScore: runtimeResult.state.criticScore,
       history: runtimeResult.history,
       metrics,

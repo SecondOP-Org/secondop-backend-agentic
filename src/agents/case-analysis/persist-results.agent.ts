@@ -3,6 +3,7 @@ import { markAnalysisRunSucceeded } from '../../services/analysisRun.service';
 import { clearDeidVault } from '../../services/deidVault.service';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 import { resolveContractCheckArtifact } from '../../services/analysis.service';
+import { computeOnlineEvalSignals } from '../../services/onlineEvals.service';
 import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
@@ -15,10 +16,20 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
     }
 
     try {
-      if (input.analysis.artifact) {
+      const contractArtifact = input.analysis.artifact
+        ? resolveContractCheckArtifact(input.analysis)
+        : null;
+
+      if (contractArtifact) {
         // Validate tokenized twin against de-identified reports; persist clinician-facing artifact below.
-        enforceCaseAnalysisContract(resolveContractCheckArtifact(input.analysis), { reports: input.reports });
+        enforceCaseAnalysisContract(contractArtifact, { reports: input.reports });
       }
+
+      const onlineEvals = computeOnlineEvalSignals({
+        contractArtifact,
+        reports: input.reports,
+        criticScore: null,
+      });
 
       await query(
         `UPDATE cases
@@ -46,6 +57,8 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         promptTokens: input.analysis.usage?.promptTokens ?? null,
         completionTokens: input.analysis.usage?.completionTokens ?? null,
         totalTokens: input.analysis.usage?.totalTokens ?? null,
+        criticScore: onlineEvals.criticScore,
+        contractPass: onlineEvals.contractPass,
       });
 
       // Clinician artifact is persisted with real values; drop sealed map to minimize PHI retention.

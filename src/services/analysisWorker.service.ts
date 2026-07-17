@@ -29,6 +29,11 @@ import {
 } from './caseAnalysisRunArtifact.service';
 import { clearDeidVault } from './deidVault.service';
 import { notifyAnalysisRunTerminal } from './analysisAlerting.service';
+import {
+  attachOnlineEvalSpanAttributes,
+  computeOnlineEvalSignals,
+} from './onlineEvals.service';
+import { resolveContractCheckArtifact } from './analysis.service';
 
 const fireAnalysisAlerts = (params: {
   runId: string;
@@ -309,9 +314,20 @@ class AnalysisWorker {
         const totalTokens = agenticResult.metrics?.totalTokenUsage?.totalTokens ?? promptTokens + completionTokens;
         const estimatedCostUsd = estimateTokenCostUsd(promptTokens, completionTokens);
 
+        const onlineEvals = computeOnlineEvalSignals({
+          contractArtifact: agenticResult.analysis
+            ? resolveContractCheckArtifact(agenticResult.analysis)
+            : agenticResult.artifact?.artifact,
+          reports: agenticResult.reports,
+          criticScore: agenticResult.criticScore,
+        });
+        attachOnlineEvalSpanAttributes(agenticRunSpan, onlineEvals);
+
         await markAnalysisRunSucceeded(runId, {
           ...buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics),
           estimatedCostUsd,
+          criticScore: onlineEvals.criticScore,
+          contractPass: onlineEvals.contractPass,
         });
 
         await query(
@@ -441,6 +457,16 @@ class AnalysisWorker {
         const baselinePrompt = pipelineState.analysis?.usage?.promptTokens ?? 0;
         const baselineCompletion = pipelineState.analysis?.usage?.completionTokens ?? 0;
         const baselineTotal = pipelineState.analysis?.usage?.totalTokens ?? baselinePrompt + baselineCompletion;
+
+        const baselineOnlineEvals = computeOnlineEvalSignals({
+          contractArtifact: pipelineState.analysis
+            ? resolveContractCheckArtifact(pipelineState.analysis)
+            : null,
+          reports: pipelineState.reports,
+          criticScore: null,
+        });
+        attachOnlineEvalSpanAttributes(baselineRunSpan, baselineOnlineEvals);
+
         baselineRunSpan.addAttributes({
           latency_ms: Date.now() - baselineStartedAt,
           prompt_tokens: baselinePrompt,
@@ -492,9 +518,20 @@ class AnalysisWorker {
               agenticResult.metrics?.totalTokenUsage?.totalTokens ?? promptTokens + completionTokens;
             const estimatedCostUsd = estimateTokenCostUsd(promptTokens, completionTokens);
 
+            const shadowOnlineEvals = computeOnlineEvalSignals({
+              contractArtifact: agenticResult.analysis
+                ? resolveContractCheckArtifact(agenticResult.analysis)
+                : agenticResult.artifact?.artifact,
+              reports: agenticResult.reports,
+              criticScore: agenticResult.criticScore,
+            });
+            attachOnlineEvalSpanAttributes(agenticRunSpan, shadowOnlineEvals);
+
             await markAnalysisRunSucceeded(agenticRun.id, {
               ...buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics),
               estimatedCostUsd,
+              criticScore: shadowOnlineEvals.criticScore,
+              contractPass: shadowOnlineEvals.contractPass,
             });
             await clearDeidVault(agenticRun.id);
 

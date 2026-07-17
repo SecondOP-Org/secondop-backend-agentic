@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-108 - Online evals on production traces
+
+- Status: Implementing; draft PR pending human merge approval.
+- Human approval: User asked merge SEC-117 then continue; batch deploy later.
+- Branch/worktree: `sec-108-online-evals`.
+- Files changed: migration `024_analysis_run_online_evals.sql`, `onlineEvals.service.ts`, `contractChecks` groundedness helper, `markAnalysisRunSucceeded` columns, worker + persist-results hooks, tests.
+- PR: (pending)
+- Checks: (pending)
+- Deployment: Deferred (batch with subsequent tickets).
+- Verification: Unit tests for signals + span attrs; no new LLM calls.
+- Blockers: None for code; merge approval + later batch deploy.
+- Follow-ups: SEC-111 doctor-edit distance; then remaining backlog; batch deploy.
+
 ## 2026-07-17 - SEC-109 - Shadow-parity report
 
 - Status: Implementing; draft PR pending human merge approval.

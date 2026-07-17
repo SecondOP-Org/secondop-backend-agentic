@@ -158,7 +158,6 @@ export const validateEvidenceGrounding = (
     .map(([section]) => section as keyof StructuredSummary);
   const coveredSections = new Set(evidenceRefs.map((ref) => ref.section));
   const reportNameSet = new Set(reports.map((report) => report.fileName));
-  const reportTextByName = new Map(reports.map((report) => [report.fileName, normalize(report.text)]));
 
   if (evidenceRefs.length === 0) {
     violations.push('Evidence references are missing.');
@@ -172,21 +171,34 @@ export const validateEvidenceGrounding = (
     violations.push('Evidence references do not map to extracted reports.');
   }
 
-  const ungroundedSnippet = evidenceRefs.find((ref) => {
-    const reportText = reportTextByName.get(ref.file_name);
-    if (!reportText) {
-      return true;
-    }
-
-    const snippet = normalize(ref.snippet);
-    return !snippet || !reportText.includes(snippet);
-  });
-
-  if (ungroundedSnippet) {
+  const groundedness = computeEvidenceGroundedness(artifact, reports);
+  if (groundedness.total > 0 && groundedness.matched < groundedness.total) {
     violations.push('Evidence snippets are not grounded in extracted report text.');
   }
 
   return violations;
+};
+
+/** Continuous groundedness: % of evidence snippets found in extracted report text. */
+export const computeEvidenceGroundedness = (
+  artifact: CaseAnalysisArtifact,
+  reports: ExtractedReport[]
+): { total: number; matched: number; percent: number } => {
+  const evidenceRefs = artifact.evidence_refs || [];
+  const reportTextByName = new Map(reports.map((report) => [report.fileName, normalize(report.text)]));
+  let matched = 0;
+
+  for (const ref of evidenceRefs) {
+    const reportText = reportTextByName.get(ref.file_name);
+    const snippet = normalize(ref.snippet || '');
+    if (reportText && snippet && reportText.includes(snippet)) {
+      matched += 1;
+    }
+  }
+
+  const total = evidenceRefs.length;
+  const percent = total === 0 ? 0 : Number(((matched / total) * 100).toFixed(2));
+  return { total, matched, percent };
 };
 
 export const collectContractText = (artifact: CaseAnalysisArtifact): string => {

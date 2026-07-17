@@ -159,6 +159,8 @@ describe('Case analysis agent orchestrator', () => {
       promptTokens: null,
       completionTokens: null,
       totalTokens: null,
+      contractPass: true,
+      criticScore: null,
     });
 
     expect(mockedInsertCaseAnalysisArtifact).toHaveBeenCalledTimes(5);
