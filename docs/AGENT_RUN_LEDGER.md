@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-124 - Patient-facing analysis failure UX (PC4)
+
+- Status: Draft PR pending.
+- Human approval: User ordered PC1→PC2→PC4→PC3.
+- Branch/worktree: `sec-124-patient-failure-ux` (BE stacked on SEC-122).
+- Files changed: `getCaseAnalysis` adds `analysisRetrying` (hides retry raw error); FE friendly fail + Try again + Continue without AI; retrying copy while processing.
+- PR: (pending)
+- Checks: BE/FE build.
+- Deployment: After PC1+PC2 for retrying flag accuracy.
+- Verification: Terminal fail never shows raw typed error; mid-retry shows longer-than-usual.
+- Blockers: Human merge approval.
+- Follow-ups: SEC-123 per-case latency span/log.
+
 ## 2026-07-17 - SEC-122 - Per-case attention_reason + doctor banner + ops (PC2)
 
 - Status: Draft PR pending human merge approval.
