@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User asked merge SEC-111 then continue backlog; batch deploy later.
 - Branch/worktree: `sec-116-log-trace-correlation`.
 - Files changed: `logContext.ts`, winston inject format, `getActiveTraceId`, analysisWorker wrappers, tests.
-- PR: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/75
 - Checks: unit tests for ALS + winston metadata.
 - Deployment: Deferred (batch).
 - Verification: runId always in analysis-path logs; trace_id when Phoenix span active.
