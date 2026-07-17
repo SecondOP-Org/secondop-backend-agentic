@@ -414,6 +414,7 @@ class AnalysisWorker {
           estimatedCostUsd,
           criticScore: onlineEvals.criticScore,
           contractPass: onlineEvals.contractPass,
+          confidenceScore: agenticResult.artifact.artifact?.confidence_score ?? null,
         });
 
         await query(
@@ -646,6 +647,7 @@ class AnalysisWorker {
                 estimatedCostUsd,
                 criticScore: shadowOnlineEvals.criticScore,
                 contractPass: shadowOnlineEvals.contractPass,
+                confidenceScore: agenticResult.artifact.artifact?.confidence_score ?? null,
               });
               await clearDeidVault(agenticRun.id);
 

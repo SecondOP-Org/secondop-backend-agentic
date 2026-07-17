@@ -3,8 +3,13 @@ import { AgenticCriticScore } from '../agentic/core/types';
 import { normalizeExecutionMode, AnalysisExecutionMode } from '../agentic/core/executionMode';
 import { getAnalysisRunVersionMetadata } from './analysisVersioning';
 import { CaseAnalysisArtifact } from './analysisArtifact.service';
+import {
+  computeAttentionReason,
+  type AttentionReason,
+} from './analysisAttention.service';
 
 export type { AnalysisExecutionMode } from '../agentic/core/executionMode';
+export type { AttentionReason } from './analysisAttention.service';
 
 export type AnalysisRunStatus = 'queued' | 'processing' | 'succeeded' | 'failed';
 export type AnalysisRunEngine = 'baseline' | 'agentic';
@@ -31,6 +36,7 @@ export interface AnalysisRun {
   critic_score: number | null;
   contract_pass: boolean | null;
   attempt_count: number;
+  attention_reason: AttentionReason | null;
   created_at: Date;
 }
 
@@ -86,12 +92,13 @@ export interface AnalysisRunCompletionMetadata {
   estimatedCostUsd?: number | null;
   criticScore?: number | null;
   contractPass?: boolean | null;
+  confidenceScore?: number | null;
 }
 
 const ANALYSIS_RUN_SELECT_FIELDS = `
   id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, error_message,
   pipeline_version, model_version, prompt_version, latency_ms, prompt_tokens, completion_tokens,
-  total_tokens, estimated_cost_usd, critic_score, contract_pass, attempt_count, created_at
+  total_tokens, estimated_cost_usd, critic_score, contract_pass, attempt_count, attention_reason, created_at
 `;
 
 const toNullableNumber = (value: unknown): number | null => {
@@ -138,6 +145,8 @@ const mapAnalysisRunRow = (row: Record<string, unknown>): AnalysisRun => {
           ? null
           : Boolean(row.contract_pass),
     attempt_count: Math.max(1, toNullableNumber(row.attempt_count) ?? 1),
+    attention_reason:
+      typeof row.attention_reason === 'string' ? (row.attention_reason as AttentionReason) : null,
     created_at: row.created_at as Date,
   };
 };
@@ -283,7 +292,7 @@ export const markAnalysisRunSucceeded = async (
 ): Promise<void> => {
   const versions = getAnalysisRunVersionMetadata();
 
-  await query(
+  const result = await query(
     `UPDATE case_analysis_runs
      SET status = 'succeeded',
          model = $2,
@@ -303,7 +312,8 @@ export const markAnalysisRunSucceeded = async (
          error = NULL,
          error_message = NULL,
          completed_at = CURRENT_TIMESTAMP
-     WHERE id = $1`,
+     WHERE id = $1
+     RETURNING latency_ms, attempt_count`,
     [
       runId,
       metadata.model,
@@ -318,6 +328,21 @@ export const markAnalysisRunSucceeded = async (
       metadata.contractPass ?? null,
     ]
   );
+
+  const row = result.rows[0] as { latency_ms?: unknown; attempt_count?: unknown } | undefined;
+  const attentionReason = computeAttentionReason({
+    outcome: 'succeeded',
+    confidenceScore: metadata.confidenceScore ?? null,
+    latencyMs: toNullableNumber(row?.latency_ms),
+    attemptCount: toNullableNumber(row?.attempt_count) ?? 1,
+  });
+
+  await query(
+    `UPDATE case_analysis_runs
+     SET attention_reason = $2
+     WHERE id = $1`,
+    [runId, attentionReason]
+  );
 };
 
 export const markAnalysisRunFailed = async (runId: string, errorMessage: string): Promise<void> => {
@@ -326,6 +351,7 @@ export const markAnalysisRunFailed = async (runId: string, errorMessage: string)
      SET status = 'failed',
          error = $2,
          error_message = $2,
+         attention_reason = 'failed_terminal',
          latency_ms = CASE
            WHEN started_at IS NULL THEN NULL
            ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)) * 1000))
@@ -352,7 +378,8 @@ export const prepareAnalysisRunForRetry = async (
          error_message = $2,
          started_at = NULL,
          completed_at = NULL,
-         latency_ms = NULL
+         latency_ms = NULL,
+         attention_reason = NULL
      WHERE id = $1
      RETURNING attempt_count`,
     [runId, errorMessage]
@@ -472,4 +499,63 @@ export const getLatestShadowResultByCaseId = async (caseId: string): Promise<Sha
   }
 
   return mapShadowRow(result.rows[0] as Record<string, unknown>);
+};
+
+export interface FleetAnalysisRunRow {
+  id: string;
+  case_id: string;
+  status: AnalysisRunStatus;
+  engine: AnalysisRunEngine;
+  execution_mode: AnalysisExecutionMode;
+  attention_reason: AttentionReason | null;
+  attempt_count: number;
+  latency_ms: number | null;
+  model: string | null;
+  error_message: string | null;
+  completed_at: Date | null;
+  created_at: Date;
+}
+
+export const listFleetAnalysisRuns = async (params: {
+  attentionReason?: AttentionReason | null;
+  limit?: number;
+}): Promise<FleetAnalysisRunRow[]> => {
+  const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
+  const attentionReason = params.attentionReason ?? null;
+
+  const result = attentionReason
+    ? await query(
+        `SELECT ${ANALYSIS_RUN_SELECT_FIELDS}
+         FROM case_analysis_runs
+         WHERE attention_reason = $1
+         ORDER BY COALESCE(completed_at, created_at) DESC
+         LIMIT $2`,
+        [attentionReason, limit]
+      )
+    : await query(
+        `SELECT ${ANALYSIS_RUN_SELECT_FIELDS}
+         FROM case_analysis_runs
+         WHERE attention_reason IS NOT NULL
+         ORDER BY COALESCE(completed_at, created_at) DESC
+         LIMIT $1`,
+        [limit]
+      );
+
+  return (result.rows as Array<Record<string, unknown>>).map((row) => {
+    const mapped = mapAnalysisRunRow(row);
+    return {
+      id: mapped.id,
+      case_id: mapped.case_id,
+      status: mapped.status,
+      engine: mapped.engine,
+      execution_mode: mapped.execution_mode,
+      attention_reason: mapped.attention_reason,
+      attempt_count: mapped.attempt_count,
+      latency_ms: mapped.latency_ms,
+      model: mapped.model,
+      error_message: mapped.error_message,
+      completed_at: mapped.completed_at,
+      created_at: mapped.created_at,
+    };
+  });
 };
