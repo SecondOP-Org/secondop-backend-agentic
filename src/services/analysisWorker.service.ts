@@ -11,7 +11,8 @@ import {
 } from '../agentic/core/policy';
 import type { AnalysisExecutionMode } from '../agentic/core/executionMode';
 import { runAgenticCaseAnalysis } from '../agentic/orchestration/runAgenticCaseAnalysis';
-import { startPhoenixSpan, estimateTokenCostUsd } from '../observability/phoenix.service';
+import { startPhoenixSpan, estimateTokenCostUsd, getActiveTraceId } from '../observability/phoenix.service';
+import { withAnalysisLogContext, setAnalysisLogTraceId } from '../utils/logContext';
 import { getAnalysisRunVersionMetadata } from './analysisVersioning';
 import {
   AnalysisRunCompletionMetadata,
@@ -266,6 +267,10 @@ class AnalysisWorker {
   }
 
   private async processAgenticPrimaryCase(job: AnalysisQueueJob, mode: AnalysisExecutionMode): Promise<void> {
+    return withAnalysisLogContext({ runId: job.runId }, () => this.runAgenticPrimaryCase(job, mode));
+  }
+
+  private async runAgenticPrimaryCase(job: AnalysisQueueJob, mode: AnalysisExecutionMode): Promise<void> {
     const { caseId, runId } = job;
     const versions = getAnalysisRunVersionMetadata();
     const runStartedAt = Date.now();
@@ -285,6 +290,7 @@ class AnalysisWorker {
 
     try {
       await agenticRunSpan.run(async () => {
+        setAnalysisLogTraceId(getActiveTraceId());
         const claimedRun = await markAnalysisRunProcessing(runId);
         if (!claimedRun) {
           logger.info(`Skipping analysis run ${runId} for case ${caseId}; already claimed by another worker.`);
@@ -403,7 +409,6 @@ class AnalysisWorker {
   }
 
   private async processCase(job: AnalysisQueueJob): Promise<void> {
-    const { caseId, runId } = job;
     const mode = resolveExecutionMode();
     const primaryEngine = getPrimaryRunEngine(mode);
 
@@ -412,6 +417,11 @@ class AnalysisWorker {
       return;
     }
 
+    return withAnalysisLogContext({ runId: job.runId }, () => this.runBaselineCase(job, mode));
+  }
+
+  private async runBaselineCase(job: AnalysisQueueJob, mode: AnalysisExecutionMode): Promise<void> {
+    const { caseId, runId } = job;
     const versions = getAnalysisRunVersionMetadata();
     const baselineStartedAt = Date.now();
     const baselineRunSpan = startPhoenixSpan(
@@ -430,6 +440,7 @@ class AnalysisWorker {
 
     try {
       await baselineRunSpan.run(async () => {
+        setAnalysisLogTraceId(getActiveTraceId());
         const claimedBaselineRun = await markAnalysisRunProcessing(runId);
         if (!claimedBaselineRun) {
           logger.info(`Skipping analysis run ${runId} for case ${caseId}; already claimed by another worker.`);
@@ -502,84 +513,87 @@ class AnalysisWorker {
           throw new Error(`Agentic run ${agenticRun.id} could not be claimed for processing.`);
         }
 
-        try {
-          await agenticRunSpan.run(async () => {
-            const agenticResult = await runAgenticCaseAnalysis({
-              caseId,
-              runId: agenticRun.id,
-              mode,
-              maxCharsPerFile,
-              maxTotalChars,
-            });
-
-            const promptTokens = agenticResult.metrics?.totalTokenUsage?.promptTokens ?? 0;
-            const completionTokens = agenticResult.metrics?.totalTokenUsage?.completionTokens ?? 0;
-            const totalTokens =
-              agenticResult.metrics?.totalTokenUsage?.totalTokens ?? promptTokens + completionTokens;
-            const estimatedCostUsd = estimateTokenCostUsd(promptTokens, completionTokens);
-
-            const shadowOnlineEvals = computeOnlineEvalSignals({
-              contractArtifact: agenticResult.analysis
-                ? resolveContractCheckArtifact(agenticResult.analysis)
-                : agenticResult.artifact?.artifact,
-              reports: agenticResult.reports,
-              criticScore: agenticResult.criticScore,
-            });
-            attachOnlineEvalSpanAttributes(agenticRunSpan, shadowOnlineEvals);
-
-            await markAnalysisRunSucceeded(agenticRun.id, {
-              ...buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics),
-              estimatedCostUsd,
-              criticScore: shadowOnlineEvals.criticScore,
-              contractPass: shadowOnlineEvals.contractPass,
-            });
-            await clearDeidVault(agenticRun.id);
-
-            agenticRunSpan.addAttributes({
-              latency_ms: Date.now() - agenticStartedAt,
-              prompt_tokens: promptTokens,
-              completion_tokens: completionTokens,
-              total_tokens: totalTokens,
-              estimated_cost_usd: estimatedCostUsd,
-            });
-
-            if (pipelineState.analysis) {
-              const comparison = buildShadowComparisonMetrics({
-                baselineRunId: runId,
-                agenticRunId: agenticRun.id,
-                baselineAnalysis: pipelineState.analysis,
-                agenticSummary: agenticResult.artifact.summary,
-                agenticQuestions: agenticResult.artifact.questions,
-                agenticModel: agenticResult.artifact.model,
-                criticPassed: agenticResult.criticScore?.passed ?? null,
-                criticScore: agenticResult.criticScore?.score ?? null,
-              });
-
-              await insertCaseAnalysisArtifact({
-                runId,
+        await withAnalysisLogContext({ runId: agenticRun.id }, async () => {
+          try {
+            await agenticRunSpan.run(async () => {
+              setAnalysisLogTraceId(getActiveTraceId());
+              const agenticResult = await runAgenticCaseAnalysis({
                 caseId,
-                artifactType: 'final',
-                stageName: 'shadow-comparison',
-                engine: 'baseline',
-                payload: comparison as unknown as Record<string, unknown>,
+                runId: agenticRun.id,
+                mode,
+                maxCharsPerFile,
+                maxTotalChars,
               });
-            }
 
-            logger.info(
-              `Agentic shadow analysis completed for case ${caseId} (run ${agenticRun.id}, mode ${mode})`
-            );
-          });
-          agenticRunSpan.end('OK');
-        } catch (agenticError) {
-          const agenticMessage =
-            agenticError instanceof Error ? agenticError.message : 'Unknown agentic analysis error';
+              const promptTokens = agenticResult.metrics?.totalTokenUsage?.promptTokens ?? 0;
+              const completionTokens = agenticResult.metrics?.totalTokenUsage?.completionTokens ?? 0;
+              const totalTokens =
+                agenticResult.metrics?.totalTokenUsage?.totalTokens ?? promptTokens + completionTokens;
+              const estimatedCostUsd = estimateTokenCostUsd(promptTokens, completionTokens);
 
-          await markAnalysisRunFailed(agenticRun.id, agenticMessage);
-          agenticRunSpan.addAttributes({ latency_ms: Date.now() - agenticStartedAt });
-          agenticRunSpan.end('ERROR', agenticMessage);
-          logger.error(`Agentic shadow mode failed for case ${caseId}: ${agenticMessage}`);
-          fireAnalysisAlerts({ runId: agenticRun.id, caseId, errorMessage: agenticMessage });
-        }
+              const shadowOnlineEvals = computeOnlineEvalSignals({
+                contractArtifact: agenticResult.analysis
+                  ? resolveContractCheckArtifact(agenticResult.analysis)
+                  : agenticResult.artifact?.artifact,
+                reports: agenticResult.reports,
+                criticScore: agenticResult.criticScore,
+              });
+              attachOnlineEvalSpanAttributes(agenticRunSpan, shadowOnlineEvals);
+
+              await markAnalysisRunSucceeded(agenticRun.id, {
+                ...buildAgenticCompletionMetadata(agenticResult.artifact.model, agenticResult.metrics),
+                estimatedCostUsd,
+                criticScore: shadowOnlineEvals.criticScore,
+                contractPass: shadowOnlineEvals.contractPass,
+              });
+              await clearDeidVault(agenticRun.id);
+
+              agenticRunSpan.addAttributes({
+                latency_ms: Date.now() - agenticStartedAt,
+                prompt_tokens: promptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: totalTokens,
+                estimated_cost_usd: estimatedCostUsd,
+              });
+
+              if (pipelineState.analysis) {
+                const comparison = buildShadowComparisonMetrics({
+                  baselineRunId: runId,
+                  agenticRunId: agenticRun.id,
+                  baselineAnalysis: pipelineState.analysis,
+                  agenticSummary: agenticResult.artifact.summary,
+                  agenticQuestions: agenticResult.artifact.questions,
+                  agenticModel: agenticResult.artifact.model,
+                  criticPassed: agenticResult.criticScore?.passed ?? null,
+                  criticScore: agenticResult.criticScore?.score ?? null,
+                });
+
+                await insertCaseAnalysisArtifact({
+                  runId,
+                  caseId,
+                  artifactType: 'final',
+                  stageName: 'shadow-comparison',
+                  engine: 'baseline',
+                  payload: comparison as unknown as Record<string, unknown>,
+                });
+              }
+
+              logger.info(
+                `Agentic shadow analysis completed for case ${caseId} (run ${agenticRun.id}, mode ${mode})`
+              );
+            });
+            agenticRunSpan.end('OK');
+          } catch (agenticError) {
+            const agenticMessage =
+              agenticError instanceof Error ? agenticError.message : 'Unknown agentic analysis error';
+
+            await markAnalysisRunFailed(agenticRun.id, agenticMessage);
+            agenticRunSpan.addAttributes({ latency_ms: Date.now() - agenticStartedAt });
+            agenticRunSpan.end('ERROR', agenticMessage);
+            logger.error(`Agentic shadow mode failed for case ${caseId}: ${agenticMessage}`);
+            fireAnalysisAlerts({ runId: agenticRun.id, caseId, errorMessage: agenticMessage });
+          }
+        });
 
         if (pipelineState.analysis) {
           logger.info(`Baseline output retained for case ${caseId} after shadow agentic run`, {

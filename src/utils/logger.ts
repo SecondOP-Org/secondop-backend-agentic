@@ -1,7 +1,20 @@
 import path from 'path';
 import winston from 'winston';
+import { getAnalysisLogContext } from './logContext';
 
 const logLevel = process.env.LOG_LEVEL || 'info';
+
+/** Injects `runId` / `trace_id` from the active analysis log context (SEC-116). Ids only, no PHI. */
+export const injectAnalysisLogContext = winston.format((info) => {
+  const context = getAnalysisLogContext();
+  if (context?.runId) {
+    info.runId = context.runId;
+  }
+  if (context?.traceId) {
+    info.trace_id = context.traceId;
+  }
+  return info;
+});
 
 const consoleTransport = new winston.transports.Console({
   format: winston.format.combine(
@@ -39,6 +52,7 @@ const logger = winston.createLogger({
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),
     winston.format.splat(),
+    injectAnalysisLogContext(),
     winston.format.json()
   ),
   defaultMeta: { service: 'secondop-api' },

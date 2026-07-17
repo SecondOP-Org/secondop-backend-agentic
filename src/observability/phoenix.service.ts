@@ -10,11 +10,18 @@ import logger from '../utils/logger';
 export type PhoenixSpanKind = 'AGENT' | 'TOOL' | 'LLM' | 'CHAIN';
 type SpanStatusCode = 'OK' | 'ERROR';
 
+interface OpenTelemetrySpanContext {
+  traceId: string;
+  spanId: string;
+}
+
 interface OpenTelemetrySpan {
   setAttributes: (attributes: Record<string, string | number | boolean>) => void;
   setStatus: (status: { code: number; message?: string }) => void;
   recordException: (exception: Error) => void;
   end: () => void;
+  /** Standard OTel API; optional so lightweight test-only span mocks remain valid. */
+  spanContext?: () => OpenTelemetrySpanContext;
 }
 
 interface OpenTelemetryContext {
@@ -199,6 +206,31 @@ const noopSpan = (): SpanHandle => ({
 });
 
 export const isPhoenixEnabled = (): boolean => enabled;
+
+/**
+ * The OTel trace id for the currently active span (SEC-116), for log↔trace
+ * correlation. Returns undefined when Phoenix is disabled or there is no
+ * active span — callers should omit `trace_id` from logs in that case.
+ */
+export const getActiveTraceId = (): string | undefined => {
+  if (!enabled) {
+    return undefined;
+  }
+
+  const span = activeSpanStorage.getStore();
+  if (!span?.spanContext) {
+    return undefined;
+  }
+
+  try {
+    return span.spanContext().traceId || undefined;
+  } catch (error) {
+    logger.warn('Failed to read active Phoenix span trace id', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+};
 
 export const startPhoenixSpan = (
   name: string,
