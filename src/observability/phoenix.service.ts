@@ -127,6 +127,7 @@ const activeSpanStorage = new AsyncLocalStorage<OpenTelemetrySpan>();
 let failClosedCounter: OpenTelemetryCounter | null = null;
 let groundingRejectsCounter: OpenTelemetryCounter | null = null;
 let phiEntitiesCounter: OpenTelemetryCounter | null = null;
+let retriesCounter: OpenTelemetryCounter | null = null;
 
 const spanStatusCode = (status: SpanStatusCode): number => {
   const fallback = status === 'ERROR' ? 2 : 1;
@@ -153,6 +154,9 @@ const initCounters = (): void => {
     });
     phiEntitiesCounter = meter.createCounter('phi_entities_detected_total', {
       description: 'PHI entities detected during de-identification',
+    });
+    retriesCounter = meter.createCounter('retries_total', {
+      description: 'Transient analysis run retries (SEC-121)',
     });
   } catch (error) {
     logger.warn('Failed to create Phoenix guardrail counters', {
@@ -301,6 +305,10 @@ export const incrementPhiEntitiesDetected = (
   if (count > 0) {
     phiEntitiesCounter?.add(count, attrs);
   }
+};
+
+export const incrementRetriesTotal = (attrs?: Record<string, string | number | boolean>): void => {
+  retriesCounter?.add(1, attrs);
 };
 
 /** Rough USD estimate for span attrs only — not billing-grade. */

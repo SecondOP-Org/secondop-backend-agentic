@@ -30,6 +30,7 @@ export interface AnalysisRun {
   estimated_cost_usd: number | null;
   critic_score: number | null;
   contract_pass: boolean | null;
+  attempt_count: number;
   created_at: Date;
 }
 
@@ -90,7 +91,7 @@ export interface AnalysisRunCompletionMetadata {
 const ANALYSIS_RUN_SELECT_FIELDS = `
   id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, error_message,
   pipeline_version, model_version, prompt_version, latency_ms, prompt_tokens, completion_tokens,
-  total_tokens, estimated_cost_usd, critic_score, contract_pass, created_at
+  total_tokens, estimated_cost_usd, critic_score, contract_pass, attempt_count, created_at
 `;
 
 const toNullableNumber = (value: unknown): number | null => {
@@ -136,6 +137,7 @@ const mapAnalysisRunRow = (row: Record<string, unknown>): AnalysisRun => {
         : row.contract_pass === null || row.contract_pass === undefined
           ? null
           : Boolean(row.contract_pass),
+    attempt_count: Math.max(1, toNullableNumber(row.attempt_count) ?? 1),
     created_at: row.created_at as Date,
   };
 };
@@ -332,6 +334,51 @@ export const markAnalysisRunFailed = async (runId: string, errorMessage: string)
      WHERE id = $1`,
     [runId, errorMessage]
   );
+};
+
+/**
+ * Prepare a run for a delayed retry: bump attempt_count, reset to queued, clear timing.
+ * Returns the new attempt_count. Caller must re-enqueue with backoff.
+ */
+export const prepareAnalysisRunForRetry = async (
+  runId: string,
+  errorMessage: string
+): Promise<number> => {
+  const result = await query(
+    `UPDATE case_analysis_runs
+     SET status = 'queued',
+         attempt_count = attempt_count + 1,
+         error = $2,
+         error_message = $2,
+         started_at = NULL,
+         completed_at = NULL,
+         latency_ms = NULL
+     WHERE id = $1
+     RETURNING attempt_count`,
+    [runId, errorMessage]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(`Analysis run ${runId} not found for retry`);
+  }
+
+  return Number(result.rows[0].attempt_count);
+};
+
+export const getAnalysisRunById = async (runId: string): Promise<AnalysisRun | null> => {
+  const result = await query(
+    `SELECT ${ANALYSIS_RUN_SELECT_FIELDS}
+     FROM case_analysis_runs
+     WHERE id = $1
+     LIMIT 1`,
+    [runId]
+  );
+
+  if (result.rows.length === 0) {
+    return null;
+  }
+
+  return mapAnalysisRunRow(result.rows[0] as Record<string, unknown>);
 };
 
 export const insertAnalysisEvent = async (event: AnalysisEventInput): Promise<void> => {

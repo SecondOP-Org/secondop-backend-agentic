@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-121 - Bounded automatic retry on transient analysis failure (PC1)
+
+- Status: Draft PR pending human merge approval.
+- Human approval: User ordered PC1→PC2→PC4→PC3 per-case resilience spec.
+- Branch/worktree: `sec-121-analysis-transient-retry`.
+- Files changed: migration `026_analysis_run_attempt_count.sql`, `analysisFailureClassifier.service.ts`, `analysisRun.service.ts` (`prepareAnalysisRunForRetry`, `attempt_count`), `analysisWorker.service.ts` (requeue with backoff, keep case `processing`), Phoenix `retries_total`, classifier unit tests; db migrate scripts.
+- PR: (pending)
+- Checks: classifier unit tests + lint + `tsc` build locally.
+- Deployment: None yet; needs migration 026 on deploy.
+- Verification: RETRYABLE (Presidio/de-id outage, timeout) requeues up to 2 retries; TERMINAL (validation/grounding) does not; patient status stays `processing` while retrying.
+- Blockers: Merge/deploy need human approval.
+- Follow-ups: SEC-122 attention_reason; SEC-124 patient failure UX; SEC-123 per-case latency signal.
+
 ## 2026-07-17 - SEC-116 - Log↔trace correlation (runId + trace_id)
 
 - Status: Draft PR pending.

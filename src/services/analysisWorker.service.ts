@@ -11,17 +11,25 @@ import {
 } from '../agentic/core/policy';
 import type { AnalysisExecutionMode } from '../agentic/core/executionMode';
 import { runAgenticCaseAnalysis } from '../agentic/orchestration/runAgenticCaseAnalysis';
-import { startPhoenixSpan, estimateTokenCostUsd, getActiveTraceId } from '../observability/phoenix.service';
+import {
+  startPhoenixSpan,
+  estimateTokenCostUsd,
+  getActiveTraceId,
+  incrementRetriesTotal,
+  type SpanHandle,
+} from '../observability/phoenix.service';
 import { withAnalysisLogContext, setAnalysisLogTraceId } from '../utils/logContext';
 import { getAnalysisRunVersionMetadata } from './analysisVersioning';
 import {
   AnalysisRunCompletionMetadata,
   createAnalysisRun,
+  getAnalysisRunById,
   getLatestActiveAnalysisRun,
   markAnalysisRunFailed,
   markAnalysisRunProcessing,
   markAnalysisRunQueued,
   markAnalysisRunSucceeded,
+  prepareAnalysisRunForRetry,
 } from './analysisRun.service';
 import type { AnalysisRunEngine } from './analysisRun.service';
 import {
@@ -35,6 +43,11 @@ import {
   computeOnlineEvalSignals,
 } from './onlineEvals.service';
 import { resolveContractCheckArtifact } from './analysis.service';
+import {
+  canRetryAnalysisAttempt,
+  classifyAnalysisFailure,
+  getRetryBackoffSeconds,
+} from './analysisFailureClassifier.service';
 
 const fireAnalysisAlerts = (params: {
   runId: string;
@@ -145,9 +158,76 @@ class AnalysisWorker {
     await this.startPromise;
   }
 
-  private async enqueue(job: AnalysisQueueJob): Promise<void> {
+  private async enqueue(job: AnalysisQueueJob, startAfterSeconds = 0): Promise<void> {
     await this.ensureStarted();
+    if (startAfterSeconds > 0) {
+      await this.boss!.send(queueName, job, { startAfter: startAfterSeconds });
+      return;
+    }
     await this.boss!.send(queueName, job);
+  }
+
+  /**
+   * On RETRYABLE failures with attempts remaining: requeue same run, keep case processing.
+   * Returns true if a retry was scheduled (caller must not mark failed / rethrow).
+   */
+  private async maybeScheduleTransientRetry(params: {
+    caseId: string;
+    runId: string;
+    error: unknown;
+    errorMessage: string;
+    runSpan: SpanHandle;
+  }): Promise<boolean> {
+    const { caseId, runId, error, errorMessage, runSpan } = params;
+    // Prefer formatted errorMessage (includes [code]); fall back to thrown error.
+    const classified = classifyAnalysisFailure(errorMessage || error);
+    if (classified.classification !== 'RETRYABLE') {
+      return false;
+    }
+
+    const current = await getAnalysisRunById(runId);
+    const attemptCount = current?.attempt_count ?? 1;
+    if (!canRetryAnalysisAttempt(attemptCount)) {
+      return false;
+    }
+
+    const nextAttempt = await prepareAnalysisRunForRetry(runId, errorMessage);
+    const backoffSeconds = getRetryBackoffSeconds(nextAttempt);
+
+    // Keep patient-facing status as processing — never flash failed mid-retry.
+    await query(
+      `UPDATE cases
+       SET analysis_status = 'processing',
+           analysis_error = $2,
+           analysis_completed_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [caseId, `Retrying analysis (attempt ${nextAttempt}): ${classified.reason}`]
+    );
+
+    await this.enqueue({ caseId, runId }, backoffSeconds);
+
+    runSpan.addAttributes({
+      'retry.scheduled': true,
+      'retry.attempt': nextAttempt,
+      'retry.reason': classified.reason,
+      'retry.backoff_seconds': backoffSeconds,
+    });
+    incrementRetriesTotal({
+      reason: classified.reason,
+      attempt: nextAttempt,
+    });
+
+    logger.warn('Scheduled transient analysis retry', {
+      caseId,
+      runId,
+      attempt: nextAttempt,
+      reason: classified.reason,
+      backoffSeconds,
+      errorMessage,
+    });
+
+    return true;
   }
 
   public async recoverInterruptedJobs(): Promise<void> {
@@ -379,6 +459,27 @@ class AnalysisWorker {
             ? error.message
             : 'Unknown agentic analysis error';
 
+      try {
+        const retried = await this.maybeScheduleTransientRetry({
+          caseId,
+          runId,
+          error,
+          errorMessage,
+          runSpan: agenticRunSpan,
+        });
+        if (retried) {
+          agenticRunSpan.addAttributes({ latency_ms: Date.now() - runStartedAt });
+          agenticRunSpan.end('OK');
+          return;
+        }
+      } catch (retryError) {
+        logger.error('Failed to schedule analysis retry', {
+          caseId,
+          runId,
+          error: retryError instanceof Error ? retryError.message : String(retryError),
+        });
+      }
+
       await query(
         `UPDATE cases
          SET analysis_status = 'failed',
@@ -606,6 +707,27 @@ class AnalysisWorker {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown analysis error';
       const message = error instanceof AgentError ? `[${error.code}] ${errorMessage}` : errorMessage;
+
+      try {
+        const retried = await this.maybeScheduleTransientRetry({
+          caseId,
+          runId,
+          error,
+          errorMessage: message,
+          runSpan: baselineRunSpan,
+        });
+        if (retried) {
+          baselineRunSpan.addAttributes({ latency_ms: Date.now() - baselineStartedAt });
+          baselineRunSpan.end('OK');
+          return;
+        }
+      } catch (retryError) {
+        logger.error('Failed to schedule analysis retry', {
+          caseId,
+          runId,
+          error: retryError instanceof Error ? retryError.message : String(retryError),
+        });
+      }
 
       baselineRunSpan.addAttributes({ latency_ms: Date.now() - baselineStartedAt });
       baselineRunSpan.end('ERROR', message);
