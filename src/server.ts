@@ -35,7 +35,10 @@ import billingRoutes from './routes/billing.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import doctorRoutes from './routes/doctor.routes';
 import practiceRoutes from './routes/practice.routes';
-import commandCenterRoutes, { serviceHealthRouter } from './routes/commandCenter.routes';
+import commandCenterRoutes, {
+  serviceHealthRouter,
+  shadowParityRouter,
+} from './routes/commandCenter.routes';
 import aiGatewayRoutes from './routes/aiGateway.routes';
 import presidioRoutes from './routes/presidio.routes';
 import { buildHealthResponse, getVersion } from './controllers/version.controller';
@@ -171,6 +174,7 @@ app.use(`/api/${API_VERSION}/doctors`, doctorRoutes);
 app.use(`/api/${API_VERSION}/practices`, practiceRoutes);
 app.use(`/api/${API_VERSION}/admin/command-center`, commandCenterRoutes);
 app.use(`/api/${API_VERSION}/admin/service-health`, serviceHealthRouter);
+app.use(`/api/${API_VERSION}/admin/shadow-parity`, shadowParityRouter);
 app.use(`/api/${API_VERSION}/ai-gateway`, aiGatewayRoutes);
 app.use(`/api/${API_VERSION}/presidio`, presidioRoutes);
 
