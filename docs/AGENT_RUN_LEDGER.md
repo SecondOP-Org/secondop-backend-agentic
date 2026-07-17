@@ -28,14 +28,27 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-111 - Doctor-edit distance (ai_draft_edit_ratio)
+
+- Status: Implementing; draft PRs pending.
+- Human approval: User approved merge of ready work; batch deploy later.
+- Branch/worktree: `sec-111-doctor-edit-distance` (stacked on SEC-108).
+- Files changed: migration `025_ai_draft_edit_ratio.sql`, `doctorEditDistance.service.ts`, draft schema `aiDraftBaselines`, send-opinion hook + Phoenix `doctor.opinion.send` span, FE Insert AI draft capture.
+- PR: (pending)
+- Checks: unit tests + lint locally.
+- Deployment: Deferred (batch; run migrations 024+025).
+- Verification: Unit edit-distance edge cases; FE persists baselines on insert/autosave/send.
+- Blockers: SEC-108 merge first for clean main base.
+- Follow-ups: Remaining backlog A3/A4/B4/C2–C4/D2; batch deploy.
+
 ## 2026-07-17 - SEC-108 - Online evals on production traces
 
 - Status: Implementing; draft PR pending human merge approval.
 - Human approval: User asked merge SEC-117 then continue; batch deploy later.
 - Branch/worktree: `sec-108-online-evals`.
 - Files changed: migration `024_analysis_run_online_evals.sql`, `onlineEvals.service.ts`, `contractChecks` groundedness helper, `markAnalysisRunSucceeded` columns, worker + persist-results hooks, tests.
-- PR: (pending)
-- Checks: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/71
+- Checks: (pending CI after orchestrator expectation fix)
 - Deployment: Deferred (batch with subsequent tickets).
 - Verification: Unit tests for signals + span attrs; no new LLM calls.
 - Blockers: None for code; merge approval + later batch deploy.

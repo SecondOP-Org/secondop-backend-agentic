@@ -30,6 +30,7 @@ import {
   saveDoctorResponseDraft,
   validateDoctorResponseForSend,
 } from '../services/doctorResponse.service';
+import { recordAiDraftEditRatioOnSend } from '../services/doctorEditDistance.service';
 import { startCaseReview } from '../services/doctorCaseWorkflow.service';
 import {
   isStructuredDoctorResponsePayload,
@@ -50,6 +51,7 @@ import {
   isOverdue,
   resolveEffectiveDueDate,
 } from '../services/doctorCaseInbox.service';
+import logger from '../utils/logger';
 
 interface IntakePayload {
   age: number;
@@ -1268,6 +1270,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
               c.analysis_model,
               c.share_ai_analysis_with_specialists,
               c.analysis_status,
+              ca.response_draft,
               p.user_id as patient_user_id,
               p.first_name as patient_first_name,
               p.last_name as patient_last_name,
@@ -1304,9 +1307,11 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
     let content: string;
     let nextStatus: string;
     let pdfInput: Parameters<typeof generateDoctorOpinionPdf>[0];
+    let structuredPayload: ReturnType<typeof parseDoctorResponseSend> | null = null;
 
     if (isStructuredDoctorResponsePayload(req.body)) {
       const payload = parseDoctorResponseSend(req.body);
+      structuredPayload = payload;
       validateDoctorResponseForSend(resolvedQuestions, payload);
       content = composeDoctorOpinionContent(payload);
       nextStatus = typeof payload.status === 'string' && payload.status.trim() ? payload.status.trim() : 'completed';
@@ -1399,6 +1404,23 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
     );
 
     await clearDoctorResponseDraft(caseId, userId);
+
+    if (structuredPayload) {
+      try {
+        await recordAiDraftEditRatioOnSend({
+          caseId,
+          questionAnswers: structuredPayload.questionAnswers,
+          aiDraftBaselines: structuredPayload.aiDraftBaselines,
+          storedDraft: row.response_draft,
+        });
+      } catch (error) {
+        // Metric must not block send success.
+        logger.warn('Failed to record ai_draft_edit_ratio', {
+          caseId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     const io = req.app.get('io');
     io.to(`case-${caseId}`).emit('new-message', messageResult.rows[0]);
