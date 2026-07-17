@@ -289,7 +289,7 @@ export const markAnalysisRunQueued = async (runId: string, errorMessage?: string
 export const markAnalysisRunSucceeded = async (
   runId: string,
   metadata: AnalysisRunCompletionMetadata
-): Promise<void> => {
+): Promise<{ latencyMs: number | null; attentionReason: AttentionReason | null; caseId: string | null }> => {
   const versions = getAnalysisRunVersionMetadata();
 
   const result = await query(
@@ -313,7 +313,7 @@ export const markAnalysisRunSucceeded = async (
          error_message = NULL,
          completed_at = CURRENT_TIMESTAMP
      WHERE id = $1
-     RETURNING latency_ms, attempt_count`,
+     RETURNING latency_ms, attempt_count, case_id`,
     [
       runId,
       metadata.model,
@@ -329,11 +329,14 @@ export const markAnalysisRunSucceeded = async (
     ]
   );
 
-  const row = result.rows[0] as { latency_ms?: unknown; attempt_count?: unknown } | undefined;
+  const row = result.rows[0] as
+    | { latency_ms?: unknown; attempt_count?: unknown; case_id?: unknown }
+    | undefined;
+  const latencyMs = toNullableNumber(row?.latency_ms);
   const attentionReason = computeAttentionReason({
     outcome: 'succeeded',
     confidenceScore: metadata.confidenceScore ?? null,
-    latencyMs: toNullableNumber(row?.latency_ms),
+    latencyMs,
     attemptCount: toNullableNumber(row?.attempt_count) ?? 1,
   });
 
@@ -343,6 +346,12 @@ export const markAnalysisRunSucceeded = async (
      WHERE id = $1`,
     [runId, attentionReason]
   );
+
+  return {
+    latencyMs,
+    attentionReason,
+    caseId: row?.case_id ? String(row.case_id) : null,
+  };
 };
 
 export const markAnalysisRunFailed = async (runId: string, errorMessage: string): Promise<void> => {
