@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-116 - Log↔trace correlation (runId + trace_id)
+
+- Status: Draft PR pending.
+- Human approval: User asked merge SEC-111 then continue backlog; batch deploy later.
+- Branch/worktree: `sec-116-log-trace-correlation`.
+- Files changed: `logContext.ts`, winston inject format, `getActiveTraceId`, analysisWorker wrappers, tests.
+- PR: (pending)
+- Checks: unit tests for ALS + winston metadata.
+- Deployment: Deferred (batch).
+- Verification: runId always in analysis-path logs; trace_id when Phoenix span active.
+- Blockers: None.
+- Follow-ups: SEC-118 blocked on video asset; SEC-119 human Phoenix password.
+
 ## 2026-07-17 - SEC-111 - Doctor-edit distance (ai_draft_edit_ratio)
 
 - Status: Draft PR open; awaiting human merge approval.
