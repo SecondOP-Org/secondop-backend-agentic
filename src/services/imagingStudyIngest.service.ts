@@ -80,7 +80,7 @@ export interface ImagingStudyIngestResult {
   studies: Awaited<ReturnType<typeof getImagingStudiesForCase>>;
   /** Every non-ingested file under the upload root with a reason. */
   skipped: ImagingStudySkippedFile[];
-  /** Back-compat: count of skipped entries (never silently zero when files were excluded). */
+  /** @deprecated Prefer `skipped.length`. Back-compat count, always derived from `skipped` — never a separate source of truth. */
   skippedNonDicom: number;
   totalBytes: number;
   /** @deprecated Prefer `ingested` — kept for older clients. */
