@@ -186,6 +186,17 @@ describe('Analysis worker agentic modes', () => {
           specialistQuestions: ['Q1', 'Q2', 'Q3'],
           model: 'gpt-4.1-mini',
         }),
+        artifactDeidentified: buildCaseAnalysisArtifact({
+          structuredSummary: {
+            chief_concern: 'Baseline summary',
+            key_report_findings: 'Findings',
+            red_flags_to_discuss: 'Flags',
+            follow_up_discussion_points: 'Follow-up',
+            limitations_caveats: 'Limits',
+          },
+          specialistQuestions: ['Q1', 'Q2', 'Q3'],
+          model: 'gpt-4.1-mini',
+        }),
         model: 'gpt-4.1-mini',
       },
     } as any);

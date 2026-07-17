@@ -3,6 +3,9 @@
 const API_BASE_URL = (process.env.E2E_API_BASE_URL || 'https://secondop-backend-production.up.railway.app').replace(/\/+$/, '');
 const API_VERSION = process.env.E2E_API_VERSION || 'v1';
 const ENABLE_ANALYSIS = String(process.env.E2E_ENABLE_ANALYSIS || 'false').toLowerCase() === 'true';
+/** When true with E2E_ENABLE_ANALYSIS, assert agentic execution completed under DEID (SEC-106). */
+const REQUIRE_AGENTIC_DEID =
+  String(process.env.E2E_REQUIRE_AGENTIC_DEID || 'false').toLowerCase() === 'true';
 const ANALYSIS_TIMEOUT_MS = Number(process.env.E2E_ANALYSIS_TIMEOUT_MS || 180000);
 const ANALYSIS_POLL_MS = Number(process.env.E2E_ANALYSIS_POLL_MS || 5000);
 
@@ -201,8 +204,30 @@ const run = async () => {
 
     const finalAnalysis = await pollAnalysis(caseId, token);
     console.log(`[smoke] Analysis completed: ${finalAnalysis.status}`);
+
+    // SEC-106: with DEID_ENABLED on the server, agentic finalize must succeed (not fail at grounding).
+    if (REQUIRE_AGENTIC_DEID) {
+      const payload = finalAnalysis.data?.data || {};
+      const executionMode = payload.executionMode || payload.agenticMode;
+      const agenticRunId = payload.agenticRunId || payload.analysisRunId;
+      if (!agenticRunId) {
+        throw new Error('E2E_REQUIRE_AGENTIC_DEID: analysis succeeded but no run id returned');
+      }
+      if (executionMode && !['agentic', 'direct', 'shadow'].includes(String(executionMode))) {
+        throw new Error(
+          `E2E_REQUIRE_AGENTIC_DEID: expected agentic/shadow execution, got ${executionMode}`
+        );
+      }
+      if (!payload.summary || !Array.isArray(payload.analysisQuestions) || payload.analysisQuestions.length !== 3) {
+        throw new Error('E2E_REQUIRE_AGENTIC_DEID: clinician-facing artifact incomplete after DEID agentic run');
+      }
+      console.log(`[smoke] Agentic+DEID finalize check passed (mode=${executionMode || 'unknown'}, run=${agenticRunId})`);
+    }
   } else {
     console.log('[smoke] Analysis step skipped (set E2E_ENABLE_ANALYSIS=true to enable)');
+    if (REQUIRE_AGENTIC_DEID) {
+      throw new Error('E2E_REQUIRE_AGENTIC_DEID=true requires E2E_ENABLE_ANALYSIS=true');
+    }
   }
 
   console.log('[smoke] PASS');

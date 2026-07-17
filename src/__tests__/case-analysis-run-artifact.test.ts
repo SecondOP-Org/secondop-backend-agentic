@@ -94,6 +94,7 @@ describe('caseAnalysisRunArtifact.service', () => {
         summary: 'Baseline summary',
         topQuestions: ['Q1', 'Q2', 'Q3'],
         artifact: {} as any,
+        artifactDeidentified: {} as any,
         model: 'gpt-4.1-mini',
       },
       agenticSummary: 'Agentic summary',

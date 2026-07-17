@@ -129,6 +129,22 @@ describe('LangGraph agentic adapter', () => {
         model: 'gpt-4.1-mini',
         reports,
       }),
+      artifactDeidentified: buildCaseAnalysisArtifact({
+        structuredSummary: {
+          chief_concern: 'possible cardiac chest pressure',
+          key_report_findings: 'Clinical report text',
+          red_flags_to_discuss: 'Persistent chest pain',
+          follow_up_discussion_points: 'Serial biomarkers',
+          limitations_caveats: 'Requires clinician review',
+        },
+        specialistQuestions: [
+          'What immediate diagnostics are recommended for this patient?',
+          'Could this represent unstable angina despite normal ECG?',
+          'Which follow-up timeline is most appropriate now?',
+        ],
+        model: 'gpt-4.1-mini',
+        reports,
+      }),
       model: 'gpt-4.1-mini',
     });
   });
