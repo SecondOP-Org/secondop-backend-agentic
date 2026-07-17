@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-17 - SEC-123 - Per-case latency signal (slow flag + log, no webhook)
+
+- Status: Draft PR open; awaiting human merge approval.
+- Human approval: User ordered PC1→PC2→PC4→PC3.
+- Branch/worktree: `sec-123-per-case-latency-signal` (from SEC-122).
+- Files changed: `emitPerCaseLatencyWarnIfNeeded` + step breakdown; succeed-path wiring; unit tests.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/79
+- Checks: attention unit tests + lint/tsc.
+- Deployment: After SEC-122.
+- Verification: Slow run logs warn with slowest step; no webhook.
+- Blockers: Human merge approval.
+- Follow-ups: None for this PC batch.
+
 ## 2026-07-17 - SEC-122 - Per-case attention_reason + doctor banner + ops (PC2)
 
 - Status: Draft PR pending human merge approval.
