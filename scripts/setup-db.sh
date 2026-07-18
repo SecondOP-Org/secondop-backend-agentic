@@ -125,6 +125,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/026_analysis_
 echo "  → Running 027_analysis_run_attention_reason.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/027_analysis_run_attention_reason.sql
 
+echo "  → Running 028_imaging_study_download_audit.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/028_imaging_study_download_audit.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
