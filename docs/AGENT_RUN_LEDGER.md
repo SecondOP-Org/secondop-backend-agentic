@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-18 - SEC-125 - Patient-facing AI draft voice
+
+- Status: Draft PR pending.
+- Human approval: Required before merge.
+- Branch/worktree: `sec-125-patient-facing-draft-voice` (BE); FE `.worktrees/sec-125-fe`.
+- Files changed: `patientFacingDraft.service.ts` (Option A LLM + Option B template), `POST /doctor-response/ai-draft`, PDF `Dear [First name],` salutation; FE Insert AI draft for answers + summary; forbidden-claim/grounding checks on prose.
+- PR: (pending)
+- Checks: pending
+- Deployment: Not in scope.
+- Verification: Inserted drafts are second-person prose without field labels; clinician-facing structured_summary unchanged.
+- Blockers: none
+- Follow-ups: none
+
 ## 2026-07-17 - SEC-124 - Patient-facing analysis failure UX (PC4)
 
 - Status: Draft PR pending.
