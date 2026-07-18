@@ -30,15 +30,15 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-18 - SEC-126 - Download imaging study as .zip for native workstation
 
-- Status: Draft PRs open; awaiting human merge approval.
-- Human approval: Needed before merge/deploy.
+- Status: Merged and deployed (staging + production).
+- Human approval: User approved merge and deploy.
 - Branch/worktree: `sec-126-download-imaging-study-zip` (backend + frontend).
 - Files changed: `imagingStudyDownload.service.ts`, `file.controller.ts`, `case.routes.ts`, migration `028_imaging_study_download_audit.sql`, FE `files.ts` + Imaging download UI.
 - PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/82 · FE https://github.com/SecondOP-Org/secondop-frontend/pull/78
-- Checks: BE lint/test/build green; FE lint/build green.
-- Deployment: Needs migration 028; no secret rotation.
-- Verification: Manual — assigned doctor downloads 303-slice study → native viewer; tags de-identified.
-- Blockers: Merge/deploy need human approval.
+- Checks: BE CI green; FE CI green; post-deploy route probe 401 (auth required) on prod+staging download endpoint; `/health` 200; FE https://secondop.in 200.
+- Deployment: Railway `secondop-backend` + `secondop-backend-staging` redeployed from source; migration 028 applied to prod Postgres and staging Postgres-k0Us; Vercel production aliased to https://secondop.in.
+- Verification: Remaining manual — assigned doctor downloads 303-slice study → native viewer; tags de-identified.
+- Blockers: none
 - Follow-ups: Representative-slice open-frame / NaN size viewer polish (separate ticket); no MPR/3D in-app.
 
 ## 2026-07-18 - SEC-125 - Patient-facing AI draft voice
