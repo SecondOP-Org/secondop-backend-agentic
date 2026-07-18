@@ -57,6 +57,20 @@ describe('doctorOpinionPdf.service', () => {
     expect(text).toContain('Electronically signed by');
     expect(text).not.toContain('DRAFT');
     expect(text).toContain('Pat Smith (54 years, Female)');
+    expect(text).toContain('Dear Pat,');
+  });
+
+  it('uses patientFirstName for salutation when provided', async () => {
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      patientFirstName: 'Patricia',
+      isDraft: false,
+      reportId: 'report-salutation-001',
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('Dear Patricia,');
+    expect(text).toContain('CONFIDENTIAL');
   });
 
   it('stamps DRAFT on preview PDFs', async () => {

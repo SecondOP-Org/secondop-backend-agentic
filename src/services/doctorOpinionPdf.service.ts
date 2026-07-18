@@ -18,6 +18,8 @@ export interface DoctorOpinionPdfInput {
   caseTitle: string;
   caseNumber: string;
   patientName: string;
+  /** Optional first name for a personal salutation ("Dear Pat,"). */
+  patientFirstName?: string | null;
   doctorName: string;
   doctorSpecialty: string;
   doctorLicenseNumber?: string | null;
@@ -579,6 +581,22 @@ const renderDoctorOpinionPdf = (
 
   drawLetterhead(doc, input, reportId, reportDate);
   drawInfoGrid(doc, input);
+
+  const salutationName =
+    input.patientFirstName?.trim() ||
+    input.patientName?.trim().split(/\s+/)[0] ||
+    '';
+  if (salutationName && !/^patient$/i.test(salutationName)) {
+    ensureSpace(doc, 28);
+    doc
+      .font('Helvetica')
+      .fontSize(11)
+      .fillColor(BODY_COLOR)
+      .text(`Dear ${salutationName},`, PAGE_MARGIN, doc.y, {
+        width: CONTENT_WIDTH(doc),
+      });
+    space(doc, 12);
+  }
 
   const structuredAnswers = (input.questionAnswers || []).filter(
     (item) => item.question.trim() && item.answer.trim()

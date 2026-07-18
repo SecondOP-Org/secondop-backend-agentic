@@ -37,6 +37,8 @@ import {
   parseDoctorResponseDraft,
   parseDoctorResponseSend,
 } from '../schemas/doctorResponse.schema';
+import { parsePatientFacingDraftRequest } from '../schemas/patientFacingDraft.schema';
+import { generatePatientFacingDraftForCase } from '../services/patientFacingDraft.service';
 import { generateCaseNumber } from '../utils/caseNumber';
 import { resolveCaseId } from '../utils/caseIdentifier';
 import {
@@ -1119,6 +1121,30 @@ export const saveDoctorResponseDraftHandler = async (
   }
 };
 
+export const generatePatientFacingAiDraftHandler = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
+
+    await ensureDoctorAssignedToCase(caseId, userId);
+
+    const payload = parsePatientFacingDraftRequest(req.body);
+    const result = await generatePatientFacingDraftForCase(caseId, userId, payload);
+
+    res.json({
+      status: 'success',
+      data: result,
+      message: 'Patient-facing AI draft generated',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const uploadDoctorKeyImageHandler = async (
   req: AuthRequest,
   res: Response,
@@ -1226,6 +1252,7 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         caseTitle: row.title,
         caseNumber: row.case_number,
         patientName,
+        patientFirstName: row.patient_first_name || null,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
         doctorLicenseNumber: row.doctor_license_number || null,
@@ -1248,6 +1275,7 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         caseTitle: row.title,
         caseNumber: row.case_number,
         patientName,
+        patientFirstName: row.patient_first_name || null,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
         doctorLicenseNumber: row.doctor_license_number || null,
@@ -1337,6 +1365,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         caseTitle: row.title,
         caseNumber: row.case_number,
         patientName,
+        patientFirstName: row.patient_first_name || null,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
         doctorLicenseNumber: row.doctor_license_number || null,
@@ -1364,6 +1393,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         caseTitle: row.title,
         caseNumber: row.case_number,
         patientName,
+        patientFirstName: row.patient_first_name || null,
         doctorName,
         doctorSpecialty: row.doctor_specialty || '',
         doctorLicenseNumber: row.doctor_license_number || null,

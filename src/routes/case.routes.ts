@@ -19,6 +19,7 @@ import {
   sendDoctorOpinion,
   getDoctorResponseDraft,
   saveDoctorResponseDraftHandler,
+  generatePatientFacingAiDraftHandler,
   uploadDoctorKeyImageHandler,
   previewDoctorOpinion,
   startCaseReviewHandler,
@@ -57,6 +58,11 @@ router.get('/:caseId/internal-notes', authorize('doctor'), getCaseInternalNotesH
 router.post('/:caseId/internal-notes', authorize('doctor'), createCaseInternalNoteHandler);
 router.get('/:caseId/doctor-response', authorize('doctor'), getDoctorResponseDraft);
 router.put('/:caseId/doctor-response', authorize('doctor'), saveDoctorResponseDraftHandler);
+router.post(
+  '/:caseId/doctor-response/ai-draft',
+  authorize('doctor'),
+  generatePatientFacingAiDraftHandler
+);
 router.post(
   '/:caseId/doctor-response/key-images',
   authorize('doctor'),
