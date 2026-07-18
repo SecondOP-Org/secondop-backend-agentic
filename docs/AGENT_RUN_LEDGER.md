@@ -43,15 +43,15 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-18 - SEC-125 - Patient-facing AI draft voice
 
-- Status: Draft PR pending.
-- Human approval: Required before merge.
-- Branch/worktree: `sec-125-patient-facing-draft-voice` (BE); FE `.worktrees/sec-125-fe`.
+- Status: Merged and deployed.
+- Human approval: Explicit merge + deploy approval.
+- Branch/worktree: `sec-125-patient-facing-draft-voice` → `main`.
 - Files changed: `patientFacingDraft.service.ts` (Option A LLM + Option B template), `POST /doctor-response/ai-draft`, PDF `Dear [First name],` salutation; FE Insert AI draft for answers + summary; forbidden-claim/grounding checks on prose.
-- PR: (pending)
-- Checks: pending
-- Deployment: Not in scope.
-- Verification: Inserted drafts are second-person prose without field labels; clinician-facing structured_summary unchanged.
-- Blockers: none
+- PR: BE https://github.com/SecondOP-Org/secondop-backend-agentic/pull/81 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/77
+- Checks: CI green on both PRs; local lint/build/unit tests passed.
+- Deployment: Railway staging `b589e57f` + production `a869aa8e` on commit `b479346`; Vercel production FE `9bb2a19`.
+- Verification: `/health` ok; ai-draft route returns 401 (auth required) not 404 on staging/prod.
+- Blockers: `/version` gitSha lag observed (deployment meta shows correct commit).
 - Follow-ups: none
 
 ## 2026-07-17 - SEC-124 - Patient-facing analysis failure UX (PC4)
