@@ -30,14 +30,14 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-18 - SEC-126 - Download imaging study as .zip for native workstation
 
-- Status: Draft PR pending.
+- Status: Draft PRs open; awaiting human merge approval.
 - Human approval: Needed before merge/deploy.
 - Branch/worktree: `sec-126-download-imaging-study-zip` (backend + frontend).
 - Files changed: `imagingStudyDownload.service.ts`, `file.controller.ts`, `case.routes.ts`, migration `028_imaging_study_download_audit.sql`, FE `files.ts` + Imaging download UI.
-- PR: (pending)
-- Checks: pending (`npm run lint` / `npm test` / `npm run build` on BE; FE lint+build).
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/82 · FE https://github.com/SecondOP-Org/secondop-frontend/pull/78
+- Checks: BE lint/test/build green; FE lint/build green.
 - Deployment: Needs migration 028; no secret rotation.
-- Verification: Assigned doctor downloads study ZIP; opens in native viewer; tags remain de-identified.
+- Verification: Manual — assigned doctor downloads 303-slice study → native viewer; tags de-identified.
 - Blockers: Merge/deploy need human approval.
 - Follow-ups: Representative-slice open-frame / NaN size viewer polish (separate ticket); no MPR/3D in-app.
 
