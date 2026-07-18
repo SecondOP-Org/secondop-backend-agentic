@@ -37,6 +37,13 @@ import {
 import { queueReportExtraction } from '../services/reportExtractionBackground.service';
 import { validateImageUpload, validatePdfUpload } from '../services/reportExtraction.service';
 import { resolveStoredFilePath } from '../utils/uploadPath';
+import { isCommandCenterOperator } from '../middleware/commandCenterAuth';
+import {
+  assertStudyDownloadAccess,
+  getCaseMetaForDownload,
+  listStudyInstancesForDownload,
+  streamStudyZipToResponse,
+} from '../services/imagingStudyDownload.service';
 
 interface AuthorizedFileRow {
   id: string;
@@ -422,6 +429,38 @@ export const downloadFile = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     res.download(filePath, file.file_name);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * SEC-126: Stream an entire DICOM study as a ZIP for native workstation reading.
+ * Authz: owning patient, assigned doctor, or command-center operator.
+ * Serves de-identified stored bytes only — never re-identifies tags.
+ */
+export const downloadImagingStudy = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { caseId, studyUid } = req.params;
+    const user = req.user!;
+
+    if (!caseId || !studyUid) {
+      throw new AppError('caseId and studyUid are required', 400);
+    }
+
+    await assertStudyDownloadAccess(caseId, user.id, isCommandCenterOperator(user));
+
+    const caseMeta = await getCaseMetaForDownload(caseId);
+    const instances = await listStudyInstancesForDownload(caseId, studyUid);
+
+    await streamStudyZipToResponse({
+      res,
+      caseId: caseMeta.caseId,
+      caseNumber: caseMeta.caseNumber,
+      studyUid,
+      actorUserId: user.id,
+      instances,
+    });
   } catch (error) {
     next(error);
   }

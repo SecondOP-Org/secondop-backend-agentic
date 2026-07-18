@@ -28,6 +28,7 @@ import {
   createCaseInternalNoteHandler,
   getCaseInternalNotesHandler,
 } from '../controllers/caseTeam.controller';
+import { downloadImagingStudy } from '../controllers/file.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
 import { keyImageUpload } from '../middleware/upload';
@@ -71,6 +72,9 @@ router.post(
 );
 router.post('/:caseId/doctor-opinion/preview', authorize('doctor'), previewDoctorOpinion);
 router.post('/:caseId/doctor-opinion', authorize('doctor'), sendDoctorOpinion);
+
+// Imaging study egress — assigned doctor / owning patient / operator (SEC-126)
+router.get('/:caseId/studies/:studyUid/download', downloadImagingStudy);
 
 // Common routes
 router.get('/:caseId', getCaseById);
