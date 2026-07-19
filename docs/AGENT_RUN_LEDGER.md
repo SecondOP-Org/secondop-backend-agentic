@@ -30,16 +30,16 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-19 - SEC-129 - Image/DICOM pixel PHI redaction
 
-- Status: Draft PR pending human merge approval.
-- Human approval: User ordered implement; merge/deploy not approved.
-- Branch/worktree: `sec-129-image-pixel-phi-redaction`.
+- Status: Merged and deployed (staging + production).
+- Human approval: User approved merge and deploy.
+- Branch/worktree: `sec-129-image-pixel-phi-redaction` → `main` @ `04a8b9a`.
 - Files changed: `presidio-image-redactor/` sidecar, `imageRedaction.service.ts`, upload + imaging ingest wiring, `documentExtraction` defense-in-depth, compose `deid` profile, `IMAGE_DEID_ENABLED` env (default false), `image_phi_redactions_total` counter, unit tests.
-- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/83 (draft)
-- Checks: lint + full unit suite (263 pass) + `tsc` build passed locally.
-- Deployment: Not in scope until approved; ship dark (`IMAGE_DEID_ENABLED=false`).
-- Verification: Fixture image / US-SC path + fail-closed when redactor down.
-- Blockers: Human merge approval; validate redaction quality on real fixtures before enabling in prod.
-- Follow-ups: Railway sidecar sizing; enable flag after fixture validation.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/83
+- Checks: CI green; local lint/test/build green.
+- Deployment: Railway staging `e176d46c` + production `aef58a52` from `04a8b9a`; `IMAGE_DEID_ENABLED` unset (ship dark / default off). No new DB migrations.
+- Verification: staging + prod `/health` 200.
+- Blockers: none
+- Follow-ups: Validate redaction on real fixtures before enabling `IMAGE_DEID_ENABLED`; provision image-redactor sidecar on Railway when enabling.
 
 ## 2026-07-18 - SEC-126 - Download imaging study as .zip for native workstation
 
