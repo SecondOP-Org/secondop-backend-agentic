@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-19 - SEC-129 - Image/DICOM pixel PHI redaction
+
+- Status: Draft PR pending human merge approval.
+- Human approval: User ordered implement; merge/deploy not approved.
+- Branch/worktree: `sec-129-image-pixel-phi-redaction`.
+- Files changed: `presidio-image-redactor/` sidecar, `imageRedaction.service.ts`, upload + imaging ingest wiring, `documentExtraction` defense-in-depth, compose `deid` profile, `IMAGE_DEID_ENABLED` env (default false), `image_phi_redactions_total` counter, unit tests.
+- PR: (pending)
+- Checks: (pending local lint/test/build)
+- Deployment: Not in scope until approved; ship dark (`IMAGE_DEID_ENABLED=false`).
+- Verification: Fixture image / US-SC path + fail-closed when redactor down.
+- Blockers: Human merge approval; validate redaction quality on real fixtures before enabling in prod.
+- Follow-ups: Railway sidecar sizing; enable flag after fixture validation.
+
 ## 2026-07-18 - SEC-126 - Download imaging study as .zip for native workstation
 
 - Status: Merged and deployed (staging + production).

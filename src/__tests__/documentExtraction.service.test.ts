@@ -36,6 +36,7 @@ describe('documentExtraction.service', () => {
     process.env.OCR_VISION_FALLBACK_ENABLED = 'true';
     process.env.OCR_MIN_CHARS = '40';
     process.env.OCR_TEXTRACT_MIN_CONFIDENCE = '0.75';
+    process.env.IMAGE_DEID_ENABLED = 'false';
   });
 
   it('uses pdf-parse for digital PDFs with sufficient text', async () => {

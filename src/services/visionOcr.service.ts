@@ -51,9 +51,10 @@ export const isVisionOcrConfigured = (): boolean => {
 };
 
 /**
- * Vision OCR extracts text via an image LLM call (raw pixels leave the trust
- * boundary). Post-extraction PHI tokenization for analysis prompts happens in
- * `extractCaseReports` → `deidentifyText` before any case-analysis LLM call.
+ * Vision OCR extracts text via an image LLM call. When IMAGE_DEID_ENABLED,
+ * callers must pass already-redacted pixels (see documentExtraction /
+ * imageRedaction.service). Post-extraction PHI tokenization for analysis
+ * prompts happens in `extractCaseReports` → `deidentifyText`.
  */
 export const extractTextWithVision = async (
   imageBuffer: Buffer,

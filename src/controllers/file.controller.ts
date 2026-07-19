@@ -21,6 +21,12 @@ import {
   isDicomDeidEnabled,
   upsertDicomDeidVault,
 } from '../services/dicomDeidentification.service';
+import {
+  ImageRedactionError,
+  isImageDeidEnabled,
+  redactDicomPixelsInPlace,
+  redactImageFileInPlace,
+} from '../services/imageRedaction.service';
 import { computeFileSha256 } from '../services/fileHash.service';
 import {
   paginationMeta,
@@ -243,6 +249,20 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
     let deidResult: Awaited<ReturnType<typeof deidentifyDicomFileInPlace>> | null = null;
     if (isDicom && isDicomDeidEnabled()) {
       deidResult = await deidentifyDicomFileInPlace(filePath, createDicomDeidContext(caseId));
+    }
+
+    // Pixel PHI redaction BEFORE storage / vision-OCR (SEC-129). Fail closed when enabled.
+    try {
+      if (isDicom && isImageDeidEnabled()) {
+        await redactDicomPixelsInPlace(filePath);
+      } else if (isImage && isImageDeidEnabled()) {
+        await redactImageFileInPlace(filePath, req.file.mimetype);
+      }
+    } catch (error) {
+      if (error instanceof ImageRedactionError) {
+        throw new AppError(error.message, 503);
+      }
+      throw error;
     }
 
     const storedStats = fs.statSync(filePath);

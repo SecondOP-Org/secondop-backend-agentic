@@ -128,6 +128,7 @@ let failClosedCounter: OpenTelemetryCounter | null = null;
 let groundingRejectsCounter: OpenTelemetryCounter | null = null;
 let phiEntitiesCounter: OpenTelemetryCounter | null = null;
 let retriesCounter: OpenTelemetryCounter | null = null;
+let imagePhiRedactionsCounter: OpenTelemetryCounter | null = null;
 
 const spanStatusCode = (status: SpanStatusCode): number => {
   const fallback = status === 'ERROR' ? 2 : 1;
@@ -157,6 +158,9 @@ const initCounters = (): void => {
     });
     retriesCounter = meter.createCounter('retries_total', {
       description: 'Transient analysis run retries (SEC-121)',
+    });
+    imagePhiRedactionsCounter = meter.createCounter('image_phi_redactions_total', {
+      description: 'Image/DICOM pixel PHI redaction operations (SEC-129)',
     });
   } catch (error) {
     logger.warn('Failed to create Phoenix guardrail counters', {
@@ -311,6 +315,15 @@ export const incrementRetriesTotal = (attrs?: Record<string, string | number | b
   retriesCounter?.add(1, attrs);
 };
 
+export const incrementImagePhiRedactions = (
+  count = 1,
+  attrs?: Record<string, string | number | boolean>
+): void => {
+  if (count > 0) {
+    imagePhiRedactionsCounter?.add(count, attrs);
+  }
+};
+
 /** Rough USD estimate for span attrs only — not billing-grade. */
 export const estimateTokenCostUsd = (promptTokens: number, completionTokens: number): number => {
   const inputPerMillion = 0.4;
@@ -328,6 +341,8 @@ export const resetPhoenixObservabilityForTests = (): void => {
   failClosedCounter = null;
   groundingRejectsCounter = null;
   phiEntitiesCounter = null;
+  retriesCounter = null;
+  imagePhiRedactionsCounter = null;
 };
 
 /** Test helper: force-enable with a mock OTel API. */
@@ -344,5 +359,7 @@ export const setPhoenixOtelApiForTests = (
     failClosedCounter = null;
     groundingRejectsCounter = null;
     phiEntitiesCounter = null;
+    retriesCounter = null;
+    imagePhiRedactionsCounter = null;
   }
 };

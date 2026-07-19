@@ -9,7 +9,7 @@ const { DicomMessage, DicomDict } = dcmjs.data;
 
 const ALGORITHM = 'aes-256-gcm';
 
-/** Tags cleared or replaced (Basic Profile–style subset). Pixel data untouched. */
+/** Tags cleared or replaced (Basic Profile–style subset). Pixel PHI: see IMAGE_DEID_ENABLED / imageRedaction.service. */
 const PHI_STRING_TAGS: Array<{ tag: string; name: string; replacement: string }> = [
   { tag: '00100010', name: 'PatientName', replacement: 'ANONYMIZED' },
   { tag: '00100020', name: 'PatientID', replacement: '' },
