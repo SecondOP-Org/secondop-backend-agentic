@@ -21,6 +21,11 @@
 
 ## Note
 
-Default local/prod may keep `DEID_ENABLED=false` / `IMAGE_DEID_ENABLED=false` until sidecars and ops readiness. Check env before assuming de-id is active.
+Text de-id (`DEID_ENABLED`) and pixel de-id (`IMAGE_DEID_ENABLED`) are independent. As of SEC-130, production/staging backends set `IMAGE_DEID_ENABLED=true` with Railway services:
+
+- Staging: `secondop-presidio-image-redactor-staging`
+- Production: `secondop-presidio-image-redactor`
+
+See `presidio-image-redactor/README.md` and workspace `DEPLOYMENT_RUNBOOK.md` §8c.
 
 Supersedes root `PRESIDIO_DEIDENTIFICATION_SPEC.md` (removed).

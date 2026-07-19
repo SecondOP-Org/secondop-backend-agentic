@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-19 - SEC-130 - Enable IMAGE_DEID (Railway image-redactor)
+
+- Status: Sidecars deployed; flag enabled on staging + production.
+- Human approval: User said proceed on SEC-129 follow-up (enable IMAGE_DEID).
+- Branch/worktree: `sec-130-enable-image-deid` (Dockerfile/libGL + spaCy fix; docs).
+- Files changed: `presidio-image-redactor/Dockerfile`, `requirements.txt`, `railway.toml`; runbook section 8c.
+- PR: (pending)
+- Checks: Sidecar staging+prod `/health` 200; `POST /redact-image` 200; backend staging+prod `/health` 200 after env set.
+- Deployment: Railway services `secondop-presidio-image-redactor-staging` + `secondop-presidio-image-redactor`; `IMAGE_DEID_ENABLED=true` + `PRESIDIO_IMAGE_REDACTOR_URL` on both backends.
+- Verification: Blank PNG redact smoke (entity_count 0 / skipped); full burned-in PHI fixture validation still recommended.
+- Blockers: none
+- Follow-ups: Real fixture quality check; prefer private DNS for redactor URLs.
+
 ## 2026-07-19 - SEC-129 - Image/DICOM pixel PHI redaction
 
 - Status: Merged and deployed (staging + production).
