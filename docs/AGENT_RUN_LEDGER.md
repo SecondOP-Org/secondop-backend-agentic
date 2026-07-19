@@ -28,13 +28,26 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-19 - SEC-104 - Production Presidio fetch failed (closeout)
+
+- Status: Verified + documented; marking Done.
+- Human approval: User said next after SEC-130.
+- Branch/worktree: `sec-104-presidio-docs`.
+- Files changed: `docs/PRESIDIO_PRODUCTION.md`, ledger; workspace runbook §8c (local).
+- PR: (pending)
+- Checks: Prod analyzer/anonymizer `/health` 200; `POST /analyze` returns PERSON; backend runtime `fetch(PRESIDIO_ANALYZER_URL/health)` ok; `DEID_*` + `PRESIDIO_*` keys present on staging/prod.
+- Deployment: Config already applied (no new deploy required for closeout).
+- Verification: Full patient UI re-run of analysis not executed here; connectivity path that caused `fetch failed` is confirmed fixed.
+- Blockers: none
+- Follow-ups: Prefer private DNS for prod Presidio URLs.
+
 ## 2026-07-19 - SEC-130 - Enable IMAGE_DEID (Railway image-redactor)
 
 - Status: Sidecars deployed; flag enabled on staging + production.
 - Human approval: User said proceed on SEC-129 follow-up (enable IMAGE_DEID).
 - Branch/worktree: `sec-130-enable-image-deid` (Dockerfile/libGL + spaCy fix; docs).
 - Files changed: `presidio-image-redactor/Dockerfile`, `requirements.txt`, `railway.toml`; runbook section 8c.
-- PR: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/85 → `579d43c`
 - Checks: Sidecar staging+prod `/health` 200; `POST /redact-image` 200; backend staging+prod `/health` 200 after env set.
 - Deployment: Railway services `secondop-presidio-image-redactor-staging` + `secondop-presidio-image-redactor`; `IMAGE_DEID_ENABLED=true` + `PRESIDIO_IMAGE_REDACTOR_URL` on both backends.
 - Verification: Blank PNG redact smoke (entity_count 0 / skipped); full burned-in PHI fixture validation still recommended.
