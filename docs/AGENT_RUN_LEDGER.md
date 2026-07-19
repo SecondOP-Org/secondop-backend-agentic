@@ -34,8 +34,8 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: User ordered implement; merge/deploy not approved.
 - Branch/worktree: `sec-129-image-pixel-phi-redaction`.
 - Files changed: `presidio-image-redactor/` sidecar, `imageRedaction.service.ts`, upload + imaging ingest wiring, `documentExtraction` defense-in-depth, compose `deid` profile, `IMAGE_DEID_ENABLED` env (default false), `image_phi_redactions_total` counter, unit tests.
-- PR: (pending)
-- Checks: (pending local lint/test/build)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/83 (draft)
+- Checks: lint + full unit suite (263 pass) + `tsc` build passed locally.
 - Deployment: Not in scope until approved; ship dark (`IMAGE_DEID_ENABLED=false`).
 - Verification: Fixture image / US-SC path + fail-closed when redactor down.
 - Blockers: Human merge approval; validate redaction quality on real fixtures before enabling in prod.
