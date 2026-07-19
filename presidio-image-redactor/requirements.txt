@@ -7,3 +7,5 @@ presidio-analyzer==2.2.358
 presidio-image-redactor==0.0.56
 # OCR engine used by Presidio image redactor
 pytesseract==0.3.13
+# Headless OpenCV avoids libGL crashes in slim containers
+opencv-python-headless==4.13.0.92
