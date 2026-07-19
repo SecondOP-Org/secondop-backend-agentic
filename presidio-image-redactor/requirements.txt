@@ -1,0 +1,9 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+python-multipart==0.0.20
+pillow==11.2.1
+pydicom==3.0.1
+presidio-analyzer==2.2.358
+presidio-image-redactor==0.0.56
+# OCR engine used by Presidio image redactor
+pytesseract==0.3.13

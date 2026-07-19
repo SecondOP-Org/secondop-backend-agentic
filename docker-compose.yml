@@ -101,6 +101,25 @@ services:
       retries: 10
       start_period: 30s
 
+  # Pixel PHI redaction (burned-in text on images / US-SC DICOM). SEC-129.
+  # Start with the deid profile; enable with IMAGE_DEID_ENABLED=true.
+  presidio-image-redactor:
+    build:
+      context: ./presidio-image-redactor
+    container_name: secondop-presidio-image-redactor
+    profiles: ["deid"]
+    restart: unless-stopped
+    environment:
+      PRESIDIO_MIN_SCORE: ${PRESIDIO_MIN_SCORE:-0.5}
+    ports:
+      - "${PRESIDIO_IMAGE_REDACTOR_PORT:-5003}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
 volumes:
   secondop_postgres_data:
   secondop_pgadmin_data:

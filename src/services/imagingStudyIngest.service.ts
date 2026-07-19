@@ -12,6 +12,11 @@ import {
   upsertDicomDeidVault,
   type DicomDeidContext,
 } from './dicomDeidentification.service';
+import {
+  ImageRedactionError,
+  isImageDeidEnabled,
+  redactDicomPixelsInPlace,
+} from './imageRedaction.service';
 import { isDicomMagicFile } from '../utils/dicomMagic';
 import { listFilesFromDicomdir } from '../utils/dicomdir';
 import { extractZipArchive } from '../utils/zipExtract';
@@ -295,6 +300,18 @@ const persistDicomInstance = async ({
   if (isDicomDeidEnabled()) {
     const context = deidContext || createDicomDeidContext(caseId);
     deidResult = await deidentifyDicomFileInPlace(destination, context);
+  }
+
+  // Pixel PHI redaction after tag de-id; US/SC/XC/OT (+ RGB) only — CT/MR skipped (SEC-129).
+  if (isImageDeidEnabled()) {
+    try {
+      await redactDicomPixelsInPlace(destination);
+    } catch (error) {
+      if (error instanceof ImageRedactionError) {
+        throw new AppError(error.message, 503);
+      }
+      throw error;
+    }
   }
 
   const stats = await fs.stat(destination);

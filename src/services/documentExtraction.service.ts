@@ -7,6 +7,7 @@ import {
   extractTextWithVision,
   isVisionOcrConfigured,
 } from './visionOcr.service';
+import { ensureImageBufferRedacted } from './imageRedaction.service';
 
 export type DocumentExtractionMethod =
   | 'pdf-parse'
@@ -193,7 +194,9 @@ export const extractTextFromReportFile = async (
   const config = getOcrConfig();
 
   if (isImageMimeType(mimeType)) {
-    const ocrResult = await runOcrFallback(buffer, mimeType, fileName);
+    // Defense in depth: ensure pixels are redacted before Textract/vision leave the boundary.
+    const safeBuffer = await ensureImageBufferRedacted(buffer, mimeType, fileName);
+    const ocrResult = await runOcrFallback(safeBuffer, mimeType, fileName);
     if (ocrResult && ocrResult.text.length >= config.minChars) {
       return ocrResult;
     }
