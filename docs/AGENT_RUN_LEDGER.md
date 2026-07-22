@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Pending merge approval.
 - Branch/worktree: `sec-137-patient-profile-upload-inr-pay`.
 - Files changed: `src/controllers/user.controller.ts` (GET/PUT patient profile includes emergency contacts, allergies, medications, medical conditions); ledger.
-- PR: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/87 (FE: https://github.com/SecondOP-Org/secondop-frontend/pull/87)
 - Checks: `npm run lint`, `npm run build` passed.
 - Deployment: none.
 - Verification: Manual patient profile save/reload after FE PR merges.
