@@ -14,7 +14,9 @@ export const getProfile = async (req: AuthRequest, res: Response, next: NextFunc
         SELECT u.id, u.email, u.phone, u.user_type, u.is_verified,
                p.first_name, p.last_name, p.date_of_birth, p.gender,
                p.address, p.city, p.state, p.country, p.postal_code,
-               p.avatar_url, p.blood_type, p.allergies, p.current_medications
+               p.emergency_contact_name, p.emergency_contact_phone,
+               p.avatar_url, p.blood_type, p.allergies, p.current_medications,
+               p.medical_conditions
         FROM users u
         JOIN patients p ON u.id = p.user_id
         WHERE u.id = $1
@@ -64,7 +66,22 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
 
     // Update profile table based on user type
     if (userType === 'patient') {
-      const { firstName, lastName, dateOfBirth, gender, address, city, state, country, postalCode } = updates;
+      const {
+        firstName,
+        lastName,
+        dateOfBirth,
+        gender,
+        address,
+        city,
+        state,
+        country,
+        postalCode,
+        emergencyContactName,
+        emergencyContactPhone,
+        allergies,
+        currentMedications,
+        medicalConditions,
+      } = updates;
       await query(
         `UPDATE patients SET 
          first_name = COALESCE($1, first_name),
@@ -76,9 +93,30 @@ export const updateProfile = async (req: AuthRequest, res: Response, next: NextF
          state = COALESCE($7, state),
          country = COALESCE($8, country),
          postal_code = COALESCE($9, postal_code),
+         emergency_contact_name = COALESCE($10, emergency_contact_name),
+         emergency_contact_phone = COALESCE($11, emergency_contact_phone),
+         allergies = COALESCE($12, allergies),
+         current_medications = COALESCE($13, current_medications),
+         medical_conditions = COALESCE($14, medical_conditions),
          updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $10`,
-        [firstName, lastName, dateOfBirth, gender, address, city, state, country, postalCode, userId]
+         WHERE user_id = $15`,
+        [
+          firstName,
+          lastName,
+          dateOfBirth,
+          gender,
+          address,
+          city,
+          state,
+          country,
+          postalCode,
+          emergencyContactName,
+          emergencyContactPhone,
+          allergies,
+          currentMedications,
+          medicalConditions,
+          userId,
+        ]
       );
     } else {
       const {

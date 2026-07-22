@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-22 - SEC-137 - Patient profile PUT fields for persistence
+
+- Status: Ready for review (paired with frontend SEC-137).
+- Human approval: Pending merge approval.
+- Branch/worktree: `sec-137-patient-profile-upload-inr-pay`.
+- Files changed: `src/controllers/user.controller.ts` (GET/PUT patient profile includes emergency contacts, allergies, medications, medical conditions); ledger.
+- PR: (pending)
+- Checks: `npm run lint`, `npm run build` passed.
+- Deployment: none.
+- Verification: Manual patient profile save/reload after FE PR merges.
+- Blockers: none
+- Follow-ups: none
+
 ## 2026-07-19 - SEC-104 - Production Presidio fetch failed (closeout)
 
 - Status: Verified + documented; marking Done.
