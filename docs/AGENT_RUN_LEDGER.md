@@ -30,16 +30,16 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-22 - SEC-137 - Patient profile PUT fields for persistence
 
-- Status: Ready for review (paired with frontend SEC-137).
-- Human approval: Pending merge approval.
-- Branch/worktree: `sec-137-patient-profile-upload-inr-pay`.
+- Status: Merged and deployed (staging + production).
+- Human approval: User said merge and deploy.
+- Branch/worktree: `sec-137-patient-profile-upload-inr-pay` → `main` @ `8a727f8`.
 - Files changed: `src/controllers/user.controller.ts` (GET/PUT patient profile includes emergency contacts, allergies, medications, medical conditions); ledger.
-- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/87 (FE: https://github.com/SecondOP-Org/secondop-frontend/pull/87)
-- Checks: `npm run lint`, `npm run build` passed.
-- Deployment: none.
-- Verification: Manual patient profile save/reload after FE PR merges.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/87 (FE: https://github.com/SecondOP-Org/secondop-frontend/pull/87 → `4d2b011`)
+- Checks: BE CI green on PR; local lint/build green; FE CI green.
+- Deployment: Railway staging `6688af2e` + production `4b5a7439`; Vercel production promote `secondop-frontend` (`dpl_DrMuagYaoedw8K7rRsExGdrXnMex` → secondop.in) + `secondop-fe-deploy`.
+- Verification: staging/prod `/health` 200; prod CORS allows `https://secondop.in`; `secondop.in` 200; unauth patient profile route 401 (route present). Full logged-in UI smoke not run here.
 - Blockers: none
-- Follow-ups: none
+- Follow-ups: gitSha metadata still reports older SHA on Railway `/version` (pre-existing; deploy IDs confirm new releases).
 
 ## 2026-07-19 - SEC-104 - Production Presidio fetch failed (closeout)
 
