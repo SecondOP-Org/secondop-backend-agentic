@@ -1,5 +1,10 @@
+import fs from 'fs';
+import path from 'path';
 import {
   generateDoctorOpinionPdfBuffer,
+  LAST_NAME_REDACTION,
+  redactLastName,
+  resolveLogoPath,
   type DoctorOpinionPdfInput,
 } from '../services/doctorOpinionPdf.service';
 
@@ -40,6 +45,23 @@ const baseInput = (): DoctorOpinionPdfInput => ({
 });
 
 describe('doctorOpinionPdf.service', () => {
+  it('redactLastName replaces only the final name token', () => {
+    expect(redactLastName('Pat Smith')).toBe(`Pat ${LAST_NAME_REDACTION}`);
+    expect(redactLastName('Dr. Doc Jones')).toBe(`Dr. Doc ${LAST_NAME_REDACTION}`);
+    expect(redactLastName('Madonna')).toBe('Madonna');
+    expect(redactLastName('')).toBe('—');
+  });
+
+  it('resolves a high-resolution app brand logo asset', () => {
+    const logoPath = resolveLogoPath();
+    expect(logoPath).toBeTruthy();
+    expect(fs.existsSync(logoPath!)).toBe(true);
+    // Prefer ≥4× the 28pt draw size so the mark stays sharp in print/PDF zoom.
+    const abs = path.resolve(logoPath!);
+    expect(abs.endsWith('secondop-logo.png')).toBe(true);
+    expect(fs.statSync(abs).size).toBeGreaterThan(1000);
+  });
+
   it('generates a valid PDF with summary-first branded content', async () => {
     const buffer = await generateDoctorOpinionPdfBuffer({
       ...baseInput(),
@@ -53,11 +75,41 @@ describe('doctorOpinionPdf.service', () => {
     expect(text).toContain('Independent Second Opinion');
     expect(text).toContain('Clinical Impression');
     expect(text).toContain('CONFIDENTIAL');
-    expect(text).toContain('report-final-001');
     expect(text).toContain('Electronically signed by');
     expect(text).not.toContain('DRAFT');
-    expect(text).toContain('Pat Smith (54 years, Female)');
     expect(text).toContain('Dear Pat,');
+  });
+
+  it('does not print Report ID / GUID on the PDF', async () => {
+    const guid = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      isDraft: false,
+      reportId: guid,
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).not.toMatch(/Report ID/i);
+    expect(text).not.toContain(guid);
+    expect(text).not.toContain('report-final-001');
+    expect(text).toContain('Case ref: SO-1001');
+    expect(text).toMatch(/Generated /);
+  });
+
+  it('redacts patient and doctor last names with a visible marker', async () => {
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      isDraft: false,
+      reportId: 'report-redact-001',
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain(`Pat ${LAST_NAME_REDACTION} (54 years, Female)`);
+    expect(text).toContain(`Dr. Doc ${LAST_NAME_REDACTION}`);
+    expect(text).not.toContain('Pat Smith');
+    expect(text).not.toContain('Doc Jones');
+    expect(text).not.toMatch(/Smith/);
+    expect(text).not.toMatch(/Jones/);
   });
 
   it('uses patientFirstName for salutation when provided', async () => {
@@ -85,20 +137,66 @@ describe('doctorOpinionPdf.service', () => {
     expect(text).toContain('Pending signature');
   });
 
-  it('supports legacy clinicalResponse without structured Q&A', async () => {
+  it('uses signedAt for Report date when present, not generation time', async () => {
+    const signedAt = '2026-07-21T12:00:00.000Z';
+    const expectedReportDate = new Date(signedAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
     const buffer = await generateDoctorOpinionPdfBuffer({
-      caseTitle: 'Legacy case',
-      caseNumber: 'SO-2002',
-      patientName: 'Alex Doe',
-      doctorName: 'Dr. Lee',
-      doctorSpecialty: 'Neurology',
-      clinicalResponse: 'Legacy free-text clinical opinion body.',
+      ...baseInput(),
       isDraft: false,
-      reportId: 'report-legacy-001',
+      signedAt,
+      reportId: 'report-signed-date-001',
     });
 
     const text = extractPdfText(buffer);
-    expect(text).toContain('Clinical Opinion');
-    expect(text).toContain('Legacy free-text');
+    expect(text).toContain(`Report date: ${expectedReportDate}`);
+    expect(text).toContain(expectedReportDate);
+    expect(text).toMatch(/Generated /);
+  });
+
+  it('falls back to generation date for unsigned draft Report date', async () => {
+    const before = Date.now();
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      isDraft: true,
+      signedAt: null,
+      reportId: 'report-draft-date-001',
+    });
+    const after = Date.now();
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('DRAFT');
+
+    const possibleDates = new Set<string>();
+    for (let t = before; t <= after; t += 60_000) {
+      possibleDates.add(
+        new Date(t).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      );
+    }
+    possibleDates.add(
+      new Date(before).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    );
+    possibleDates.add(
+      new Date(after).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    );
+
+    const matched = [...possibleDates].some((date) => text.includes(`Report date: ${date}`));
+    expect(matched).toBe(true);
   });
 });
