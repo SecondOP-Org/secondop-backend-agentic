@@ -85,20 +85,68 @@ describe('doctorOpinionPdf.service', () => {
     expect(text).toContain('Pending signature');
   });
 
-  it('supports legacy clinicalResponse without structured Q&A', async () => {
+  it('uses signedAt for Report date when present, not generation time', async () => {
+    const signedAt = '2026-07-21T12:00:00.000Z';
+    const expectedReportDate = new Date(signedAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+
     const buffer = await generateDoctorOpinionPdfBuffer({
-      caseTitle: 'Legacy case',
-      caseNumber: 'SO-2002',
-      patientName: 'Alex Doe',
-      doctorName: 'Dr. Lee',
-      doctorSpecialty: 'Neurology',
-      clinicalResponse: 'Legacy free-text clinical opinion body.',
+      ...baseInput(),
       isDraft: false,
-      reportId: 'report-legacy-001',
+      signedAt,
+      reportId: 'report-signed-date-001',
     });
 
     const text = extractPdfText(buffer);
-    expect(text).toContain('Clinical Opinion');
-    expect(text).toContain('Legacy free-text');
+    expect(text).toContain(`Report date: ${expectedReportDate}`);
+    // Info-grid label is drawn as uppercase "REPORT DATE" then the value nearby.
+    expect(text).toContain(expectedReportDate);
+    // Footer provenance remains a Generated line (true generation time).
+    expect(text).toMatch(/Generated /);
+  });
+
+  it('falls back to generation date for unsigned draft Report date', async () => {
+    const before = Date.now();
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      isDraft: true,
+      signedAt: null,
+      reportId: 'report-draft-date-001',
+    });
+    const after = Date.now();
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('DRAFT');
+
+    const possibleDates = new Set<string>();
+    for (let t = before; t <= after; t += 60_000) {
+      possibleDates.add(
+        new Date(t).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      );
+    }
+    possibleDates.add(
+      new Date(before).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    );
+    possibleDates.add(
+      new Date(after).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    );
+
+    const matched = [...possibleDates].some((date) => text.includes(`Report date: ${date}`));
+    expect(matched).toBe(true);
   });
 });

@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-23 - SEC-147 - Doctor opinion PDF REPORT DATE uses signedAt
+
+- Status: Draft PR open; awaiting merge approval.
+- Human approval: pending.
+- Branch/worktree: `sec-147-pdf-report-date-signedat`.
+- Files changed: `doctorOpinionPdf.service.ts`, `doctorOpinionPdf.service.test.ts`, ledger.
+- PR: (pending)
+- Checks: PDF unit tests (signedAt Report date); lint/build green.
+- Deployment: none.
+- Verification: asserts Report date equals signedAt when present; drafts fall back to generation date; footer Generated line unchanged.
+- Blockers: none.
+- Follow-ups: none.
+
 ## 2026-07-22 - SEC-137 - Patient profile PUT fields for persistence
 
 - Status: Merged and deployed (staging + production).

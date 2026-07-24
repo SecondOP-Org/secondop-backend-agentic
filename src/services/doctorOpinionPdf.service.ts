@@ -222,7 +222,11 @@ const drawLetterhead = (
   space(doc, 14);
 };
 
-const drawInfoGrid = (doc: PDFKit.PDFDocument, input: DoctorOpinionPdfInput): void => {
+const drawInfoGrid = (
+  doc: PDFKit.PDFDocument,
+  input: DoctorOpinionPdfInput,
+  reportDate: string
+): void => {
   ensureSpace(doc, 90);
   const colGap = 24;
   const colWidth = (CONTENT_WIDTH(doc) - colGap) / 2;
@@ -273,7 +277,7 @@ const drawInfoGrid = (doc: PDFKit.PDFDocument, input: DoctorOpinionPdfInput): vo
     input.doctorLicenseNumber?.trim() || '—'
   );
   rightY = drawLabeled(rightX, rightY, 'Case submitted', formatDisplayDate(input.submittedDate));
-  rightY = drawLabeled(rightX, rightY, 'Report date', formatDisplayDate(new Date()));
+  rightY = drawLabeled(rightX, rightY, 'Report date', reportDate);
 
   doc.y = Math.max(leftY, rightY);
   space(doc, 4);
@@ -577,10 +581,12 @@ const renderDoctorOpinionPdf = (
   reportId: string,
   generatedAt: Date
 ): void => {
-  const reportDate = formatDisplayDate(generatedAt);
+  // Signed opinions freeze REPORT DATE to signedAt; drafts fall back to generation time.
+  // Footer "Generated …" always uses generatedAt for provenance.
+  const reportDate = formatDisplayDate(input.signedAt || generatedAt);
 
   drawLetterhead(doc, input, reportId, reportDate);
-  drawInfoGrid(doc, input);
+  drawInfoGrid(doc, input, reportDate);
 
   const salutationName =
     input.patientFirstName?.trim() ||
