@@ -1,4 +1,8 @@
 import { ExtractedReport } from './reportExtraction.service';
+import {
+  isNavOrOcrJunkSnippet,
+  isProseLikeEvidenceSnippet,
+} from './extractedReportSanitize.service';
 
 export interface TokenUsageMetrics {
   promptTokens: number;
@@ -113,15 +117,38 @@ const tokenizeForOverlap = (value: string): string[] =>
     .split(/[^a-z0-9]+/)
     .filter((word) => word.length >= 3);
 
-const getReportChunks = (report: ExtractedReport): string[] =>
-  report.text
+const getReportChunks = (report: ExtractedReport): string[] => {
+  const chunks = report.text
     .split(/[.!?\n]+/)
     .map((chunk) => chunk.trim())
     .filter((chunk) => chunk.length >= 12);
 
+  const proseChunks = chunks.filter((chunk) => isProseLikeEvidenceSnippet(chunk));
+  if (proseChunks.length > 0) {
+    return proseChunks;
+  }
+
+  // Fallback: keep chunks that are not obvious chrome (need some lowercase density).
+  return chunks.filter((chunk) => {
+    if (isNavOrOcrJunkSnippet(chunk)) {
+      return false;
+    }
+    const letters = chunk.replace(/[^a-zA-Z]/g, '');
+    if (!letters) {
+      return false;
+    }
+    const lowercase = (chunk.match(/[a-z]/g) || []).length;
+    return lowercase / letters.length >= 0.15;
+  });
+};
+
 const scoreChunkOverlap = (sectionWords: string[], chunk: string): number => {
   const normalizedChunk = normalizeForMatch(chunk);
-  return sectionWords.filter((word) => normalizedChunk.includes(word)).length;
+  let score = sectionWords.filter((word) => normalizedChunk.includes(word)).length;
+  if (isProseLikeEvidenceSnippet(chunk)) {
+    score += 1;
+  }
+  return score;
 };
 
 const matchEvidenceInReports = (
@@ -149,10 +176,14 @@ const matchEvidenceInReports = (
       if (normalizedCandidate.length >= 12 && normalizedReport.includes(normalizedCandidate.slice(0, 120))) {
         const startIndex = normalizedReport.indexOf(normalizedCandidate.slice(0, 120));
         const rawSnippet = report.text.slice(startIndex, startIndex + 220).trim();
+        const snippet = rawSnippet || candidate.slice(0, 220);
+        if (isNavOrOcrJunkSnippet(snippet) && !isProseLikeEvidenceSnippet(snippet)) {
+          continue;
+        }
         return {
           fileId: report.fileId,
           fileName: report.fileName,
-          snippet: rawSnippet || candidate.slice(0, 220),
+          snippet,
         };
       }
     }
@@ -241,7 +272,7 @@ export const findBestEffortEvidenceSnippet = (
     }
 
     const trimmed = report.text.trim();
-    if (trimmed.length >= 12) {
+    if (trimmed.length >= 12 && !isNavOrOcrJunkSnippet(trimmed)) {
       return {
         fileId: report.fileId,
         fileName: report.fileName,
