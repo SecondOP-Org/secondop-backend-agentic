@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {
+  DOCTOR_OPINION_PDF_LAYOUT,
   generateDoctorOpinionPdfBuffer,
   LAST_NAME_REDACTION,
   redactLastName,
@@ -72,12 +73,13 @@ describe('doctorOpinionPdf.service', () => {
 
     expect(buffer.subarray(0, 4).toString('utf8')).toBe('%PDF');
     const text = extractPdfText(buffer);
-    expect(text).toContain('Independent Second Opinion');
+    expect(text).toContain('SecondOp');
     expect(text).toContain('Clinical Impression');
     expect(text).toContain('CONFIDENTIAL');
     expect(text).toContain('Electronically signed by');
     expect(text).not.toContain('DRAFT');
     expect(text).toContain('Dear Pat,');
+    expect(text).not.toContain('Independent Second Opinion');
   });
 
   it('does not print Report ID / GUID on the PDF', async () => {
@@ -198,5 +200,39 @@ describe('doctorOpinionPdf.service', () => {
 
     const matched = [...possibleDates].some((date) => text.includes(`Report date: ${date}`));
     expect(matched).toBe(true);
+  });
+
+  it('reserves a bottom margin large enough for the footer band', () => {
+    expect(DOCTOR_OPINION_PDF_LAYOUT.bottomMargin).toBe(
+      DOCTOR_OPINION_PDF_LAYOUT.pageMargin + DOCTOR_OPINION_PDF_LAYOUT.footerReserved
+    );
+    expect(DOCTOR_OPINION_PDF_LAYOUT.footerReserved).toBeGreaterThanOrEqual(100);
+  });
+
+  it('paginates long clinical content instead of colliding with the footer', async () => {
+    const paragraph =
+      'The reviewing specialist carefully considered history, exam findings, labs, and imaging. ';
+    const longAnswer = paragraph.repeat(60);
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      summary: paragraph.repeat(25),
+      questionAnswers: Array.from({ length: 6 }, (_, index) => ({
+        questionId: `sq-${index + 1}`,
+        question: `What is the recommended next step for item ${index + 1}?`,
+        answer: longAnswer,
+      })),
+      aiAssistedReview: true,
+      isDraft: false,
+      reportId: 'report-footer-pagination-001',
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('CONFIDENTIAL');
+    expect(text).toContain('Generated ');
+    const pageMatch = text.match(/Page 1 of (\d+)/);
+    expect(pageMatch).toBeTruthy();
+    expect(Number(pageMatch![1])).toBeGreaterThan(1);
+    // Footer markers must remain present on a multi-page report.
+    expect(text).toMatch(/Page \d+ of \d+/);
   });
 });
