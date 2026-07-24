@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-23 - SEC-154 - Opinion PDF icon, hide GUID, redact last names
+
+- Status: Ready for review.
+- Human approval: Pending merge approval.
+- Branch/worktree: `sec-154-opinion-pdf-icon-guid-redact`.
+- Files changed: `src/services/doctorOpinionPdf.service.ts` (app brand mark PNG 256px + vector fallback; remove Report ID from letterhead/footer; redact patient/doctor last names as `[REDACTED]`); `assets/secondop-logo.png` + `assets/secondop-mark.svg`; PDF unit tests; ledger.
+- PR: (pending)
+- Checks: `npm test -- --testPathPattern=doctorOpinionPdf.service.test`, `npm run lint`, `npm run build` passed.
+- Deployment: none.
+- Verification: Unit coverage for logo path, no GUID/Report ID, redacted names, signedAt date preserved.
+- Blockers: none
+- Follow-ups: SEC-152 canonical brand across FE/favicon still product-decision blocked; local BE nodemon may need restart to pick up assets.
+
 ## 2026-07-22 - SEC-137 - Patient profile PUT fields for persistence
 
 - Status: Merged and deployed (staging + production).

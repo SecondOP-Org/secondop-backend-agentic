@@ -58,12 +58,32 @@ const PAGE_MARGIN = 50;
 const FOOTER_RESERVED = 72;
 const CONTENT_WIDTH = (doc: PDFKit.PDFDocument) => doc.page.width - PAGE_MARGIN * 2;
 
+/** WinAnsi-safe visible redaction marker (PDF Helvetica cannot reliably render █). */
+export const LAST_NAME_REDACTION = '[REDACTED]';
+
+/**
+ * Redact the last whitespace-separated name token for display.
+ * "Pat Smith" → "Pat [REDACTED]"; "Dr. Doc Jones" → "Dr. Doc [REDACTED]".
+ * Single-token names are left unchanged (no last name to redact).
+ */
+export const redactLastName = (fullName: string): string => {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return '—';
+  }
+  if (parts.length === 1) {
+    return parts[0];
+  }
+  return [...parts.slice(0, -1), LAST_NAME_REDACTION].join(' ');
+};
+
 const resolveUploadDir = (): string => {
   const configured = process.env.UPLOAD_DIR || './uploads';
   return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
 };
 
-const resolveLogoPath = (): string | null => {
+/** High-res app mark (navy square + white shield) — same chrome as UnifiedHeader. */
+export const resolveLogoPath = (): string | null => {
   const candidates = [
     path.resolve(process.cwd(), 'assets/secondop-logo.png'),
     path.resolve(__dirname, '../../assets/secondop-logo.png'),
@@ -78,6 +98,39 @@ const resolveLogoPath = (): string | null => {
     }
   }
   return null;
+};
+
+/** Draw the in-app brand mark when the PNG cannot be embedded. */
+const drawAppBrandMarkFallback = (doc: PDFKit.PDFDocument, x: number, y: number, size: number): void => {
+  doc.save();
+  doc.translate(x, y);
+  const scale = size / 64;
+  doc.scale(scale);
+  doc.roundedRect(0, 0, 64, 64, 14).fill(BRAND_COLOR);
+  // Same shield path as public/secondop-favicon.svg / header icon.
+  doc
+    .path(
+      'M32 13.5 16 20.2v12.6c0 10 6.8 19.3 16 22.2 9.2-2.9 16-12.2 16-22.2V20.2L32 13.5Zm0 5.4 10.7 4.5v9.4c0 7.3-4.7 14.7-10.7 17.4-6-2.7-10.7-10.1-10.7-17.4v-9.4L32 18.9Z'
+    )
+    .fill('#FFFFFF');
+  doc.restore();
+};
+
+const drawLetterheadBrandMark = (doc: PDFKit.PDFDocument, x: number, y: number, size: number): void => {
+  const logoPath = resolveLogoPath();
+  if (logoPath) {
+    try {
+      doc.image(logoPath, x, y, { width: size, height: size });
+      return;
+    } catch (_error) {
+      // fall through to vector mark
+    }
+  }
+  try {
+    drawAppBrandMarkFallback(doc, x, y, size);
+  } catch (_error) {
+    doc.roundedRect(x, y, size, size, 6).fill(BRAND_COLOR);
+  }
 };
 
 const formatDisplayDate = (value?: string | Date | null): string => {
@@ -166,23 +219,13 @@ const drawBodyText = (
 const drawLetterhead = (
   doc: PDFKit.PDFDocument,
   input: DoctorOpinionPdfInput,
-  reportId: string,
   reportDate: string
 ): void => {
-  const logoPath = resolveLogoPath();
   const metaX = PAGE_MARGIN + CONTENT_WIDTH(doc) * 0.55;
   const metaWidth = CONTENT_WIDTH(doc) * 0.45;
   const topY = PAGE_MARGIN;
 
-  if (logoPath) {
-    try {
-      doc.image(logoPath, PAGE_MARGIN, topY, { width: 28, height: 28 });
-    } catch (_error) {
-      doc.roundedRect(PAGE_MARGIN, topY, 28, 28, 6).fill(BRAND_COLOR);
-    }
-  } else {
-    doc.roundedRect(PAGE_MARGIN, topY, 28, 28, 6).fill(BRAND_COLOR);
-  }
+  drawLetterheadBrandMark(doc, PAGE_MARGIN, topY, 28);
 
   doc
     .font('Helvetica-Bold')
@@ -191,11 +234,8 @@ const drawLetterhead = (
     .text('SecondOp', PAGE_MARGIN + 36, topY + 5, { width: 200, lineBreak: false });
 
   doc.font('Helvetica').fontSize(8).fillColor(MUTED_COLOR);
-  const metaLines = [
-    `Report ID: ${reportId}`,
-    `Report date: ${reportDate}`,
-    `Case ref: ${input.caseNumber}`,
-  ];
+  // Do not print Report ID / GUID — case ref is the patient-facing identifier.
+  const metaLines = [`Report date: ${reportDate}`, `Case ref: ${input.caseNumber}`];
   let metaY = topY;
   for (const line of metaLines) {
     doc.text(line, metaX, metaY, { width: metaWidth, align: 'right' });
@@ -222,7 +262,11 @@ const drawLetterhead = (
   space(doc, 14);
 };
 
-const drawInfoGrid = (doc: PDFKit.PDFDocument, input: DoctorOpinionPdfInput): void => {
+const drawInfoGrid = (
+  doc: PDFKit.PDFDocument,
+  input: DoctorOpinionPdfInput,
+  reportDate: string
+): void => {
   ensureSpace(doc, 90);
   const colGap = 24;
   const colWidth = (CONTENT_WIDTH(doc) - colGap) / 2;
@@ -273,7 +317,7 @@ const drawInfoGrid = (doc: PDFKit.PDFDocument, input: DoctorOpinionPdfInput): vo
     input.doctorLicenseNumber?.trim() || '—'
   );
   rightY = drawLabeled(rightX, rightY, 'Case submitted', formatDisplayDate(input.submittedDate));
-  rightY = drawLabeled(rightX, rightY, 'Report date', formatDisplayDate(new Date()));
+  rightY = drawLabeled(rightX, rightY, 'Report date', reportDate);
 
   doc.y = Math.max(leftY, rightY);
   space(doc, 4);
@@ -509,7 +553,6 @@ const drawDraftWatermark = (doc: PDFKit.PDFDocument): void => {
 const drawFooter = (
   doc: PDFKit.PDFDocument,
   input: DoctorOpinionPdfInput,
-  reportId: string,
   generatedAt: Date
 ): void => {
   const disclaimerParts = [
@@ -521,7 +564,7 @@ const drawFooter = (
     );
   }
   const disclaimer = disclaimerParts.join(' ');
-  const metaLine = `Report ID: ${reportId} · Generated ${formatDisplayDateTime(generatedAt)} · secondop.in`;
+  const metaLine = `Generated ${formatDisplayDateTime(generatedAt)} · secondop.in`;
 
   const range = doc.bufferedPageRange();
   for (let pageIndex = range.start; pageIndex < range.start + range.count; pageIndex += 1) {
@@ -571,16 +614,24 @@ const drawFooter = (
   }
 };
 
+const withRedactedDisplayNames = (input: DoctorOpinionPdfInput): DoctorOpinionPdfInput => ({
+  ...input,
+  patientName: redactLastName(input.patientName),
+  doctorName: redactLastName(input.doctorName),
+});
+
 const renderDoctorOpinionPdf = (
   doc: PDFKit.PDFDocument,
   input: DoctorOpinionPdfInput,
-  reportId: string,
   generatedAt: Date
 ): void => {
-  const reportDate = formatDisplayDate(generatedAt);
+  // Signed opinions freeze REPORT DATE to signedAt; drafts fall back to generation time.
+  // Footer "Generated …" always uses generatedAt for provenance.
+  const reportDate = formatDisplayDate(input.signedAt || generatedAt);
+  const display = withRedactedDisplayNames(input);
 
-  drawLetterhead(doc, input, reportId, reportDate);
-  drawInfoGrid(doc, input);
+  drawLetterhead(doc, display, reportDate);
+  drawInfoGrid(doc, display, reportDate);
 
   const salutationName =
     input.patientFirstName?.trim() ||
@@ -633,13 +684,13 @@ const renderDoctorOpinionPdf = (
     drawKeyImages(doc, keyImages);
   }
 
-  drawSignatureBlock(doc, input);
+  drawSignatureBlock(doc, display);
 
   if (input.isDraft) {
     drawDraftWatermark(doc);
   }
 
-  drawFooter(doc, input, reportId, generatedAt);
+  drawFooter(doc, display, generatedAt);
 };
 
 const createPdfDocument = (input: DoctorOpinionPdfInput): PDFKit.PDFDocument =>
@@ -657,7 +708,7 @@ const createPdfDocument = (input: DoctorOpinionPdfInput): PDFKit.PDFDocument =>
     },
   });
 
-const pipePdfToBuffer = (input: DoctorOpinionPdfInput, reportId: string): Promise<Buffer> =>
+const pipePdfToBuffer = (input: DoctorOpinionPdfInput): Promise<Buffer> =>
   new Promise((resolve, reject) => {
     const generatedAt = new Date();
     const doc = createPdfDocument(input);
@@ -668,18 +719,14 @@ const pipePdfToBuffer = (input: DoctorOpinionPdfInput, reportId: string): Promis
     doc.on('error', reject);
 
     try {
-      renderDoctorOpinionPdf(doc, input, reportId, generatedAt);
+      renderDoctorOpinionPdf(doc, input, generatedAt);
       doc.end();
     } catch (error) {
       reject(error);
     }
   });
 
-const pipePdfToFile = (
-  input: DoctorOpinionPdfInput,
-  filePath: string,
-  reportId: string
-): Promise<void> =>
+const pipePdfToFile = (input: DoctorOpinionPdfInput, filePath: string): Promise<void> =>
   new Promise((resolve, reject) => {
     const generatedAt = new Date();
     const doc = createPdfDocument(input);
@@ -688,7 +735,7 @@ const pipePdfToFile = (
     doc.pipe(stream);
 
     try {
-      renderDoctorOpinionPdf(doc, input, reportId, generatedAt);
+      renderDoctorOpinionPdf(doc, input, generatedAt);
       doc.end();
     } catch (error) {
       reject(error);
@@ -705,10 +752,7 @@ export const buildDoctorOpinionOriginalName = (caseNumber: string): string =>
 
 export const generateDoctorOpinionPdfBuffer = async (
   input: DoctorOpinionPdfInput
-): Promise<Buffer> => {
-  const reportId = input.reportId?.trim() || uuidv4();
-  return pipePdfToBuffer(input, reportId);
-};
+): Promise<Buffer> => pipePdfToBuffer(input);
 
 export const generateDoctorOpinionPdf = async (
   input: DoctorOpinionPdfInput
@@ -721,7 +765,7 @@ export const generateDoctorOpinionPdf = async (
   const filePath = path.join(uploadDir, filename);
   const originalName = buildDoctorOpinionOriginalName(input.caseNumber);
 
-  await pipePdfToFile(input, filePath, reportId);
+  await pipePdfToFile(input, filePath);
 
   const stats = fs.statSync(filePath);
 
