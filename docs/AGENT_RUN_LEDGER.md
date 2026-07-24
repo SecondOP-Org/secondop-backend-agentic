@@ -30,16 +30,29 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 
 ## 2026-07-24 - SEC-162 - Opinion PDF body must not overlay footer
 
-- Status: Draft PR pending review.
+- Status: Merged (PR #92).
 - Human approval: User reported overlay on prod case PDF and asked to check and fix.
 - Branch/worktree: `sec-162-pdf-footer-overlay`.
 - Files changed: `src/services/doctorOpinionPdf.service.ts` (bottom margin includes footer band; larger FOOTER_RESERVED; callout/Q&A pagination fixes); PDF unit tests; ledger.
-- PR: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/92
 - Checks: `npm test -- --testPathPattern=doctorOpinionPdf.service.test`; lint; build.
-- Deployment: not yet.
+- Deployment: pending production deploy.
 - Verification: long-content PDF paginates (Page 1 of N, N>1) with CONFIDENTIAL footer retained.
 - Blockers: none
 - Follow-ups: regenerate/preview PDF for case ecee6762… after deploy.
+
+## 2026-07-24 - SEC-161 - Patient-facing case ref never GUID
+
+- Status: Merged (PR #91, rebased after SEC-162).
+- Human approval: User requested PDF/customer docs must not show GUID case numbers.
+- Branch/worktree: `sec-161-patient-facing-case-ref`.
+- Files changed: `src/utils/caseNumber.ts` (`toPatientFacingCaseRef`); `doctorOpinionPdf.service.ts`; `imagingStudyDownload.service.ts`; tests; ledger.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/91
+- Checks: targeted jest + lint + build passed.
+- Deployment: pending production deploy.
+- Verification: PDF with `SO-{uuid}` asserts short `SO-XXXXXXXX` only.
+- Blockers: none
+- Follow-ups: optional DB backfill of legacy `case_number` (out of scope).
 
 ## 2026-07-23 - SEC-154 - Opinion PDF icon, hide GUID, redact last names
 

@@ -98,6 +98,21 @@ describe('doctorOpinionPdf.service', () => {
     expect(text).toMatch(/Generated /);
   });
 
+  it('prints a short SO-XXXXXXXX case ref when caseNumber is a GUID', async () => {
+    const guid = '43f96bb4-a058-4da6-b319-0a6bf6bc3b34';
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      caseNumber: `SO-${guid}`,
+      isDraft: false,
+      reportId: 'report-case-ref-001',
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('Case ref: SO-43F96BB4');
+    expect(text).not.toContain(guid);
+    expect(text).not.toContain(`SO-${guid}`);
+  });
+
   it('redacts patient and doctor last names with a visible marker', async () => {
     const buffer = await generateDoctorOpinionPdfBuffer({
       ...baseInput(),
