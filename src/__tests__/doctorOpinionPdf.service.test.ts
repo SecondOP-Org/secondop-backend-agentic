@@ -73,12 +73,13 @@ describe('doctorOpinionPdf.service', () => {
 
     expect(buffer.subarray(0, 4).toString('utf8')).toBe('%PDF');
     const text = extractPdfText(buffer);
-    expect(text).toContain('Independent Second Opinion');
+    expect(text).toContain('SecondOp');
     expect(text).toContain('Clinical Impression');
     expect(text).toContain('CONFIDENTIAL');
     expect(text).toContain('Electronically signed by');
     expect(text).not.toContain('DRAFT');
     expect(text).toContain('Dear Pat,');
+    expect(text).not.toContain('Independent Second Opinion');
   });
 
   it('does not print Report ID / GUID on the PDF', async () => {

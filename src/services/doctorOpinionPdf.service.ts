@@ -261,16 +261,6 @@ const drawLetterhead = (
     .lineTo(doc.page.width - PAGE_MARGIN, doc.y)
     .stroke();
   space(doc, 14);
-
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(20)
-    .fillColor(BODY_COLOR)
-    .text('Independent Second Opinion', PAGE_MARGIN, doc.y, {
-      width: CONTENT_WIDTH(doc),
-      align: 'left',
-    });
-  space(doc, 14);
 };
 
 const drawInfoGrid = (
@@ -731,7 +721,7 @@ const createPdfDocument = (input: DoctorOpinionPdfInput): PDFKit.PDFDocument =>
     // Keep content streams plaintext so reports remain searchable and tests can assert copy.
     compress: false,
     info: {
-      Title: `SecondOp Independent Second Opinion — ${input.caseNumber}`,
+      Title: `SecondOp Opinion — ${input.caseNumber}`,
       Author: 'SecondOp',
       Subject: 'Second opinion report',
       Keywords: 'second opinion, clinical report, SecondOp',
