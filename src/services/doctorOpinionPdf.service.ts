@@ -55,8 +55,18 @@ const BODY_COLOR = '#1F2937';
 const MUTED_COLOR = '#6B7280';
 const RULE_COLOR = '#223B6C';
 const PAGE_MARGIN = 50;
-const FOOTER_RESERVED = 72;
+/** Vertical band reserved for the per-page footer (rule + PHI + disclaimer + meta). */
+const FOOTER_RESERVED = 100;
+/** PDFKit bottom margin must include the footer band so body text auto-paginates above it. */
+const BOTTOM_MARGIN = PAGE_MARGIN + FOOTER_RESERVED;
 const CONTENT_WIDTH = (doc: PDFKit.PDFDocument) => doc.page.width - PAGE_MARGIN * 2;
+
+/** Exported for tests — body content must stay above this inset from the page bottom. */
+export const DOCTOR_OPINION_PDF_LAYOUT = {
+  pageMargin: PAGE_MARGIN,
+  footerReserved: FOOTER_RESERVED,
+  bottomMargin: BOTTOM_MARGIN,
+} as const;
 
 /** WinAnsi-safe visible redaction marker (PDF Helvetica cannot reliably render █). */
 export const LAST_NAME_REDACTION = '[REDACTED]';
@@ -172,7 +182,8 @@ const space = (doc: PDFKit.PDFDocument, pts = 10): void => {
 };
 
 const ensureSpace = (doc: PDFKit.PDFDocument, requiredHeight: number): void => {
-  const bottom = doc.page.height - PAGE_MARGIN - FOOTER_RESERVED;
+  // Prefer PDFKit's margin-aware maxY so this stays aligned with auto page breaks.
+  const bottom = doc.page.maxY();
   if (doc.y + requiredHeight > bottom) {
     doc.addPage();
   }
@@ -333,13 +344,21 @@ const drawCalloutBox = (doc: PDFKit.PDFDocument, title: string, body: string): v
   const accentWidth = 3;
   const textWidth = boxWidth - padding * 2 - accentWidth;
 
-  const textStartY = doc.y + padding;
   doc.font('Helvetica').fontSize(10.5).fillColor(BODY_COLOR);
   const textHeight = doc.heightOfString(body, { width: textWidth, lineGap: 3 });
   const boxHeight = textHeight + padding * 2;
+  const maxBoxHeight = Math.max(80, doc.page.maxY() - doc.y - 8);
+
+  // Very tall impressions: flow as normal body text so PDFKit can paginate above the footer.
+  if (boxHeight > maxBoxHeight) {
+    drawBodyText(doc, body);
+    space(doc, 10);
+    return;
+  }
 
   ensureSpace(doc, boxHeight + 8);
   const boxY = doc.y;
+  const textStartY = boxY + padding;
 
   doc.save();
   doc.rect(boxX, boxY, boxWidth, boxHeight).fill(CREAM_COLOR);
@@ -360,11 +379,13 @@ const drawQaBlock = (
   item: DoctorOpinionQuestionAnswer
 ): void => {
   const answerIndent = 16;
-  const estimated =
-    40 +
-    doc.heightOfString(item.question, { width: CONTENT_WIDTH(doc) - 28 }) +
-    doc.heightOfString(item.answer, { width: CONTENT_WIDTH(doc) - answerIndent - 8 });
-  ensureSpace(doc, Math.min(estimated, 120));
+  doc.font('Helvetica-Bold').fontSize(10.5);
+  const questionHeight = doc.heightOfString(`${index}. ${item.question}`, {
+    width: CONTENT_WIDTH(doc) - 24,
+    lineGap: 2,
+  });
+  // Reserve room for the question chip + label; the answer itself paginates via bottom margin.
+  ensureSpace(doc, Math.min(40 + questionHeight + 36, 160));
 
   const chipY = doc.y;
   doc.roundedRect(PAGE_MARGIN, chipY, 18, 14, 3).fill(BRAND_COLOR);
@@ -396,17 +417,20 @@ const drawQaBlock = (
     width: CONTENT_WIDTH(doc) - answerIndent,
   });
   space(doc, 2);
-  const ruleStart = answerTop;
+  const ruleStart = doc.y;
   drawBodyText(doc, item.answer, { indent: answerIndent, width: CONTENT_WIDTH(doc) - answerIndent });
-  const ruleEnd = doc.y;
-  doc
-    .strokeColor(BRAND_COLOR)
-    .opacity(0.35)
-    .lineWidth(2)
-    .moveTo(PAGE_MARGIN + 4, ruleStart)
-    .lineTo(PAGE_MARGIN + 4, ruleEnd)
-    .stroke();
-  doc.opacity(1);
+  const ruleEnd = Math.min(doc.y, doc.page.maxY());
+  // Only draw the accent rule on the page where the answer started (avoid spanning footers).
+  if (ruleEnd > ruleStart) {
+    doc
+      .strokeColor(BRAND_COLOR)
+      .opacity(0.35)
+      .lineWidth(2)
+      .moveTo(PAGE_MARGIN + 4, ruleStart)
+      .lineTo(PAGE_MARGIN + 4, ruleEnd)
+      .stroke();
+    doc.opacity(1);
+  }
   space(doc, 12);
 };
 
@@ -570,7 +594,8 @@ const drawFooter = (
   for (let pageIndex = range.start; pageIndex < range.start + range.count; pageIndex += 1) {
     doc.switchToPage(pageIndex);
     const pageWidth = CONTENT_WIDTH(doc);
-    const footerTop = doc.page.height - PAGE_MARGIN - FOOTER_RESERVED + 8;
+    // Footer sits inside the reserved bottom margin band (not in the body flow area).
+    const footerTop = doc.page.height - BOTTOM_MARGIN + 8;
 
     doc
       .strokeColor(BRAND_COLOR)
@@ -695,7 +720,13 @@ const renderDoctorOpinionPdf = (
 
 const createPdfDocument = (input: DoctorOpinionPdfInput): PDFKit.PDFDocument =>
   new PDFDocument({
-    margin: PAGE_MARGIN,
+    // Bottom margin includes the footer band so PDFKit page-breaks body text above it.
+    margins: {
+      top: PAGE_MARGIN,
+      left: PAGE_MARGIN,
+      right: PAGE_MARGIN,
+      bottom: BOTTOM_MARGIN,
+    },
     bufferPages: true,
     // Keep content streams plaintext so reports remain searchable and tests can assert copy.
     compress: false,

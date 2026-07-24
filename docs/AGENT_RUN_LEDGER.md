@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-24 - SEC-162 - Opinion PDF body must not overlay footer
+
+- Status: Draft PR pending review.
+- Human approval: User reported overlay on prod case PDF and asked to check and fix.
+- Branch/worktree: `sec-162-pdf-footer-overlay`.
+- Files changed: `src/services/doctorOpinionPdf.service.ts` (bottom margin includes footer band; larger FOOTER_RESERVED; callout/Q&A pagination fixes); PDF unit tests; ledger.
+- PR: (pending)
+- Checks: `npm test -- --testPathPattern=doctorOpinionPdf.service.test`; lint; build.
+- Deployment: not yet.
+- Verification: long-content PDF paginates (Page 1 of N, N>1) with CONFIDENTIAL footer retained.
+- Blockers: none
+- Follow-ups: regenerate/preview PDF for case ecee6762… after deploy.
+
 ## 2026-07-23 - SEC-154 - Opinion PDF icon, hide GUID, redact last names
 
 - Status: Ready for review.
