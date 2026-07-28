@@ -21,6 +21,7 @@ import {
 } from './deidentification.service';
 import { upsertDeidVault } from './deidVault.service';
 import { getPresidioConfig } from './presidioConfig.service';
+import { sanitizeExtractedReportText } from './extractedReportSanitize.service';
 
 export interface ExtractedReport {
   fileId: string;
@@ -243,7 +244,7 @@ export const extractCaseReports = async (
       });
     }
 
-    const boundedText = text.slice(0, maxCharsPerFile);
+    const boundedText = sanitizeExtractedReportText(text).slice(0, maxCharsPerFile);
     if (boundedText.length < minChars) {
       const shortError = `extracted text too short (${boundedText.length} chars).`;
       extractionIssues.push(`${row.file_name}: ${shortError}`);

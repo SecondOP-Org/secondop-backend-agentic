@@ -54,6 +54,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Blockers: none
 - Follow-ups: optional DB backfill of legacy `case_number` (out of scope).
 
+## 2026-07-23 - SEC-145 - Evidence chip reject OCR/nav junk
+
+- Status: Rebased onto main; merging PR #88.
+- Human approval: User approved merge of remaining conflicted PRs.
+- Branch/worktree: `sec-145-evidence-chip-reject-ocr-junk`.
+- Files changed: `extractedReportSanitize.service.ts` (new), `reportExtraction.service.ts`, `analysisArtifact.service.ts`, `extracted-report-sanitize.test.ts`, ledger.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/88
+- Checks: lint / test / build.
+- Deployment: pending with this merge.
+- Verification: unit coverage of junk chip + groundedness; live case re-analysis not run here.
+- Blockers: none.
+- Follow-ups: re-run analysis on junk-chip case then re-capture `ai-summary.jpg` (SEC-148).
+
 ## 2026-07-23 - SEC-154 - Opinion PDF icon, hide GUID, redact last names
 
 - Status: Ready for review.
