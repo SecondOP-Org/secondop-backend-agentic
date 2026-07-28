@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import PDFDocument from 'pdfkit';
 import { v4 as uuidv4 } from 'uuid';
+import { toPatientFacingCaseRef } from '../utils/caseNumber';
 
 export interface DoctorOpinionQuestionAnswer {
   questionId: string;
@@ -635,6 +636,11 @@ const withRedactedDisplayNames = (input: DoctorOpinionPdfInput): DoctorOpinionPd
   doctorName: redactLastName(input.doctorName),
 });
 
+const withCustomerFacingFields = (input: DoctorOpinionPdfInput): DoctorOpinionPdfInput => ({
+  ...withRedactedDisplayNames(input),
+  caseNumber: toPatientFacingCaseRef(input.caseNumber),
+});
+
 const renderDoctorOpinionPdf = (
   doc: PDFKit.PDFDocument,
   input: DoctorOpinionPdfInput,
@@ -643,7 +649,7 @@ const renderDoctorOpinionPdf = (
   // Signed opinions freeze REPORT DATE to signedAt; drafts fall back to generation time.
   // Footer "Generated …" always uses generatedAt for provenance.
   const reportDate = formatDisplayDate(input.signedAt || generatedAt);
-  const display = withRedactedDisplayNames(input);
+  const display = withCustomerFacingFields(input);
 
   drawLetterhead(doc, display, reportDate);
   drawInfoGrid(doc, display, reportDate);
@@ -708,8 +714,9 @@ const renderDoctorOpinionPdf = (
   drawFooter(doc, display, generatedAt);
 };
 
-const createPdfDocument = (input: DoctorOpinionPdfInput): PDFKit.PDFDocument =>
-  new PDFDocument({
+const createPdfDocument = (input: DoctorOpinionPdfInput): PDFKit.PDFDocument => {
+  const caseRef = toPatientFacingCaseRef(input.caseNumber);
+  return new PDFDocument({
     // Bottom margin includes the footer band so PDFKit page-breaks body text above it.
     margins: {
       top: PAGE_MARGIN,
@@ -721,13 +728,14 @@ const createPdfDocument = (input: DoctorOpinionPdfInput): PDFKit.PDFDocument =>
     // Keep content streams plaintext so reports remain searchable and tests can assert copy.
     compress: false,
     info: {
-      Title: `SecondOp Opinion — ${input.caseNumber}`,
+      Title: `SecondOp Opinion — ${caseRef}`,
       Author: 'SecondOp',
       Subject: 'Second opinion report',
       Keywords: 'second opinion, clinical report, SecondOp',
       CreationDate: new Date(),
     },
   });
+};
 
 const pipePdfToBuffer = (input: DoctorOpinionPdfInput): Promise<Buffer> =>
   new Promise((resolve, reject) => {
@@ -768,8 +776,10 @@ const pipePdfToFile = (input: DoctorOpinionPdfInput, filePath: string): Promise<
     doc.on('error', reject);
   });
 
-export const buildDoctorOpinionOriginalName = (caseNumber: string): string =>
-  `SecondOp-Opinion-${caseNumber.replace(/[^a-zA-Z0-9-]/g, '')}.pdf`;
+export const buildDoctorOpinionOriginalName = (caseNumber: string): string => {
+  const caseRef = toPatientFacingCaseRef(caseNumber);
+  return `SecondOp-Opinion-${caseRef.replace(/[^a-zA-Z0-9-]/g, '')}.pdf`;
+};
 
 export const generateDoctorOpinionPdfBuffer = async (
   input: DoctorOpinionPdfInput

@@ -3,6 +3,7 @@ import path from 'path';
 import { Response } from 'express';
 import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
+import { toPatientFacingCaseRef } from '../utils/caseNumber';
 import { resolveStoredFilePath } from '../utils/uploadPath';
 import logger from '../utils/logger';
 
@@ -113,7 +114,10 @@ export const getCaseMetaForDownload = async (caseId: string): Promise<StudyDownl
   }
   return {
     caseId: result.rows[0].id as string,
-    caseNumber: String(result.rows[0].case_number || caseId),
+    caseNumber: toPatientFacingCaseRef(
+      result.rows[0].case_number as string | null | undefined,
+      result.rows[0].id as string
+    ),
   };
 };
 
