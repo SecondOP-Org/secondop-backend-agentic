@@ -880,15 +880,6 @@ export const assignDoctorToCase = async (req: AuthRequest, res: Response, next: 
     }
 
     await ensurePatientOwnsCase(caseId, userId);
-
-    const doctorExists = await query(
-      'SELECT id, verification_status FROM doctors WHERE id = $1',
-      [doctorId]
-    );
-    if (doctorExists.rows.length === 0) {
-      throw new AppError('Doctor not found', 404);
-    }
-
     await ensureDoctorCredentialVerifiedByDoctorId(doctorId);
 
     await query(

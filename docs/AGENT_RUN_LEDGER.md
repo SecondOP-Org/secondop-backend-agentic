@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-29 - SEC-174 - Unified canSignOpinion gate (doctor + org)
+
+- Status: In progress (draft PR).
+- Human approval: User asked to work next hybrid item after §1.
+- Branch/worktree: `sec-174-unified-cansign-gate` (stacked on SEC-173).
+- Files changed: `doctorVerification.service.ts` (`canSignOpinion` / `assertCanSignOpinion` + JOIN orgs); assign/sign use helpers; tests for solo + org-member cases.
+- PR: TBD
+- Checks: pending
+- Deployment: not yet; depends on SEC-173 merge + migration 030
+- Verification: pending
+- Blockers: stacked on SEC-173 / PR #94
+- Follow-ups: SEC-170 org invites
+
 ## 2026-07-29 - SEC-173 - Hybrid §1 organizations foundation
 
 - Status: In progress (foundation PR).
