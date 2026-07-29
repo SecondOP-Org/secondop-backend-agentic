@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-29 - SEC-170 - Org invites + admin org verification
+
+- Status: In progress (implementation).
+- Human approval: User asked to proceed with hybrid plan after SEC-173/174 merge.
+- Branch/worktree: `sec-170-org-invites` (BE), `sec-170-org-invites-fe` (FE).
+- Files changed: migration `031_organization_invites.sql`; `organization.service` invite + admin verify; org routes/controller; auth register `inviteToken`; admin `/organization-verifications`; email invite builder; unit tests.
+- PR: TBD
+- Checks: pending
+- Deployment: apply migration 031 (and 030 if not yet) before BE deploy
+- Verification: pending
+- Blockers: none yet
+- Follow-ups: draft BE+FE PRs; mark Linear In Review; wait for merge approval
+
 ## 2026-07-29 - SEC-174 - Unified canSignOpinion gate (doctor + org)
 
 - Status: In progress (draft PR).
