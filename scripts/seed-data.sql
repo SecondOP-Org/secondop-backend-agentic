@@ -44,11 +44,11 @@ BEGIN
   SELECT id INTO williams_user_id FROM users WHERE email = 'dr.williams@secondop.com';
   SELECT id INTO patient_user_id FROM users WHERE email = 'patient@example.com';
 
-  INSERT INTO doctors (user_id, first_name, last_name, specialty, sub_specialties, license_number, years_of_experience, hospital_affiliation, education, certifications, languages, bio, consultation_fee, rating, review_count, country, city, is_verified, is_available)
+  INSERT INTO doctors (user_id, first_name, last_name, specialty, sub_specialties, license_number, years_of_experience, hospital_affiliation, education, certifications, languages, bio, consultation_fee, rating, review_count, country, city, is_verified, is_available, registration_council, verification_status, verified_at)
   VALUES
-    (smith_user_id, 'John', 'Smith', 'Cardiology', ARRAY['Interventional Cardiology', 'Heart Failure'], 'MD123456', 15, 'Mayo Clinic', ARRAY['MD - Harvard Medical School', 'Residency - Johns Hopkins'], ARRAY['Board Certified Cardiologist', 'FACC'], ARRAY['English', 'Spanish'], 'Dr. Smith is a board-certified cardiologist with over 15 years of experience in treating complex cardiac conditions.', 150.00, 4.8, 127, 'United States', 'Rochester, MN', true, true),
-    (johnson_user_id, 'Emily', 'Johnson', 'Oncology', ARRAY['Breast Cancer', 'Lung Cancer'], 'MD789012', 12, 'MD Anderson Cancer Center', ARRAY['MD - Stanford University', 'Fellowship - Memorial Sloan Kettering'], ARRAY['Board Certified Oncologist', 'ASCO Member'], ARRAY['English', 'French'], 'Dr. Johnson specializes in personalized cancer treatment with a focus on breast and lung cancers.', 175.00, 4.9, 203, 'United States', 'Houston, TX', true, true),
-    (williams_user_id, 'Michael', 'Williams', 'Neurology', ARRAY['Stroke', 'Epilepsy', 'Movement Disorders'], 'MD345678', 20, 'Cleveland Clinic', ARRAY['MD - Yale School of Medicine', 'Residency - Massachusetts General Hospital'], ARRAY['Board Certified Neurologist', 'FAAN'], ARRAY['English', 'German', 'Italian'], 'Dr. Williams is a renowned neurologist with expertise in stroke management and movement disorders.', 200.00, 4.7, 156, 'United States', 'Cleveland, OH', true, true)
+    (smith_user_id, 'John', 'Smith', 'Cardiology', ARRAY['Interventional Cardiology', 'Heart Failure'], 'MD123456', 15, 'Mayo Clinic', ARRAY['MD - Harvard Medical School', 'Residency - Johns Hopkins'], ARRAY['Board Certified Cardiologist', 'FACC'], ARRAY['English', 'Spanish'], 'Dr. Smith is a board-certified cardiologist with over 15 years of experience in treating complex cardiac conditions.', 150.00, 4.8, 127, 'United States', 'Rochester, MN', true, true, 'Minnesota Board of Medical Practice', 'verified', CURRENT_TIMESTAMP),
+    (johnson_user_id, 'Emily', 'Johnson', 'Oncology', ARRAY['Breast Cancer', 'Lung Cancer'], 'MD789012', 12, 'MD Anderson Cancer Center', ARRAY['MD - Stanford University', 'Fellowship - Memorial Sloan Kettering'], ARRAY['Board Certified Oncologist', 'ASCO Member'], ARRAY['English', 'French'], 'Dr. Johnson specializes in personalized cancer treatment with a focus on breast and lung cancers.', 175.00, 4.9, 203, 'United States', 'Houston, TX', true, true, 'Texas Medical Board', 'verified', CURRENT_TIMESTAMP),
+    (williams_user_id, 'Michael', 'Williams', 'Neurology', ARRAY['Stroke', 'Epilepsy', 'Movement Disorders'], 'MD345678', 20, 'Cleveland Clinic', ARRAY['MD - Yale School of Medicine', 'Residency - Massachusetts General Hospital'], ARRAY['Board Certified Neurologist', 'FAAN'], ARRAY['English', 'German', 'Italian'], 'Dr. Williams is a renowned neurologist with expertise in stroke management and movement disorders.', 200.00, 4.7, 156, 'United States', 'Cleveland, OH', true, true, 'State Medical Board of Ohio', 'verified', CURRENT_TIMESTAMP)
   ON CONFLICT (user_id) DO UPDATE
   SET first_name = EXCLUDED.first_name,
       last_name = EXCLUDED.last_name,
@@ -68,6 +68,9 @@ BEGIN
       city = EXCLUDED.city,
       is_verified = EXCLUDED.is_verified,
       is_available = EXCLUDED.is_available,
+      registration_council = EXCLUDED.registration_council,
+      verification_status = 'verified',
+      verified_at = COALESCE(doctors.verified_at, CURRENT_TIMESTAMP),
       updated_at = CURRENT_TIMESTAMP;
 
   INSERT INTO patients (user_id, first_name, last_name, date_of_birth, gender, address, city, state, country, postal_code, blood_type)

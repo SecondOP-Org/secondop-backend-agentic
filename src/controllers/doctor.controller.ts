@@ -10,7 +10,9 @@ export const getDoctors = async (req: AuthRequest, res: Response, next: NextFunc
     let queryStr = `SELECT d.*, u.email, u.phone 
                     FROM doctors d 
                     JOIN users u ON d.user_id = u.id 
-                    WHERE d.is_verified = true AND d.is_available = true`;
+                    WHERE d.verification_status = 'verified'
+                      AND d.is_verified = true
+                      AND d.is_available = true`;
     const params: any[] = [];
 
     if (specialty) {
@@ -78,7 +80,8 @@ export const searchDoctors = async (req: AuthRequest, res: Response, next: NextF
       `SELECT d.*, u.email 
        FROM doctors d
        JOIN users u ON d.user_id = u.id
-       WHERE d.is_verified = true 
+       WHERE d.verification_status = 'verified'
+       AND d.is_verified = true
        AND (
          d.first_name ILIKE $1 OR 
          d.last_name ILIKE $1 OR 

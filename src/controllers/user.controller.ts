@@ -28,7 +28,9 @@ export const getProfile = async (req: AuthRequest, res: Response, next: NextFunc
                d.license_number, d.years_of_experience, d.hospital_affiliation,
                d.education, d.certifications, d.languages, d.bio,
                d.consultation_fee, d.rating, d.review_count, d.avatar_url,
-               d.country, d.city, d.is_verified as doctor_verified, d.is_available
+               d.country, d.city, d.is_verified as doctor_verified, d.is_available,
+               d.registration_council, d.npi, d.verification_status, d.verification_reason,
+               d.verified_at
         FROM users u
         JOIN doctors d ON u.id = d.user_id
         WHERE u.id = $1

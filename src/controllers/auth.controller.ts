@@ -14,6 +14,7 @@ import {
   queueEmail,
 } from '../services/email.service';
 import logger from '../utils/logger';
+import { normalizeDoctorSpecialty } from '../constants/doctorSpecialties';
 
 // Helper function to generate JWT token
 const generateToken = (userId: string, email: string, userType: 'patient' | 'doctor') => {
@@ -94,16 +95,51 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           [user.id, firstName, lastName]
         );
       } else {
-        // For doctors, we need additional fields
-        const { specialty, licenseNumber } = req.body;
-        if (!specialty || !licenseNumber) {
-          throw new AppError('Specialty and license number required for doctors', 400);
+        // Credential fields for manual verification (SEC-169). New doctors start pending.
+        const {
+          specialty,
+          licenseNumber,
+          registrationNumber,
+          registrationCouncil,
+          country,
+          npi,
+        } = req.body;
+        const registrationId =
+          typeof registrationNumber === 'string' && registrationNumber.trim()
+            ? registrationNumber.trim()
+            : typeof licenseNumber === 'string'
+              ? licenseNumber.trim()
+              : '';
+        const council =
+          typeof registrationCouncil === 'string' ? registrationCouncil.trim() : '';
+        const jurisdiction = typeof country === 'string' ? country.trim() : '';
+        const npiValue = typeof npi === 'string' && npi.trim() ? npi.trim() : null;
+        const normalizedSpecialty =
+          typeof specialty === 'string' ? normalizeDoctorSpecialty(specialty) : null;
+
+        if (!normalizedSpecialty || !registrationId || !council || !jurisdiction) {
+          throw new AppError(
+            'Specialty (from allowed list), registration council, registration number, and country are required for doctors',
+            400
+          );
         }
 
         await client.query(
-          `INSERT INTO doctors (user_id, first_name, last_name, specialty, license_number)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [user.id, firstName, lastName, specialty, licenseNumber]
+          `INSERT INTO doctors (
+             user_id, first_name, last_name, specialty, license_number,
+             registration_council, country, npi, verification_status, is_verified
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', false)`,
+          [
+            user.id,
+            firstName,
+            lastName,
+            normalizedSpecialty,
+            registrationId,
+            council,
+            jurisdiction,
+            npiValue,
+          ]
         );
       }
 

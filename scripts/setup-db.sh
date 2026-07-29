@@ -128,6 +128,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/027_analysis_
 echo "  → Running 028_imaging_study_download_audit.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/028_imaging_study_download_audit.sql
 
+echo "  → Running 029_doctor_credential_verification.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/029_doctor_credential_verification.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
