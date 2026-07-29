@@ -56,6 +56,13 @@ export interface Doctor {
   city?: string;
   is_verified: boolean;
   is_available: boolean;
+  registration_council?: string | null;
+  npi?: string | null;
+  verification_status: 'pending' | 'verified' | 'rejected';
+  verification_reason?: string | null;
+  verified_at?: Date | null;
+  verified_by?: string | null;
+  organization_id?: string | null;
   created_at: Date;
   updated_at: Date;
 }

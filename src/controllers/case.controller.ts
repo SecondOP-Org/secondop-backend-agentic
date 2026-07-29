@@ -33,6 +33,10 @@ import {
 import { recordAiDraftEditRatioOnSend } from '../services/doctorEditDistance.service';
 import { startCaseReview } from '../services/doctorCaseWorkflow.service';
 import {
+  ensureDoctorCredentialVerifiedByDoctorId,
+  ensureDoctorCredentialVerifiedByUserId,
+} from '../services/doctorVerification.service';
+import {
   isStructuredDoctorResponsePayload,
   parseDoctorResponseDraft,
   parseDoctorResponseSend,
@@ -873,10 +877,15 @@ export const assignDoctorToCase = async (req: AuthRequest, res: Response, next: 
 
     await ensurePatientOwnsCase(caseId, userId);
 
-    const doctorExists = await query('SELECT id FROM doctors WHERE id = $1', [doctorId]);
+    const doctorExists = await query(
+      'SELECT id, verification_status FROM doctors WHERE id = $1',
+      [doctorId]
+    );
     if (doctorExists.rows.length === 0) {
       throw new AppError('Doctor not found', 404);
     }
+
+    await ensureDoctorCredentialVerifiedByDoctorId(doctorId);
 
     await query(
       `INSERT INTO case_assignments (case_id, doctor_id, status)
@@ -1305,6 +1314,7 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
     const userId = req.user!.id;
 
     await ensureDoctorAssignedToCase(caseId, userId);
+    await ensureDoctorCredentialVerifiedByUserId(userId);
 
     const caseResult = await query(
       `SELECT c.id, c.title, c.case_number, c.submitted_date,

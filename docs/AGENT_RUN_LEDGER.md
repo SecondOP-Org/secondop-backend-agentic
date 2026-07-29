@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-29 - SEC-169 - Doctor signup credential verification gate
+
+- Status: Implementation complete; draft PR pending human merge approval.
+- Human approval: User tasked `DOCTOR_SIGNUP_VERIFICATION_SPEC.md` Phase 1.
+- Branch/worktree: `sec-169-doctor-signup-credential-verification` (backend); FE `sec-169-doctor-credential-verification`.
+- Files changed: migration `029_doctor_credential_verification.sql`; `doctorVerification.service.ts` + admin controller/routes; auth register credential fields + `pending`; case assign + opinion-sign 403 gates; profile fields; demo/seed backfill `verified`; public doctor listing also requires `verification_status=verified`; tests.
+- PR: pending
+- Checks: targeted jest (`doctor-credential-verification`, `demo-data`); lint/build pending in same run.
+- Deployment: not started (needs migration + human approval).
+- Verification: API rejects assign/sign for non-verified doctors; admin approve/reject writes `doctor_verification_events`.
+- Blockers: none for code; production migrate must run before FE gate is meaningful.
+- Follow-ups: Phase 2 org/team ([SEC-170](https://linear.app/secondop/issue/SEC-170)); optional admin UI beyond operator API; automated registry lookup later.
+
 ## 2026-07-24 - SEC-162 - Opinion PDF body must not overlay footer
 
 - Status: Merged (PR #92).

@@ -9,6 +9,10 @@ import {
 import { getServiceHealth } from '../controllers/serviceHealth.controller';
 import { getShadowParity } from '../controllers/shadowParity.controller';
 import { getFleetAnalysisRuns } from '../controllers/fleetAnalysisRuns.controller';
+import {
+  listDoctorVerifications,
+  updateDoctorVerification,
+} from '../controllers/doctorVerification.controller';
 import { authenticate } from '../middleware/auth';
 import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
 
@@ -24,6 +28,13 @@ router.get('/deployments', getDeployments);
 router.get('/ledgers/latest', getLatestLedgers);
 
 export default router;
+
+/** Sibling admin route: doctor credential verification queue (SEC-169). */
+export const doctorVerificationRouter = Router();
+doctorVerificationRouter.use(authenticate);
+doctorVerificationRouter.use(authorizeCommandCenterOperator);
+doctorVerificationRouter.get('/', listDoctorVerifications);
+doctorVerificationRouter.patch('/:doctorId', updateDoctorVerification);
 
 /** Sibling admin route: same operator allowlist as command center. */
 export const serviceHealthRouter = Router();

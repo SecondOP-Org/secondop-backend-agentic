@@ -297,6 +297,9 @@ describe('doctor response workflow', () => {
       mockedQuery
         .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
         .mockResolvedValueOnce({
+          rows: [{ id: 'doctor-row', verification_status: 'verified' }],
+        } as any)
+        .mockResolvedValueOnce({
           rows: [
             {
               id: 'case-1',
@@ -468,6 +471,9 @@ describe('doctor response workflow', () => {
     it('clears draft after successful send', async () => {
       mockedQuery
         .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+        .mockResolvedValueOnce({
+          rows: [{ id: 'doctor-row', verification_status: 'verified' }],
+        } as any)
         .mockResolvedValueOnce({
           rows: [
             {

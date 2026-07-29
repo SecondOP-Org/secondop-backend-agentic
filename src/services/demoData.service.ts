@@ -38,20 +38,21 @@ export const ensureDemoData = async (): Promise<void> => {
     `INSERT INTO doctors (
        user_id, first_name, last_name, specialty, sub_specialties, license_number,
        years_of_experience, hospital_affiliation, education, certifications, languages,
-       bio, consultation_fee, rating, review_count, country, city, is_verified, is_available
+       bio, consultation_fee, rating, review_count, country, city, is_verified, is_available,
+       registration_council, verification_status, verified_at
      )
      SELECT u.id, profile.first_name, profile.last_name, profile.specialty, profile.sub_specialties,
             profile.license_number, profile.years_of_experience, profile.hospital_affiliation,
             profile.education, profile.certifications, profile.languages, profile.bio,
             profile.consultation_fee, profile.rating, profile.review_count, profile.country,
-            profile.city, true, true
+            profile.city, true, true, profile.registration_council, 'verified', CURRENT_TIMESTAMP
      FROM users u
      JOIN (
        VALUES
-         ('dr.smith@secondop.com', 'John', 'Smith', 'Cardiology', ARRAY['Interventional Cardiology', 'Heart Failure']::text[], 'MD123456', 15, 'Mayo Clinic', ARRAY['MD - Harvard Medical School', 'Residency - Johns Hopkins']::text[], ARRAY['Board Certified Cardiologist', 'FACC']::text[], ARRAY['English', 'Spanish']::text[], 'Dr. Smith is a board-certified cardiologist with over 15 years of experience in treating complex cardiac conditions.', 150.00::numeric, 4.8::numeric, 127, 'United States', 'Rochester, MN'),
-         ('dr.johnson@secondop.com', 'Emily', 'Johnson', 'Oncology', ARRAY['Breast Cancer', 'Lung Cancer']::text[], 'MD789012', 12, 'MD Anderson Cancer Center', ARRAY['MD - Stanford University', 'Fellowship - Memorial Sloan Kettering']::text[], ARRAY['Board Certified Oncologist', 'ASCO Member']::text[], ARRAY['English', 'French']::text[], 'Dr. Johnson specializes in personalized cancer treatment with a focus on breast and lung cancers.', 175.00::numeric, 4.9::numeric, 203, 'United States', 'Houston, TX'),
-         ('dr.williams@secondop.com', 'Michael', 'Williams', 'Neurology', ARRAY['Stroke', 'Epilepsy', 'Movement Disorders']::text[], 'MD345678', 20, 'Cleveland Clinic', ARRAY['MD - Yale School of Medicine', 'Residency - Massachusetts General Hospital']::text[], ARRAY['Board Certified Neurologist', 'FAAN']::text[], ARRAY['English', 'German', 'Italian']::text[], 'Dr. Williams is a renowned neurologist with expertise in stroke management and movement disorders.', 200.00::numeric, 4.7::numeric, 156, 'United States', 'Cleveland, OH')
-     ) AS profile(email, first_name, last_name, specialty, sub_specialties, license_number, years_of_experience, hospital_affiliation, education, certifications, languages, bio, consultation_fee, rating, review_count, country, city)
+         ('dr.smith@secondop.com', 'John', 'Smith', 'Cardiology', ARRAY['Interventional Cardiology', 'Heart Failure']::text[], 'MD123456', 15, 'Mayo Clinic', ARRAY['MD - Harvard Medical School', 'Residency - Johns Hopkins']::text[], ARRAY['Board Certified Cardiologist', 'FACC']::text[], ARRAY['English', 'Spanish']::text[], 'Dr. Smith is a board-certified cardiologist with over 15 years of experience in treating complex cardiac conditions.', 150.00::numeric, 4.8::numeric, 127, 'United States', 'Rochester, MN', 'Minnesota Board of Medical Practice'),
+         ('dr.johnson@secondop.com', 'Emily', 'Johnson', 'Oncology', ARRAY['Breast Cancer', 'Lung Cancer']::text[], 'MD789012', 12, 'MD Anderson Cancer Center', ARRAY['MD - Stanford University', 'Fellowship - Memorial Sloan Kettering']::text[], ARRAY['Board Certified Oncologist', 'ASCO Member']::text[], ARRAY['English', 'French']::text[], 'Dr. Johnson specializes in personalized cancer treatment with a focus on breast and lung cancers.', 175.00::numeric, 4.9::numeric, 203, 'United States', 'Houston, TX', 'Texas Medical Board'),
+         ('dr.williams@secondop.com', 'Michael', 'Williams', 'Neurology', ARRAY['Stroke', 'Epilepsy', 'Movement Disorders']::text[], 'MD345678', 20, 'Cleveland Clinic', ARRAY['MD - Yale School of Medicine', 'Residency - Massachusetts General Hospital']::text[], ARRAY['Board Certified Neurologist', 'FAAN']::text[], ARRAY['English', 'German', 'Italian']::text[], 'Dr. Williams is a renowned neurologist with expertise in stroke management and movement disorders.', 200.00::numeric, 4.7::numeric, 156, 'United States', 'Cleveland, OH', 'State Medical Board of Ohio')
+     ) AS profile(email, first_name, last_name, specialty, sub_specialties, license_number, years_of_experience, hospital_affiliation, education, certifications, languages, bio, consultation_fee, rating, review_count, country, city, registration_council)
        ON profile.email = u.email
      ON CONFLICT (user_id) DO UPDATE
      SET first_name = EXCLUDED.first_name,
@@ -72,6 +73,9 @@ export const ensureDemoData = async (): Promise<void> => {
          city = EXCLUDED.city,
          is_verified = EXCLUDED.is_verified,
          is_available = EXCLUDED.is_available,
+         registration_council = EXCLUDED.registration_council,
+         verification_status = 'verified',
+         verified_at = COALESCE(doctors.verified_at, CURRENT_TIMESTAMP),
          updated_at = CURRENT_TIMESTAMP`
   );
 
