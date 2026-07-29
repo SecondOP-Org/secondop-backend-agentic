@@ -35,6 +35,7 @@ import billingRoutes from './routes/billing.routes';
 import appointmentRoutes from './routes/appointment.routes';
 import doctorRoutes from './routes/doctor.routes';
 import practiceRoutes from './routes/practice.routes';
+import organizationRoutes from './routes/organization.routes';
 import commandCenterRoutes, {
   doctorVerificationRouter,
   serviceHealthRouter,
@@ -65,13 +66,13 @@ const io = new SocketIOServer(httpServer, {
 interface SocketTokenPayload {
   id: string;
   email: string;
-  type: 'patient' | 'doctor';
+  type: 'patient' | 'doctor' | 'organization';
 }
 
 interface SocketUser {
   id: string;
   email: string;
-  type: 'patient' | 'doctor';
+  type: 'patient' | 'doctor' | 'organization';
 }
 
 const canAccessCase = async (caseId: string, userId: string): Promise<boolean> => {
@@ -116,7 +117,11 @@ io.use(async (socket, next) => {
       return next(new Error('Account is unavailable'));
     }
 
-    const user = userResult.rows[0] as { id: string; email: string | null; user_type: 'patient' | 'doctor' };
+    const user = userResult.rows[0] as {
+      id: string;
+      email: string | null;
+      user_type: 'patient' | 'doctor' | 'organization';
+    };
     socket.data.user = {
       id: user.id,
       email: user.email || decoded.email,
@@ -174,6 +179,7 @@ app.use(`/api/${API_VERSION}/billing`, billingRoutes);
 app.use(`/api/${API_VERSION}/appointments`, appointmentRoutes);
 app.use(`/api/${API_VERSION}/doctors`, doctorRoutes);
 app.use(`/api/${API_VERSION}/practices`, practiceRoutes);
+app.use(`/api/${API_VERSION}/organizations`, organizationRoutes);
 app.use(`/api/${API_VERSION}/admin/command-center`, commandCenterRoutes);
 app.use(`/api/${API_VERSION}/admin/service-health`, serviceHealthRouter);
 app.use(`/api/${API_VERSION}/admin/shadow-parity`, shadowParityRouter);
