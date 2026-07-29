@@ -179,6 +179,35 @@ export const buildPasswordResetEmail = (input: {
   return { subject, text, html };
 };
 
+export const buildOrganizationInviteEmail = (input: {
+  organizationName: string;
+  inviteUrl: string;
+}): { subject: string; text: string; html: string } => {
+  const org = input.organizationName.trim() || 'a SecondOp partner organization';
+  const subject = `You're invited to join ${org} on SecondOp`;
+  const text = [
+    `You have been invited to join ${org} as a specialist on SecondOp.`,
+    '',
+    'Accept the invitation and complete your credential profile:',
+    input.inviteUrl,
+    '',
+    'This link expires in 7 days. Credential verification is still required before you can review cases.',
+    '',
+    'If you were not expecting this invite, you can ignore this message.',
+    '',
+    '— The SecondOp team',
+  ].join('\n');
+  const html = `
+    <p>You have been invited to join <strong>${escapeHtml(org)}</strong> as a specialist on SecondOp.</p>
+    <p><a href="${escapeAttr(input.inviteUrl)}">Accept invitation</a></p>
+    <p>This link expires in 7 days. Credential verification is still required before you can review cases.</p>
+    <p>Or paste this link into your browser:<br/>${escapeHtml(input.inviteUrl)}</p>
+    <p>If you were not expecting this invite, you can ignore this message.</p>
+    <p>— The SecondOp team</p>
+  `.trim();
+  return { subject, text, html };
+};
+
 const escapeHtml = (value: string): string =>
   value
     .replace(/&/g, '&amp;')

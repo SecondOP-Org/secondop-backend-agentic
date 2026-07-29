@@ -13,6 +13,10 @@ import {
   listDoctorVerifications,
   updateDoctorVerification,
 } from '../controllers/doctorVerification.controller';
+import {
+  listOrganizationVerifications,
+  updateOrganizationVerification,
+} from '../controllers/organization.controller';
 import { authenticate } from '../middleware/auth';
 import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
 
@@ -35,6 +39,13 @@ doctorVerificationRouter.use(authenticate);
 doctorVerificationRouter.use(authorizeCommandCenterOperator);
 doctorVerificationRouter.get('/', listDoctorVerifications);
 doctorVerificationRouter.patch('/:doctorId', updateDoctorVerification);
+
+/** Sibling admin route: organization partnership verification queue (SEC-170). */
+export const organizationVerificationRouter = Router();
+organizationVerificationRouter.use(authenticate);
+organizationVerificationRouter.use(authorizeCommandCenterOperator);
+organizationVerificationRouter.get('/', listOrganizationVerifications);
+organizationVerificationRouter.patch('/:organizationId', updateOrganizationVerification);
 
 /** Sibling admin route: same operator allowlist as command center. */
 export const serviceHealthRouter = Router();

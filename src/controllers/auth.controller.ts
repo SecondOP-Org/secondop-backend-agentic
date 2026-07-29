@@ -17,7 +17,9 @@ import logger from '../utils/logger';
 import { normalizeDoctorSpecialty } from '../constants/doctorSpecialties';
 import {
   createPendingOrganizationWithOwner,
+  markOrganizationInviteAccepted,
   parseOrganizationSignupInput,
+  resolveInviteForDoctorRegistration,
 } from '../services/organization.service';
 
 // Helper function to generate JWT token
@@ -70,6 +72,14 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Invalid user type', 400);
     }
 
+    if (
+      typeof req.body.inviteToken === 'string' &&
+      req.body.inviteToken.trim() &&
+      userType !== 'doctor'
+    ) {
+      throw new AppError('Organization invites can only be accepted by doctor accounts', 400);
+    }
+
     // Check if user already exists
     const existingUser = await query(
       'SELECT id FROM users WHERE email = $1 OR ($2::text IS NOT NULL AND phone = $2)',
@@ -111,6 +121,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         await createPendingOrganizationWithOwner(client, orgInput, user.id);
       } else {
         // Credential fields for manual verification (SEC-169). New doctors start pending.
+        // Invite token (SEC-170) attaches organization_id + member role (stance A: still pending).
         const {
           specialty,
           licenseNumber,
@@ -118,6 +129,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           registrationCouncil,
           country,
           npi,
+          inviteToken,
         } = req.body;
         const registrationId =
           typeof registrationNumber === 'string' && registrationNumber.trim()
@@ -139,13 +151,24 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
           );
         }
 
+        let organizationId: string | null = null;
+        let inviteId: string | null = null;
+        if (typeof inviteToken === 'string' && inviteToken.trim()) {
+          const invite = await resolveInviteForDoctorRegistration(client, {
+            inviteToken: inviteToken.trim(),
+            email: String(email),
+          });
+          organizationId = invite.organizationId;
+          inviteId = invite.inviteId;
+        }
+
         await client.query(
           `INSERT INTO doctors (
              user_id, first_name, last_name, specialty, license_number,
              registration_council, country, npi, verification_status, is_verified,
              organization_id
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', false, NULL)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', false, $9)`,
           [
             user.id,
             firstName,
@@ -155,8 +178,19 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
             council,
             jurisdiction,
             npiValue,
+            organizationId,
           ]
         );
+
+        if (organizationId && inviteId) {
+          await client.query(
+            `INSERT INTO organization_members (organization_id, user_id, role)
+             VALUES ($1, $2, 'member')
+             ON CONFLICT (organization_id, user_id) DO NOTHING`,
+            [organizationId, user.id]
+          );
+          await markOrganizationInviteAccepted(client, inviteId, user.id);
+        }
       }
 
       return user;
