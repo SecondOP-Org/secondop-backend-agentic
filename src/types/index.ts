@@ -3,7 +3,7 @@ export interface User {
   email: string;
   phone?: string;
   password_hash?: string;
-  user_type: 'patient' | 'doctor';
+  user_type: 'patient' | 'doctor' | 'organization';
   is_verified: boolean;
   is_active: boolean;
   created_at: Date;

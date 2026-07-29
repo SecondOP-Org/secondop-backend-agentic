@@ -15,9 +15,17 @@ import {
 } from '../services/email.service';
 import logger from '../utils/logger';
 import { normalizeDoctorSpecialty } from '../constants/doctorSpecialties';
+import {
+  createPendingOrganizationWithOwner,
+  parseOrganizationSignupInput,
+} from '../services/organization.service';
 
 // Helper function to generate JWT token
-const generateToken = (userId: string, email: string, userType: 'patient' | 'doctor') => {
+const generateToken = (
+  userId: string,
+  email: string,
+  userType: 'patient' | 'doctor' | 'organization'
+) => {
   const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as jwt.SignOptions['expiresIn'];
   return jwt.sign(
     { id: userId, email, type: userType },
@@ -58,14 +66,14 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Missing required fields', 400);
     }
 
-    if (!['patient', 'doctor'].includes(userType)) {
+    if (!['patient', 'doctor', 'organization'].includes(userType)) {
       throw new AppError('Invalid user type', 400);
     }
 
     // Check if user already exists
     const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1 OR phone = $2',
-      [email, phone]
+      'SELECT id FROM users WHERE email = $1 OR ($2::text IS NOT NULL AND phone = $2)',
+      [email, phone || null]
     );
 
     if (existingUser.rows.length > 0) {
@@ -82,18 +90,25 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         `INSERT INTO users (email, phone, password_hash, user_type, is_verified)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, email, user_type, is_verified, created_at`,
-        [email, phone, passwordHash, userType, false]
+        [email, phone || null, passwordHash, userType, false]
       );
 
       const user = userResult.rows[0];
 
-      // Create patient or doctor profile
+      // Create patient, doctor, or organization profile
       if (userType === 'patient') {
         await client.query(
           `INSERT INTO patients (user_id, first_name, last_name)
            VALUES ($1, $2, $3)`,
           [user.id, firstName, lastName]
         );
+      } else if (userType === 'organization') {
+        const orgInput = parseOrganizationSignupInput(req.body as Record<string, unknown>);
+        // Contact email on the org must match the account email used to sign in.
+        if (orgInput.contactEmail.toLowerCase() !== String(email).toLowerCase()) {
+          throw new AppError('Organization contact email must match the account email', 400);
+        }
+        await createPendingOrganizationWithOwner(client, orgInput, user.id);
       } else {
         // Credential fields for manual verification (SEC-169). New doctors start pending.
         const {
@@ -127,9 +142,10 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         await client.query(
           `INSERT INTO doctors (
              user_id, first_name, last_name, specialty, license_number,
-             registration_council, country, npi, verification_status, is_verified
+             registration_council, country, npi, verification_status, is_verified,
+             organization_id
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', false)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', false, NULL)`,
           [
             user.id,
             firstName,

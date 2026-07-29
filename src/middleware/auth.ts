@@ -3,27 +3,34 @@ import jwt from 'jsonwebtoken';
 import { query } from '../database/connection';
 import { AppError } from './errorHandler';
 
+export type AuthUserType = 'patient' | 'doctor' | 'organization';
+
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
-    type: 'patient' | 'doctor';
+    type: AuthUserType;
   };
 }
 
 interface JwtPayload {
   id: string;
   email: string;
-  type: 'patient' | 'doctor';
+  type: AuthUserType;
 }
 
 const isDevSkipAuthEnabled = (): boolean => {
   return process.env.DEV_SKIP_AUTH === 'true' && process.env.NODE_ENV !== 'production';
 };
 
-const resolveDevUser = async (): Promise<{ id: string; email: string; type: 'patient' | 'doctor' }> => {
+const resolveDevUser = async (): Promise<{ id: string; email: string; type: AuthUserType }> => {
   const configuredType = process.env.DEV_SKIP_AUTH_USER_TYPE;
-  const userType: 'patient' | 'doctor' = configuredType === 'doctor' ? 'doctor' : 'patient';
+  const userType: AuthUserType =
+    configuredType === 'doctor'
+      ? 'doctor'
+      : configuredType === 'organization'
+        ? 'organization'
+        : 'patient';
   const configuredId = process.env.DEV_SKIP_AUTH_USER_ID;
 
   const byIdResult = configuredId
@@ -34,7 +41,7 @@ const resolveDevUser = async (): Promise<{ id: string; email: string; type: 'pat
          LIMIT 1`,
         [configuredId]
       )
-    : { rows: [] as Array<{ id: string; email: string | null; user_type: 'patient' | 'doctor' }> };
+    : { rows: [] as Array<{ id: string; email: string | null; user_type: AuthUserType }> };
 
   const userRow =
     byIdResult.rows[0] ||
@@ -95,7 +102,7 @@ export const authenticate = async (
       throw new AppError('Account is unavailable', 401);
     }
 
-    const user = userResult.rows[0] as { id: string; email: string | null; user_type: 'patient' | 'doctor' };
+    const user = userResult.rows[0] as { id: string; email: string | null; user_type: AuthUserType };
 
     req.user = {
       id: user.id,
@@ -114,7 +121,7 @@ export const authenticate = async (
   }
 };
 
-export const authorize = (...roles: ('patient' | 'doctor')[]) => {
+export const authorize = (...roles: AuthUserType[]) => {
   return (req: AuthRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError('Authentication required', 401));

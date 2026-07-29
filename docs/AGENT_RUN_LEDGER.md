@@ -28,18 +28,31 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-07-29 - SEC-173 - Hybrid §1 organizations foundation
+
+- Status: In progress (foundation PR).
+- Human approval: User asked to implement hybrid doctor/provider signup + verification spec; sequenced per §7 (this run = §1 only).
+- Branch/worktree: `sec-173-hybrid-org-foundation` (backend); FE `sec-173-hybrid-org-signup`.
+- Files changed: migration `030_organizations_hybrid.sql`; `organization.service.ts` + routes/controller; auth register `userType=organization`; JWT/auth user types include organization; tests for parse/create pending org.
+- PR: TBD
+- Checks: pending
+- Deployment: not yet
+- Verification: pending
+- Blockers: none for coding; merge/deploy wait human approval
+- Follow-ups: SEC-174 unified gate; SEC-170 org invites (stance A)
+
 ## 2026-07-29 - SEC-169 - Doctor signup credential verification gate
 
-- Status: Implementation complete; draft PR pending human merge approval.
-- Human approval: User tasked `DOCTOR_SIGNUP_VERIFICATION_SPEC.md` Phase 1.
+- Status: Merged + deployed (staging + production).
+- Human approval: User tasked `DOCTOR_SIGNUP_VERIFICATION_SPEC.md` Phase 1, then approved merge and deploy.
 - Branch/worktree: `sec-169-doctor-signup-credential-verification` (backend); FE `sec-169-doctor-credential-verification`.
 - Files changed: migration `029_doctor_credential_verification.sql`; `doctorVerification.service.ts` + admin controller/routes; auth register credential fields + `pending`; case assign + opinion-sign 403 gates; profile fields; demo/seed backfill `verified`; public doctor listing also requires `verification_status=verified`; tests.
-- PR: pending
-- Checks: targeted jest (`doctor-credential-verification`, `demo-data`); lint/build pending in same run.
-- Deployment: not started (needs migration + human approval).
-- Verification: API rejects assign/sign for non-verified doctors; admin approve/reject writes `doctor_verification_events`.
-- Blockers: none for code; production migrate must run before FE gate is meaningful.
-- Follow-ups: Phase 2 org/team ([SEC-170](https://linear.app/secondop/issue/SEC-170)); optional admin UI beyond operator API; automated registry lookup later.
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/93 (FE: https://github.com/SecondOP-Org/secondop-frontend/pull/109)
+- Checks: targeted jest (`doctor-credential-verification`, `doctor-response`, `demo-data`); lint; build; CI green.
+- Deployment: Railway staging + production redeployed after applying migration 029 to staging Postgres-k0Us and production Postgres. Initial post-merge deploy crashed on missing `registration_council` during `ensureDemoData` until migrate ran. FE Vercel production Ready at https://secondop.in.
+- Verification: staging/production `/health` 200; secondop.in 200.
+- Blockers: none remaining after migrate + redeploy.
+- Follow-ups: Phase 2 org/team (SEC-170); optional admin UI beyond operator API; automated registry lookup later.
 
 ## 2026-07-24 - SEC-162 - Opinion PDF body must not overlay footer
 

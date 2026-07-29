@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { query, transaction } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
-import { AuthRequest } from '../middleware/auth';
+import { AuthRequest, AuthUserType } from '../middleware/auth';
 import { isCommandCenterOperator } from '../middleware/commandCenterAuth';
 import { extractObservationsFromSummary } from '../services/analysis.service';
 import {
@@ -156,8 +156,12 @@ const ensureDoctorAssignedToCase = async (caseId: string, userId: string): Promi
 const ensureCaseAccess = async (
   caseId: string,
   userId: string,
-  userType: 'patient' | 'doctor'
+  userType: AuthUserType
 ): Promise<void> => {
+  if (userType === 'organization') {
+    throw new AppError('Organization accounts cannot access clinical cases', 403);
+  }
+
   if (userType === 'patient') {
     await ensurePatientOwnsCase(caseId, userId);
     return;
@@ -223,7 +227,7 @@ const redactAiAnalysisForDoctor = <T extends CaseRowWithAiSharing>(row: T): T =>
 
 const sanitizeCaseRowForViewer = <T extends CaseRowWithAiSharing>(
   row: T,
-  userType: 'patient' | 'doctor'
+  userType: AuthUserType
 ): T => {
   if (userType === 'doctor' && row.share_ai_analysis_with_specialists === false) {
     return redactAiAnalysisForDoctor(row);
