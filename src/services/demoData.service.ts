@@ -98,6 +98,20 @@ export const ensureDemoData = async (): Promise<void> => {
          updated_at = CURRENT_TIMESTAMP`
   );
 
+  // SEC-185: demo profile is female; keep case_intake.sex aligned for her cases only.
+  await query(
+    `UPDATE case_intake ci
+     SET sex = 'female'
+     FROM cases c
+     JOIN patients p ON p.id = c.patient_id
+     JOIN users u ON u.id = p.user_id
+     WHERE ci.case_id = c.id
+       AND u.email = 'patient@example.com'
+       AND p.first_name = 'Jane'
+       AND p.last_name = 'Doe'
+       AND LOWER(TRIM(ci.sex)) <> 'female'`
+  );
+
   const assignmentResult = await query(
     `INSERT INTO case_assignments (case_id, doctor_id, status)
      SELECT c.id, d.id, 'assigned'

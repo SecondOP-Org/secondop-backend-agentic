@@ -34,25 +34,38 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Required before merge (docs only).
 - Branch/worktree: `sec-26-deployment-runbook-exception`
 - Files changed: `docs/DEPLOYMENT_RUNBOOK.md` (versioned copy of workspace runbook §0 exception, rollback detail, Linear/GitHub updates); `.cursor/skills/secondop-deploy/SKILL.md`
-- PR: (link after open)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/99
 - Checks: Docs review only
 - Deployment: Not started
 - Verification: Dry-run checklist language against 2026-06-23 direct-to-prod event
 - Blockers: None
 - Follow-ups: Keep workspace root `DEPLOYMENT_RUNBOOK.md` in sync with this copy
 
+## 2026-08-03 - SEC-185 - Jane Doe demo intake sex consistency
+
+- Status: Implementation complete; draft PR pending human merge approval.
+- Human approval: Required before merge/deploy.
+- Branch/worktree: `sec-185-demo-intake-sex`
+- Files changed: `src/services/demoData.service.ts` (correct demo Jane Doe `case_intake.sex` to female); `src/__tests__/demo-data.service.test.ts`
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/98
+- Checks: unit test for ensureDemoData
+- Deployment: Not started
+- Verification: Pending after merge + demo bootstrap on target env
+- Blockers: None for code; prod correction runs on next `ensureDemoData` boot when enabled
+- Follow-ups: Frontend demographics display helper in companion FE PR
+
 ## 2026-07-29 - SEC-170 - Org invites + admin org verification
 
-- Status: Draft PRs open; awaiting human merge approval.
-- Human approval: User asked to proceed with hybrid plan after SEC-173/174 merge.
-- Branch/worktree: `sec-170-org-invites` (BE), `sec-170-org-invites-fe` (FE).
-- Files changed: migration `031_organization_invites.sql`; `organization.service` invite + admin verify; org routes/controller; auth register `inviteToken`; admin `/organization-verifications`; email invite builder; unit tests; FE portal invite + `/accept-invite`.
+- Status: Merged and deployed (staging + production).
+- Human approval: User requested merge and deploy.
+- Branch/worktree: merged via BE #96 / FE #114 onto `main`.
+- Files changed: migration `031_organization_invites.sql`; org invite APIs; auth `inviteToken`; admin org verification; FE portal + `/accept-invite`.
 - PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/96 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/114
-- Checks: BE lint/test/build pass; FE lint/build pass
-- Deployment: apply migration 031 (and 030 if not yet) before BE deploy
-- Verification: unit coverage for invite create/preview/resolve + reject-without-reason
-- Blockers: waiting for human merge approval
-- Follow-ups: merge BE then FE; apply 031 on Railway; smoke verify org → invite → accept
+- Checks: BE/FE CI green before merge
+- Deployment: Railway staging+prod redeploy `--from-source` @ `cd7e51a`; Vercel prod → https://secondop.in; migrations 030+031 applied (idempotent)
+- Verification: `/health` ok; invite preview 404 for bogus token; CORS allow-origin secondop.in; `/accept-invite` 200
+- Blockers: none
+- Follow-ups: `/version` still reports stale `gitSha` build metadata (runtime routes confirm SEC-170 live)
 
 ## 2026-07-29 - SEC-174 - Unified canSignOpinion gate (doctor + org)
 

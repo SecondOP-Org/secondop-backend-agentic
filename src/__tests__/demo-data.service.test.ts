@@ -39,13 +39,16 @@ describe('ensureDemoData', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it('upserts demo users, doctors, patient profile, and case assignments', async () => {
+  it('upserts demo users, doctors, patient profile, corrects Jane Doe intake sex, and case assignments', async () => {
     await ensureDemoData();
 
-    expect(mockQuery).toHaveBeenCalledTimes(4);
+    expect(mockQuery).toHaveBeenCalledTimes(5);
     expect(mockQuery.mock.calls[0][0]).toContain('INSERT INTO users');
     expect(mockQuery.mock.calls[1][0]).toContain('INSERT INTO doctors');
     expect(mockQuery.mock.calls[2][0]).toContain('INSERT INTO patients');
-    expect(mockQuery.mock.calls[3][0]).toContain('INSERT INTO case_assignments');
+    expect(mockQuery.mock.calls[3][0]).toContain('UPDATE case_intake');
+    expect(mockQuery.mock.calls[3][0]).toContain("patient@example.com");
+    expect(mockQuery.mock.calls[3][0]).toContain("sex = 'female'");
+    expect(mockQuery.mock.calls[4][0]).toContain('INSERT INTO case_assignments');
   });
 });
