@@ -28,13 +28,26 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-03 - SEC-26 - Deployment runbook exception + rollback
+
+- Status: Implementation complete; draft PR pending human merge approval.
+- Human approval: Required before merge (docs only).
+- Branch/worktree: `sec-26-deployment-runbook-exception`
+- Files changed: `docs/DEPLOYMENT_RUNBOOK.md` (versioned copy of workspace runbook §0 exception, rollback detail, Linear/GitHub updates); `.cursor/skills/secondop-deploy/SKILL.md`
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/99
+- Checks: Docs review only
+- Deployment: Not started
+- Verification: Dry-run checklist language against 2026-06-23 direct-to-prod event
+- Blockers: None
+- Follow-ups: Keep workspace root `DEPLOYMENT_RUNBOOK.md` in sync with this copy
+
 ## 2026-08-03 - SEC-185 - Jane Doe demo intake sex consistency
 
 - Status: Implementation complete; draft PR pending human merge approval.
 - Human approval: Required before merge/deploy.
 - Branch/worktree: `sec-185-demo-intake-sex`
 - Files changed: `src/services/demoData.service.ts` (correct demo Jane Doe `case_intake.sex` to female); `src/__tests__/demo-data.service.test.ts`
-- PR: (link after open)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/98
 - Checks: unit test for ensureDemoData
 - Deployment: Not started
 - Verification: Pending after merge + demo bootstrap on target env

@@ -8,9 +8,13 @@ description: >-
 
 # SecondOp Deploy
 
-Authoritative runbook: workspace root `DEPLOYMENT_RUNBOOK.md`.
+Authoritative runbook: workspace root `DEPLOYMENT_RUNBOOK.md` (versioned copy: `docs/DEPLOYMENT_RUNBOOK.md` in this repo).
 
 Policy: `AGENTS.md` — **do not deploy without explicit human approval.**
+
+Release paths (SEC-26):
+- **Normal:** PR → CI → staging → smoke → human prod approval → production → post-deploy smoke → Linear/GitHub update
+- **Exception (staging unavailable):** explicit human direct-to-prod approval + risk note + rollback readiness + post-deploy smoke evidence — see runbook §0
 
 ## Preconditions
 
