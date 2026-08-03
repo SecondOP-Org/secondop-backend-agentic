@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-03 - SEC-26 - Deployment runbook exception + rollback
+
+- Status: Implementation complete; draft PR pending human merge approval.
+- Human approval: Required before merge (docs only).
+- Branch/worktree: `sec-26-deployment-runbook-exception`
+- Files changed: `docs/DEPLOYMENT_RUNBOOK.md` (versioned copy of workspace runbook §0 exception, rollback detail, Linear/GitHub updates); `.cursor/skills/secondop-deploy/SKILL.md`
+- PR: (link after open)
+- Checks: Docs review only
+- Deployment: Not started
+- Verification: Dry-run checklist language against 2026-06-23 direct-to-prod event
+- Blockers: None
+- Follow-ups: Keep workspace root `DEPLOYMENT_RUNBOOK.md` in sync with this copy
+
 ## 2026-07-29 - SEC-170 - Org invites + admin org verification
 
 - Status: Draft PRs open; awaiting human merge approval.
