@@ -1,8 +1,17 @@
 import { z } from 'zod';
 import { AppError } from '../middleware/errorHandler';
 
+export const patientFacingDraftKinds = [
+  'question',
+  'summary',
+  'clinical_summary',
+  'assessment',
+  'recommendations',
+  'limitations',
+] as const;
+
 export const patientFacingDraftRequestSchema = z.object({
-  kind: z.enum(['question', 'summary']),
+  kind: z.enum(patientFacingDraftKinds),
   questionId: z.string().min(1).optional(),
   questionIndex: z.number().int().min(0).optional(),
 });

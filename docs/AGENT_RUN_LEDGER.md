@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-04 - SEC-190 - Doctor opinion comprehensive report (backend)
+
+- Status: Backend implementation complete on feature branch; awaiting FE companion + draft PR.
+- Human approval: Required before merge/deploy.
+- Branch/worktree: `sec-190-doctor-opinion-report`
+- Files changed: `doctorResponse.schema.ts` (structured sections + send gates); `doctorResponse.service.ts` (merge/validate/compose + records helper); `doctorOpinionPdf.service.ts` (customer headings, no name redaction, de-dup report date); `case.controller.ts` (pdfInput fields); `patientFacingDraft.service.ts` + schema (section draft kinds); PDF + doctor-response tests; this ledger entry
+- PR: Not opened yet
+- Checks: `npm test -- --testPathPattern='doctorOpinionPdf|doctor-response'` (29 passed); `npm run lint` (clean)
+- Deployment: Not started
+- Verification: Unit coverage for customer headings, full names, concordance/records/limitations, send validation
+- Blockers: None for backend code; FE compose panel is companion work
+- Follow-ups: FE DoctorResponsePanel sections + gates; signed sample PDF review; draft PR
+
 ## 2026-08-04 - SEC-189 - Plain-language patient register (dual register)
 
 - Status: Implementation complete; draft PR pending human merge approval.

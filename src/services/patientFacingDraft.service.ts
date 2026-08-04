@@ -39,7 +39,13 @@ export const PATIENT_VOICE_GUIDANCE = [
   'Do not include inline evidence markers like "[Evidence:…]"; a footnote may be appended separately.',
 ].join(' ');
 
-export type PatientFacingDraftKind = 'question' | 'summary';
+export type PatientFacingDraftKind =
+  | 'question'
+  | 'summary'
+  | 'clinical_summary'
+  | 'assessment'
+  | 'recommendations'
+  | 'limitations';
 
 export interface PatientFacingDraftRequest {
   kind: PatientFacingDraftKind;
@@ -239,6 +245,72 @@ export const composePatientFacingSummaryTemplate = (summary: StructuredSummary):
   }
 
   return paragraphs.join('\n\n').trim();
+};
+
+/** clinical_summary ← chief_concern (+ intake when available later). */
+export const composeClinicalSummaryTemplate = (summary: StructuredSummary): string => {
+  const concern = normalizeWhitespace(summary.chief_concern || '');
+  if (!concern) {
+    return 'Based on the records you submitted, here is a brief picture of your case in plain language. Please edit this draft so it reflects how you would explain the situation to the patient.';
+  }
+  return [
+    'Here is a brief picture of your case based on the records you submitted.',
+    `The main concern reflected in those materials is ${concern.replace(/\.$/, '')}.`,
+    'Please edit this draft so it matches how you would explain the situation in your own words.',
+  ].join(' ');
+};
+
+/** assessment ← key_report_findings + red_flags_to_discuss. */
+export const composeAssessmentTemplate = (summary: StructuredSummary): string => {
+  const findings = normalizeWhitespace(summary.key_report_findings || '');
+  const redFlags = normalizeWhitespace(summary.red_flags_to_discuss || '');
+  const parts: string[] = [];
+
+  if (findings) {
+    parts.push(`What stands out in your records: ${findings}`);
+  }
+  if (redFlags) {
+    parts.push(
+      `Points that deserve a closer look with your treating team: ${redFlags.replace(/\.$/, '')}.`
+    );
+  }
+  if (parts.length === 0) {
+    return 'Draft assessment from the submitted records is limited. Please write what the records show and what it means for the patient in plain language.';
+  }
+  parts.push(
+    'This draft is for you to edit — the signed opinion should state your clinical reading clearly.'
+  );
+  return parts.join('\n\n');
+};
+
+/** recommendations ← follow_up_discussion_points (same source as today's summary kind). */
+export const composeRecommendationsTemplate = (summary: StructuredSummary): string => {
+  const discussion = normalizeWhitespace(summary.follow_up_discussion_points || '');
+  if (!discussion) {
+    return composePatientFacingSummaryTemplate(summary);
+  }
+  return [
+    'Here are practical next steps to discuss with your treating clinicians.',
+    discussion,
+    'Please edit this draft so the recommendations match your clinical judgment.',
+  ].join('\n\n');
+};
+
+/** limitations ← limitations_caveats + editable note (never AI concordance). */
+export const composeLimitationsTemplate = (summary: StructuredSummary): string => {
+  const caveats = normalizeWhitespace(summary.limitations_caveats || '');
+  const boilerplate = [
+    'This is a remote, records-only second opinion. I have not examined you in person.',
+    'Findings and recommendations are based solely on the materials available at the time of review.',
+    'This review does not replace ongoing care with your treating clinicians, and it is not an emergency service.',
+  ].join(' ');
+
+  const parts = [boilerplate];
+  if (caveats) {
+    parts.push(caveats);
+  }
+  parts.push('You can edit this section before signing so it accurately reflects the limits of this review.');
+  return parts.join('\n\n');
 };
 
 const collectGroundingCorpus = (
@@ -545,8 +617,19 @@ export const generatePatientFacingDraftForCase = async (
   doctorUserId: string,
   request: PatientFacingDraftRequest
 ): Promise<PatientFacingDraftResult> => {
-  if (request.kind !== 'question' && request.kind !== 'summary') {
-    throw new AppError('kind must be "question" or "summary"', 400);
+  const allowedKinds: PatientFacingDraftKind[] = [
+    'question',
+    'summary',
+    'clinical_summary',
+    'assessment',
+    'recommendations',
+    'limitations',
+  ];
+  if (!allowedKinds.includes(request.kind)) {
+    throw new AppError(
+      'kind must be one of: question, summary, clinical_summary, assessment, recommendations, limitations',
+      400
+    );
   }
 
   const caseResult = await query(
@@ -599,9 +682,37 @@ export const generatePatientFacingDraftForCase = async (
     throw new AppError('No analysis artifact available for AI draft', 400);
   }
 
-  if (request.kind === 'summary') {
+  // Concordance is never AI-generated — specialist judgment only.
+  if (request.kind === 'summary' || request.kind === 'recommendations') {
     const built = await buildPatientFacingSummaryDraft({ caseId, artifact });
-    return { draft: built.draft, kind: 'summary', source: built.source };
+    // Prefer recommendations-oriented template when kind is recommendations and LLM falls back.
+    if (request.kind === 'recommendations' && built.source === 'template') {
+      return {
+        draft: composeRecommendationsTemplate(artifact.structured_summary),
+        kind: 'recommendations',
+        source: 'template',
+      };
+    }
+    return {
+      draft: built.draft,
+      kind: request.kind,
+      source: built.source,
+    };
+  }
+
+  if (request.kind === 'clinical_summary') {
+    const draft = composeClinicalSummaryTemplate(artifact.structured_summary);
+    return { draft, kind: 'clinical_summary', source: 'template' };
+  }
+
+  if (request.kind === 'assessment') {
+    const draft = composeAssessmentTemplate(artifact.structured_summary);
+    return { draft, kind: 'assessment', source: 'template' };
+  }
+
+  if (request.kind === 'limitations') {
+    const draft = composeLimitationsTemplate(artifact.structured_summary);
+    return { draft, kind: 'limitations', source: 'template' };
   }
 
   const questions = resolveSpecialistQuestions(row);

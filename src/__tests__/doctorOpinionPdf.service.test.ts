@@ -42,6 +42,19 @@ const baseInput = (): DoctorOpinionPdfInput => ({
     },
   ],
   summary: 'Clinical impression: likely paroxysmal AF; recommend rhythm monitoring.',
+  recommendations: 'Likely paroxysmal AF; recommend rhythm monitoring.',
+  clinicalSummary: 'You were evaluated for intermittent palpitations and irregular heartbeat.',
+  assessment: 'Your records support paroxysmal atrial fibrillation as the leading explanation.',
+  concordance: {
+    level: 'agree',
+    rationale: 'The available ECGs and history align with the working diagnosis of PAF.',
+  },
+  limitations:
+    'This is a remote, records-only second opinion. I have not examined you in person.',
+  recordsReviewed: [
+    { name: 'ECG report.pdf', kind: 'report', meta: 'application/pdf' },
+    { name: 'Cardiac MRI', kind: 'imaging', meta: 'MR · 3 series' },
+  ],
   aiAssistedReview: true,
 });
 
@@ -63,7 +76,7 @@ describe('doctorOpinionPdf.service', () => {
     expect(fs.statSync(abs).size).toBeGreaterThan(1000);
   });
 
-  it('generates a valid PDF with summary-first branded content', async () => {
+  it('generates a valid PDF with customer-facing section headings', async () => {
     const buffer = await generateDoctorOpinionPdfBuffer({
       ...baseInput(),
       isDraft: false,
@@ -74,9 +87,23 @@ describe('doctorOpinionPdf.service', () => {
     expect(buffer.subarray(0, 4).toString('utf8')).toBe('%PDF');
     const text = extractPdfText(buffer);
     expect(text).toContain('SecondOp');
-    expect(text).toContain('Clinical Impression');
+    expect(text).toContain('What to do next');
+    expect(text).toContain('Your case in brief');
+    expect(text).toContain('What your records show');
+    expect(text).toContain('Do we agree with your current diagnosis');
+    expect(text).toContain('We agree with your current diagnosis');
+    expect(text).toContain('What we reviewed');
+    expect(text).toContain("What this review does and doesn't cover");
+    expect(text).toContain('Your questions, answered');
+    expect(text).toContain('Signed by your specialist');
+    expect(text).not.toContain('Clinical Impression');
+    expect(text).not.toContain('Concordance');
+    expect(text).not.toMatch(/\bAssessment\b/);
     expect(text).toContain('CONFIDENTIAL');
     expect(text).toContain('Electronically signed by');
+    expect(text).toContain('Dr. Doc Jones');
+    expect(text).toContain('Pat Smith');
+    expect(text).not.toContain(LAST_NAME_REDACTION);
     expect(text).not.toContain('DRAFT');
     expect(text).toContain('Dear Pat,');
     expect(text).not.toContain('Independent Second Opinion');
@@ -113,20 +140,20 @@ describe('doctorOpinionPdf.service', () => {
     expect(text).not.toContain(`SO-${guid}`);
   });
 
-  it('redacts patient and doctor last names with a visible marker', async () => {
+  it('prints full patient and doctor names on the patient deliverable (no redaction)', async () => {
     const buffer = await generateDoctorOpinionPdfBuffer({
       ...baseInput(),
       isDraft: false,
-      reportId: 'report-redact-001',
+      signedAt: '2026-07-14T15:42:00.000Z',
+      reportId: 'report-names-001',
     });
 
     const text = extractPdfText(buffer);
-    expect(text).toContain(`Pat ${LAST_NAME_REDACTION} (54 years, Female)`);
-    expect(text).toContain(`Dr. Doc ${LAST_NAME_REDACTION}`);
-    expect(text).not.toContain('Pat Smith');
-    expect(text).not.toContain('Doc Jones');
-    expect(text).not.toMatch(/Smith/);
-    expect(text).not.toMatch(/Jones/);
+    expect(text).toContain('Pat Smith (54 years, Female)');
+    expect(text).toContain('Dr. Doc Jones');
+    expect(text).toContain('Smith');
+    expect(text).toContain('Jones');
+    expect(text).not.toContain(LAST_NAME_REDACTION);
   });
 
   it('uses patientFirstName for salutation when provided', async () => {
@@ -171,7 +198,9 @@ describe('doctorOpinionPdf.service', () => {
 
     const text = extractPdfText(buffer);
     expect(text).toContain(`Report date: ${expectedReportDate}`);
-    expect(text).toContain(expectedReportDate);
+    // Letterhead only — avoid a second "Report date" label in the info grid.
+    const reportDateLabelMatches = text.match(/Report date:/g) || [];
+    expect(reportDateLabelMatches.length).toBe(1);
     expect(text).toMatch(/Generated /);
   });
 
@@ -217,6 +246,47 @@ describe('doctorOpinionPdf.service', () => {
     expect(matched).toBe(true);
   });
 
+  it('renders concordance, records reviewed, and limitations when provided', async () => {
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      concordance: {
+        level: 'partially_agree',
+        rationale: 'Rhythm diagnosis fits; the proposed medication plan needs adjustment.',
+      },
+      isDraft: false,
+      signedAt: '2026-07-14T15:42:00.000Z',
+      reportId: 'report-sections-001',
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('We partially agree with your current diagnosis');
+    expect(text).toContain('Rhythm diagnosis fits');
+    expect(text).toContain('ECG report.pdf');
+    expect(text).toContain('Cardiac MRI');
+    expect(text).toContain('records-only second opinion');
+    expect(text).not.toContain('Clinical Impression');
+  });
+
+  it('falls back to summary for What to do next when recommendations omitted', async () => {
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      recommendations: undefined,
+      clinicalSummary: undefined,
+      assessment: undefined,
+      concordance: null,
+      limitations: undefined,
+      recordsReviewed: [],
+      summary: 'Legacy summary-only recommendations text.',
+      isDraft: false,
+      reportId: 'report-legacy-summary-001',
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('What to do next');
+    expect(text).toContain('Legacy summary-only recommendations text.');
+    expect(text).not.toContain('Clinical Impression');
+  });
+
   it('reserves a bottom margin large enough for the footer band', () => {
     expect(DOCTOR_OPINION_PDF_LAYOUT.bottomMargin).toBe(
       DOCTOR_OPINION_PDF_LAYOUT.pageMargin + DOCTOR_OPINION_PDF_LAYOUT.footerReserved
@@ -230,6 +300,7 @@ describe('doctorOpinionPdf.service', () => {
     const longAnswer = paragraph.repeat(60);
     const buffer = await generateDoctorOpinionPdfBuffer({
       ...baseInput(),
+      recommendations: paragraph.repeat(25),
       summary: paragraph.repeat(25),
       questionAnswers: Array.from({ length: 6 }, (_, index) => ({
         questionId: `sq-${index + 1}`,

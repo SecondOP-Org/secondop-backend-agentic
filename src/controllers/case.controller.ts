@@ -1251,6 +1251,8 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
 
     if (isStructuredDoctorResponsePayload(req.body)) {
       const payload = parseDoctorResponseDraft(req.body);
+      const recommendations =
+        (payload.recommendations || '').trim() || (payload.summary || '').trim();
 
       pdfInput = {
         caseTitle: row.title,
@@ -1263,6 +1265,12 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         submittedDate: row.submitted_date,
         questionAnswers: payload.questionAnswers,
         summary: payload.summary,
+        recommendations,
+        clinicalSummary: payload.clinicalSummary,
+        assessment: payload.assessment,
+        concordance: payload.concordance ?? null,
+        limitations: payload.limitations,
+        recordsReviewed: payload.recordsReviewed || [],
         keyImages: resolveKeyImagesForPdf(payload.keyImages),
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
         patientAge,
@@ -1366,6 +1374,9 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
       content = composeDoctorOpinionContent(payload);
       nextStatus = typeof payload.status === 'string' && payload.status.trim() ? payload.status.trim() : 'completed';
 
+      const recommendations =
+        (payload.recommendations || '').trim() || (payload.summary || '').trim();
+
       pdfInput = {
         caseTitle: row.title,
         caseNumber: row.case_number,
@@ -1377,6 +1388,12 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         submittedDate: row.submitted_date,
         questionAnswers: payload.questionAnswers,
         summary: payload.summary,
+        recommendations,
+        clinicalSummary: payload.clinicalSummary,
+        assessment: payload.assessment,
+        concordance: payload.concordance ?? null,
+        limitations: payload.limitations,
+        recordsReviewed: payload.recordsReviewed || [],
         keyImages: resolveKeyImagesForPdf(payload.keyImages),
         aiAssistedReview: row.share_ai_analysis_with_specialists !== false && row.analysis_status === 'succeeded',
         patientAge,
