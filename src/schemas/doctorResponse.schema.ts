@@ -20,6 +20,19 @@ export const doctorKeyImageSchema = z.object({
   capturedAt: z.string().min(1),
 });
 
+export const recordsReviewedItemSchema = z.object({
+  name: z.string().min(1),
+  kind: z.enum(['report', 'imaging']),
+  meta: z.string().optional(),
+  /** Specialist confirms the record was reviewed. */
+  confirmed: z.boolean().optional(),
+});
+
+export const concordanceSchema = z.object({
+  level: z.enum(['agree', 'partially_agree', 'disagree']),
+  rationale: z.string(),
+});
+
 export const doctorResponseDraftSchema = z.object({
   questionAnswers: z.array(doctorQuestionAnswerSchema).default([]),
   summary: z.string().default(''),
@@ -28,22 +41,89 @@ export const doctorResponseDraftSchema = z.object({
   keyImages: z.array(doctorKeyImageSchema).optional(),
   /** Pure AI draft text per questionId, captured when the doctor clicks Insert AI draft (SEC-111). */
   aiDraftBaselines: z.record(z.string()).optional(),
+  recordsReviewed: z.array(recordsReviewedItemSchema).optional().default([]),
+  clinicalSummary: z.string().default(''),
+  assessment: z.string().default(''),
+  concordance: concordanceSchema.optional().nullable(),
+  /** Dual-write with summary (recommendations is the preferred field going forward). */
+  recommendations: z.string().default(''),
+  limitations: z.string().default(''),
 });
 
-export const doctorResponseSendSchema = doctorResponseDraftSchema.extend({
+const doctorResponseSendBaseSchema = doctorResponseDraftSchema.extend({
   questionAnswers: z.array(
     doctorQuestionAnswerSchema.extend({
       answer: z.string().min(1, 'Each question must have a non-empty answer'),
     })
   ),
-  summary: z.string().min(1, 'summary is required'),
   attestationAccepted: z.literal(true, {
     errorMap: () => ({ message: 'Attestation is required before sending' }),
   }),
 });
 
+export const doctorResponseSendSchema = doctorResponseSendBaseSchema
+  .superRefine((data, ctx) => {
+    if (!data.clinicalSummary.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'clinicalSummary is required',
+        path: ['clinicalSummary'],
+      });
+    }
+    if (!data.assessment.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'assessment is required',
+        path: ['assessment'],
+      });
+    }
+    if (!data.limitations.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'limitations is required',
+        path: ['limitations'],
+      });
+    }
+
+    const recommendations = (data.recommendations || '').trim();
+    const summary = (data.summary || '').trim();
+    if (!recommendations && !summary) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'recommendations or summary is required',
+        path: ['recommendations'],
+      });
+    }
+
+    if (!data.concordance || !data.concordance.level) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'concordance level is required',
+        path: ['concordance', 'level'],
+      });
+    } else if (!data.concordance.rationale?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'concordance rationale is required',
+        path: ['concordance', 'rationale'],
+      });
+    }
+  })
+  .transform((data) => {
+    const recommendations =
+      (data.recommendations || '').trim() || (data.summary || '').trim();
+    return {
+      ...data,
+      recommendations,
+      // Always keep summary in sync for backward-compatible consumers.
+      summary: recommendations,
+    };
+  });
+
 export type DoctorQuestionAnswer = z.infer<typeof doctorQuestionAnswerSchema>;
 export type DoctorKeyImage = z.infer<typeof doctorKeyImageSchema>;
+export type RecordsReviewedItem = z.infer<typeof recordsReviewedItemSchema>;
+export type DoctorConcordance = z.infer<typeof concordanceSchema>;
 export type DoctorResponseDraft = z.infer<typeof doctorResponseDraftSchema>;
 export type DoctorResponseSendPayload = z.infer<typeof doctorResponseSendSchema>;
 
@@ -63,6 +143,7 @@ export const parseDoctorResponseSend = (input: unknown): DoctorResponseSendPaylo
   return result.data;
 };
 
+/** Accept structured payloads that include questionAnswers + summary (legacy + new fields OK). */
 export const isStructuredDoctorResponsePayload = (
   body: Record<string, unknown>
 ): body is Record<string, unknown> & {

@@ -15,6 +15,7 @@ import {
   saveDoctorResponseDraft,
   validateDoctorResponseForSend,
 } from '../services/doctorResponse.service';
+import { parseDoctorResponseSend } from '../schemas/doctorResponse.schema';
 
 jest.mock('../database/connection', () => ({
   query: jest.fn(),
@@ -60,6 +61,18 @@ const createDoctorRequest = (body: any = {}, params: any = {}): AuthRequest =>
       }),
     },
   }) as unknown as AuthRequest;
+
+const structuredSendFields = {
+  clinicalSummary: 'Patient presents with intermittent palpitations.',
+  assessment: 'Records support paroxysmal atrial fibrillation.',
+  concordance: {
+    level: 'agree' as const,
+    rationale: 'Findings align with the working diagnosis.',
+  },
+  recommendations: 'Recommend rhythm monitoring and follow-up.',
+  limitations: 'This is a remote, records-only second opinion.',
+  recordsReviewed: [{ name: 'ECG.pdf', kind: 'report' as const }],
+};
 
 describe('doctor response workflow', () => {
   beforeEach(() => {
@@ -180,7 +193,7 @@ describe('doctor response workflow', () => {
         status: 'success',
         data: {
           resolvedQuestions: [{ id: 'sq-1', question: 'What is the diagnosis?' }],
-          draft: {
+          draft: expect.objectContaining({
             questionAnswers: [
               {
                 questionId: 'sq-1',
@@ -189,7 +202,12 @@ describe('doctor response workflow', () => {
               },
             ],
             summary: 'Draft summary',
-          },
+            clinicalSummary: '',
+            assessment: '',
+            recommendations: '',
+            limitations: '',
+            recordsReviewed: [],
+          }),
         },
       });
     });
@@ -209,6 +227,10 @@ describe('doctor response workflow', () => {
                   },
                 ],
                 summary: 'Existing summary',
+                clinicalSummary: 'Existing clinical summary',
+                assessment: 'Existing assessment',
+                limitations: 'Existing limitations',
+                recordsReviewed: [{ name: 'Lab.pdf', kind: 'report' }],
               },
             },
           ],
@@ -233,6 +255,38 @@ describe('doctor response workflow', () => {
         ])
       );
       expect(draft.summary).toBe('Existing summary');
+      expect(draft.recommendations).toBe('Existing summary');
+      expect(draft.clinicalSummary).toBe('Existing clinical summary');
+      expect(draft.assessment).toBe('Existing assessment');
+      expect(draft.limitations).toBe('Existing limitations');
+      expect(draft.recordsReviewed).toEqual([
+        expect.objectContaining({ name: 'Lab.pdf', kind: 'report' }),
+      ]);
+    });
+
+    it('syncs summary when recommendations are provided', async () => {
+      mockedQuery
+        .mockResolvedValueOnce({ rows: [{ id: 'doctor-1' }] } as any)
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              response_draft: {
+                questionAnswers: [],
+                summary: 'Old summary',
+              },
+            },
+          ],
+        } as any)
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      const draft = await saveDoctorResponseDraft('case-1', 'user-doctor-1', {
+        questionAnswers: [],
+        summary: '',
+        recommendations: 'New recommendations text',
+      });
+
+      expect(draft.recommendations).toBe('New recommendations text');
+      expect(draft.summary).toBe('New recommendations text');
     });
 
     it('preserves keyImages when PUT omits them', async () => {
@@ -267,6 +321,7 @@ describe('doctor response workflow', () => {
       });
 
       expect(draft.summary).toBe('Updated summary');
+      expect(draft.recommendations).toBe('Updated summary');
       expect(draft.keyImages).toEqual([
         expect.objectContaining({ id: 'ki-1', seriesUid: '1.2.3', instanceNumber: 12 }),
       ]);
@@ -282,6 +337,12 @@ describe('doctor response workflow', () => {
       serviceSpy.mockResolvedValueOnce({
         questionAnswers: [],
         summary: 'Saved summary',
+        recommendations: 'Saved summary',
+        clinicalSummary: '',
+        assessment: '',
+        limitations: '',
+        recordsReviewed: [],
+        concordance: null,
       });
 
       const req = createDoctorRequest({ summary: 'Saved summary' }, { caseId: 'case-1' });
@@ -294,7 +355,12 @@ describe('doctor response workflow', () => {
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'success',
-          data: { draft: { questionAnswers: [], summary: 'Saved summary' } },
+          data: {
+            draft: expect.objectContaining({
+              questionAnswers: [],
+              summary: 'Saved summary',
+            }),
+          },
         })
       );
 
@@ -343,6 +409,7 @@ describe('doctor response workflow', () => {
             },
           ],
           summary: 'Overall summary',
+          ...structuredSendFields,
           attestationAccepted: true,
         },
         { caseId: 'case-1' }
@@ -369,10 +436,56 @@ describe('doctor response workflow', () => {
               { questionId: 'sq-1', question: 'Question 1', answer: 'Answer 1' },
             ],
             summary: 'Summary',
+            ...structuredSendFields,
             attestationAccepted: true as const,
           }
         )
       ).toThrow(AppError);
+    });
+
+    it('requires clinicalSummary, assessment, limitations, and concordance on send', () => {
+      expect(() =>
+        parseDoctorResponseSend({
+          questionAnswers: [
+            { questionId: 'sq-1', question: 'Question 1', answer: 'Answer 1' },
+          ],
+          summary: 'Summary only',
+          attestationAccepted: true,
+        })
+      ).toThrow(AppError);
+
+      expect(() =>
+        validateDoctorResponseForSend([{ id: 'sq-1', question: 'Question 1' }], {
+          questionAnswers: [
+            { questionId: 'sq-1', question: 'Question 1', answer: 'Answer 1' },
+          ],
+          summary: 'Summary',
+          clinicalSummary: '',
+          assessment: 'Assessment',
+          limitations: 'Limits',
+          concordance: { level: 'agree', rationale: 'Because' },
+          recommendations: 'Recs',
+          recordsReviewed: [],
+          attestationAccepted: true as const,
+        })
+      ).toThrow(/clinicalSummary/);
+    });
+
+    it('normalizes recommendations from summary on send parse', () => {
+      const parsed = parseDoctorResponseSend({
+        questionAnswers: [
+          { questionId: 'sq-1', question: 'Question 1', answer: 'Answer 1' },
+        ],
+        summary: 'Legacy summary as recommendations',
+        clinicalSummary: 'Brief case',
+        assessment: 'Records show X',
+        limitations: 'Remote review only',
+        concordance: { level: 'disagree', rationale: 'Plan needs change' },
+        attestationAccepted: true,
+      });
+
+      expect(parsed.recommendations).toBe('Legacy summary as recommendations');
+      expect(parsed.summary).toBe('Legacy summary as recommendations');
     });
   });
 
@@ -429,6 +542,7 @@ describe('doctor response workflow', () => {
             },
           ],
           summary: 'Overall summary',
+          ...structuredSendFields,
         },
         { caseId: 'case-1' }
       );
@@ -442,6 +556,12 @@ describe('doctor response workflow', () => {
         expect.objectContaining({
           isDraft: true,
           summary: 'Overall summary',
+          recommendations: structuredSendFields.recommendations,
+          clinicalSummary: structuredSendFields.clinicalSummary,
+          assessment: structuredSendFields.assessment,
+          concordance: structuredSendFields.concordance,
+          limitations: structuredSendFields.limitations,
+          recordsReviewed: structuredSendFields.recordsReviewed,
         })
       );
       expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
@@ -523,6 +643,7 @@ describe('doctor response workflow', () => {
             },
           ],
           summary: 'Overall summary',
+          ...structuredSendFields,
           attestationAccepted: true,
         },
         { caseId: 'case-1' }
@@ -538,7 +659,13 @@ describe('doctor response workflow', () => {
           questionAnswers: [
             expect.objectContaining({ questionId: 'sq-1', answer: 'Answer 1' }),
           ],
-          summary: 'Overall summary',
+          summary: structuredSendFields.recommendations,
+          recommendations: structuredSendFields.recommendations,
+          clinicalSummary: structuredSendFields.clinicalSummary,
+          assessment: structuredSendFields.assessment,
+          concordance: structuredSendFields.concordance,
+          limitations: structuredSendFields.limitations,
+          recordsReviewed: structuredSendFields.recordsReviewed,
           isDraft: false,
           signedAt: expect.any(String),
         })

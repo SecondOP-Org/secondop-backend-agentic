@@ -15,6 +15,17 @@ export interface DoctorOpinionKeyImage {
   label: string;
 }
 
+export interface DoctorOpinionRecordReviewed {
+  name: string;
+  kind: 'report' | 'imaging';
+  meta?: string;
+}
+
+export interface DoctorOpinionConcordance {
+  level: 'agree' | 'partially_agree' | 'disagree';
+  rationale: string;
+}
+
 export interface DoctorOpinionPdfInput {
   caseTitle: string;
   caseNumber: string;
@@ -40,6 +51,14 @@ export interface DoctorOpinionPdfInput {
   signedAt?: string | null;
   /** Stable report identifier (defaults to generated uuid for file PDFs). */
   reportId?: string | null;
+  /** Itemized records/imaging the specialist reviewed. */
+  recordsReviewed?: DoctorOpinionRecordReviewed[];
+  clinicalSummary?: string;
+  assessment?: string;
+  concordance?: DoctorOpinionConcordance | null;
+  /** Prefer over summary for "What to do next". */
+  recommendations?: string;
+  limitations?: string;
 }
 
 export interface DoctorOpinionPdfFile {
@@ -266,8 +285,7 @@ const drawLetterhead = (
 
 const drawInfoGrid = (
   doc: PDFKit.PDFDocument,
-  input: DoctorOpinionPdfInput,
-  reportDate: string
+  input: DoctorOpinionPdfInput
 ): void => {
   ensureSpace(doc, 90);
   const colGap = 24;
@@ -319,7 +337,7 @@ const drawInfoGrid = (
     input.doctorLicenseNumber?.trim() || '—'
   );
   rightY = drawLabeled(rightX, rightY, 'Case submitted', formatDisplayDate(input.submittedDate));
-  rightY = drawLabeled(rightX, rightY, 'Report date', reportDate);
+  // Report date lives in the letterhead only (avoid duplicate).
 
   doc.y = Math.max(leftY, rightY);
   space(doc, 4);
@@ -426,7 +444,7 @@ const drawQaBlock = (
 };
 
 const drawKeyImages = (doc: PDFKit.PDFDocument, images: DoctorOpinionKeyImage[]): void => {
-  drawSectionHeader(doc, 'Key Images');
+  drawSectionHeader(doc, 'Key images');
   const gap = 12;
   const colWidth = (CONTENT_WIDTH(doc) - gap) / 2;
 
@@ -476,8 +494,48 @@ const drawKeyImages = (doc: PDFKit.PDFDocument, images: DoctorOpinionKeyImage[])
   }
 };
 
+const concordanceCustomerLabel = (
+  level: 'agree' | 'partially_agree' | 'disagree'
+): string => {
+  switch (level) {
+    case 'agree':
+      return 'We agree with your current diagnosis';
+    case 'partially_agree':
+      return 'We partially agree with your current diagnosis';
+    case 'disagree':
+      return 'We disagree with your current diagnosis';
+    default:
+      return level;
+  }
+};
+
+const drawRecordsReviewed = (
+  doc: PDFKit.PDFDocument,
+  records: DoctorOpinionRecordReviewed[]
+): void => {
+  drawSectionHeader(doc, 'What we reviewed');
+  for (const item of records) {
+    ensureSpace(doc, 24);
+    const meta = item.meta?.trim() ? ` — ${item.meta.trim()}` : '';
+    const kindLabel = item.kind === 'imaging' ? 'Imaging' : 'Report';
+    drawBodyText(doc, `• ${item.name}${meta} (${kindLabel})`);
+    space(doc, 4);
+  }
+  space(doc, 6);
+};
+
+const drawConcordanceBlock = (
+  doc: PDFKit.PDFDocument,
+  concordance: DoctorOpinionConcordance
+): void => {
+  const label = concordanceCustomerLabel(concordance.level);
+  const rationale = concordance.rationale?.trim() || '';
+  const body = rationale ? `${label}\n\n${rationale}` : label;
+  drawCalloutBox(doc, 'Do we agree with your current diagnosis', body);
+};
+
 const drawSignatureBlock = (doc: PDFKit.PDFDocument, input: DoctorOpinionPdfInput): void => {
-  drawSectionHeader(doc, 'Specialist Attestation & Signature');
+  drawSectionHeader(doc, 'Signed by your specialist');
   ensureSpace(doc, 110);
 
   const boxY = doc.y;
@@ -495,9 +553,10 @@ const drawSignatureBlock = (doc: PDFKit.PDFDocument, input: DoctorOpinionPdfInpu
     .text('Electronically signed by', PAGE_MARGIN + 14, y, { width: CONTENT_WIDTH(doc) - 28 });
   y = doc.y + 4;
 
+  const doctorName = input.doctorName?.trim() || 'Specialist';
   const credLine = input.doctorSpecialty
-    ? `${input.doctorName} — ${input.doctorSpecialty}`
-    : input.doctorName;
+    ? `${doctorName} — ${input.doctorSpecialty}`
+    : doctorName;
   doc.font('Helvetica-Bold').fontSize(12).fillColor(BODY_COLOR).text(credLine, PAGE_MARGIN + 14, y, {
     width: CONTENT_WIDTH(doc) - 28,
   });
@@ -523,7 +582,7 @@ const drawSignatureBlock = (doc: PDFKit.PDFDocument, input: DoctorOpinionPdfInpu
 
   doc.y = boxY + boxHeight + 10;
 
-  const attestation = `I, ${input.doctorName}${
+  const attestation = `I, ${doctorName}${
     input.doctorSpecialty ? `, ${input.doctorSpecialty}` : ''
   }${
     input.doctorLicenseNumber ? ` (License ${input.doctorLicenseNumber})` : ''
@@ -630,14 +689,9 @@ const drawFooter = (
   }
 };
 
-const withRedactedDisplayNames = (input: DoctorOpinionPdfInput): DoctorOpinionPdfInput => ({
-  ...input,
-  patientName: redactLastName(input.patientName),
-  doctorName: redactLastName(input.doctorName),
-});
-
 const withCustomerFacingFields = (input: DoctorOpinionPdfInput): DoctorOpinionPdfInput => ({
-  ...withRedactedDisplayNames(input),
+  ...input,
+  // Patient deliverable uses full names (do not redact last names on the signed opinion PDF).
   caseNumber: toPatientFacingCaseRef(input.caseNumber),
 });
 
@@ -652,7 +706,7 @@ const renderDoctorOpinionPdf = (
   const display = withCustomerFacingFields(input);
 
   drawLetterhead(doc, display, reportDate);
-  drawInfoGrid(doc, display, reportDate);
+  drawInfoGrid(doc, display);
 
   const salutationName =
     input.patientFirstName?.trim() ||
@@ -673,24 +727,61 @@ const renderDoctorOpinionPdf = (
   const structuredAnswers = (input.questionAnswers || []).filter(
     (item) => item.question.trim() && item.answer.trim()
   );
-  const summary = input.summary?.trim() || '';
+  const recommendations =
+    input.recommendations?.trim() || input.summary?.trim() || '';
+  const clinicalSummary = input.clinicalSummary?.trim() || '';
+  const assessment = input.assessment?.trim() || '';
+  const limitations = input.limitations?.trim() || '';
   const legacyResponse = input.clinicalResponse?.trim() || '';
+  const recordsReviewed = (input.recordsReviewed || []).filter((item) => item.name?.trim());
 
-  if (summary) {
-    drawCalloutBox(doc, 'Clinical Impression / Summary', summary);
-  } else if (legacyResponse && structuredAnswers.length === 0) {
-    drawCalloutBox(doc, 'Clinical Opinion', legacyResponse);
+  const hasStructuredSections =
+    recordsReviewed.length > 0 ||
+    Boolean(clinicalSummary) ||
+    Boolean(assessment) ||
+    Boolean(input.concordance?.level) ||
+    Boolean(recommendations) ||
+    Boolean(limitations);
+
+  if (recordsReviewed.length > 0) {
+    drawRecordsReviewed(doc, recordsReviewed);
+  }
+
+  if (clinicalSummary) {
+    drawSectionHeader(doc, 'Your case in brief');
+    drawBodyText(doc, clinicalSummary);
+    space(doc, 10);
+  }
+
+  if (assessment) {
+    drawSectionHeader(doc, 'What your records show');
+    drawBodyText(doc, assessment);
+    space(doc, 10);
+  }
+
+  if (input.concordance?.level) {
+    drawConcordanceBlock(doc, {
+      level: input.concordance.level,
+      rationale: input.concordance.rationale || '',
+    });
+  }
+
+  if (recommendations) {
+    drawCalloutBox(doc, 'What to do next', recommendations);
+  } else if (!hasStructuredSections && legacyResponse && structuredAnswers.length === 0) {
+    // Legacy clinicalResponse-only payload.
+    drawCalloutBox(doc, 'What to do next', legacyResponse);
   }
 
   if (structuredAnswers.length > 0) {
-    drawSectionHeader(doc, 'Patient Questions & Specialist Responses');
+    drawSectionHeader(doc, 'Your questions, answered');
     structuredAnswers.forEach((item, index) => {
       drawQaBlock(doc, index + 1, item);
     });
   }
 
-  if (!summary && legacyResponse && structuredAnswers.length > 0) {
-    drawCalloutBox(doc, 'Clinical Opinion', legacyResponse);
+  if (!recommendations && !hasStructuredSections && legacyResponse && structuredAnswers.length > 0) {
+    drawCalloutBox(doc, 'What to do next', legacyResponse);
   }
 
   const keyImages = (input.keyImages || []).filter((image) => {
@@ -705,6 +796,13 @@ const renderDoctorOpinionPdf = (
     drawKeyImages(doc, keyImages);
   }
 
+  if (limitations) {
+    drawSectionHeader(doc, "What this review does and doesn't cover");
+    drawBodyText(doc, limitations);
+    space(doc, 10);
+  }
+
+  // Always render signature block (body populated from doctor fields; draft shows pending).
   drawSignatureBlock(doc, display);
 
   if (input.isDraft) {

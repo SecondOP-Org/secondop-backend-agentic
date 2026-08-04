@@ -13,6 +13,7 @@ import {
   DoctorKeyImage,
   DoctorResponseDraft,
   DoctorResponseSendPayload,
+  RecordsReviewedItem,
   parseDoctorResponseDraft,
 } from '../schemas/doctorResponse.schema';
 
@@ -20,6 +21,99 @@ export interface ResolvedSpecialistQuestion {
   id: string;
   question: string;
 }
+
+/** Standard remote records-only review caveats — specialist may edit before send. */
+export const DEFAULT_REMOTE_REVIEW_LIMITATIONS = [
+  'This is a remote, records-only second opinion. I have not examined you in person.',
+  'Findings and recommendations are based solely on the materials available at the time of review.',
+  'This review does not replace ongoing care with your treating clinicians, and it is not an emergency service.',
+  'If your symptoms change or worsen, seek prompt in-person medical attention.',
+].join(' ');
+
+export interface CaseFileForRecordsReviewed {
+  original_filename?: string | null;
+  filename?: string | null;
+  file_type?: string | null;
+  mime_type?: string | null;
+}
+
+export interface ImagingStudyForRecordsReviewed {
+  study_description?: string | null;
+  modality?: string | null;
+  series_count?: number | null;
+  patient_name?: string | null;
+}
+
+/** Derive a default records-reviewed list from case files + imaging studies. */
+export const buildRecordsReviewedFromCase = (
+  files: CaseFileForRecordsReviewed[] = [],
+  imagingStudies: ImagingStudyForRecordsReviewed[] = []
+): RecordsReviewedItem[] => {
+  const reports: RecordsReviewedItem[] = [];
+  for (const file of files) {
+    const name = (file.original_filename || file.filename || '').trim();
+    if (!name) {
+      continue;
+    }
+    const meta = [file.file_type, file.mime_type].filter(Boolean).join(' · ') || undefined;
+    reports.push({ name, kind: 'report', meta, confirmed: false });
+  }
+
+  const imaging: RecordsReviewedItem[] = [];
+  for (const study of imagingStudies) {
+    const name = (study.study_description || study.modality || 'Imaging study').trim();
+    if (!name) {
+      continue;
+    }
+    const metaParts: string[] = [];
+    if (study.modality?.trim()) {
+      metaParts.push(study.modality.trim());
+    }
+    if (study.series_count != null && Number.isFinite(Number(study.series_count))) {
+      metaParts.push(`${study.series_count} series`);
+    }
+    imaging.push({
+      name,
+      kind: 'imaging',
+      meta: metaParts.length ? metaParts.join(' · ') : undefined,
+      confirmed: false,
+    });
+  }
+
+  return [...reports, ...imaging];
+};
+
+const emptyDraft = (): DoctorResponseDraft => ({
+  questionAnswers: [],
+  summary: '',
+  recordsReviewed: [],
+  clinicalSummary: '',
+  assessment: '',
+  concordance: null,
+  recommendations: '',
+  limitations: '',
+});
+
+/** Keep summary ↔ recommendations dual-write in sync when merging drafts. */
+const syncSummaryAndRecommendations = (
+  parsed: DoctorResponseDraft,
+  current: DoctorResponseDraft
+): { summary: string; recommendations: string } => {
+  const parsedRec = (parsed.recommendations || '').trim();
+  const parsedSum = (parsed.summary || '').trim();
+  const currentRec = (current.recommendations || '').trim();
+  const currentSum = (current.summary || '').trim();
+
+  if (parsedRec) {
+    return { recommendations: parsedRec, summary: parsedRec };
+  }
+  if (parsedSum) {
+    return { recommendations: parsedSum, summary: parsedSum };
+  }
+  // Neither provided in this PUT — preserve existing dual-write values.
+  const preserved = currentRec || currentSum;
+  return { recommendations: preserved, summary: preserved };
+};
 
 export interface CaseRowForQuestionResolution {
   specialist_questions?: string[] | null;
@@ -165,7 +259,7 @@ export const saveDoctorResponseDraft = async (
   const currentDraft =
     existing.rows[0].response_draft && typeof existing.rows[0].response_draft === 'object'
       ? parseDoctorResponseDraft(existing.rows[0].response_draft)
-      : { questionAnswers: [], summary: '' };
+      : emptyDraft();
 
   const mergedAnswers = new Map(
     currentDraft.questionAnswers.map((item) => [item.questionId, item])
@@ -175,14 +269,30 @@ export const saveDoctorResponseDraft = async (
     mergedAnswers.set(item.questionId, item);
   }
 
+  const { summary, recommendations } = syncSummaryAndRecommendations(parsed, currentDraft);
+
   const nextDraft: DoctorResponseDraft = {
     questionAnswers: Array.from(mergedAnswers.values()),
-    summary: parsed.summary !== '' ? parsed.summary : currentDraft.summary,
+    summary,
+    recommendations,
     status: parsed.status ?? currentDraft.status,
     // Client owns the full key-image list (append/remove locally, then PUT).
     keyImages: parsed.keyImages ?? currentDraft.keyImages ?? [],
     // Client owns the AI-draft baseline map (captured on Insert AI draft).
     aiDraftBaselines: parsed.aiDraftBaselines ?? currentDraft.aiDraftBaselines,
+    // Preserve structured report sections when omitted / empty on partial PUT.
+    recordsReviewed:
+      parsed.recordsReviewed && parsed.recordsReviewed.length > 0
+        ? parsed.recordsReviewed
+        : currentDraft.recordsReviewed ?? [],
+    clinicalSummary:
+      parsed.clinicalSummary !== '' ? parsed.clinicalSummary : currentDraft.clinicalSummary || '',
+    assessment: parsed.assessment !== '' ? parsed.assessment : currentDraft.assessment || '',
+    concordance:
+      parsed.concordance !== undefined && parsed.concordance !== null
+        ? parsed.concordance
+        : currentDraft.concordance ?? null,
+    limitations: parsed.limitations !== '' ? parsed.limitations : currentDraft.limitations || '',
   };
 
   await query(
@@ -200,8 +310,25 @@ export const validateDoctorResponseForSend = (
   resolvedQuestions: ResolvedSpecialistQuestion[],
   payload: DoctorResponseSendPayload
 ): void => {
-  if (!payload.summary.trim()) {
-    throw new AppError('summary is required', 400);
+  if (!payload.clinicalSummary?.trim()) {
+    throw new AppError('clinicalSummary is required', 400);
+  }
+  if (!payload.assessment?.trim()) {
+    throw new AppError('assessment is required', 400);
+  }
+  if (!payload.limitations?.trim()) {
+    throw new AppError('limitations is required', 400);
+  }
+  if (!payload.concordance?.level) {
+    throw new AppError('concordance level is required', 400);
+  }
+  if (!payload.concordance.rationale?.trim()) {
+    throw new AppError('concordance rationale is required', 400);
+  }
+
+  const recommendations = (payload.recommendations || '').trim() || (payload.summary || '').trim();
+  if (!recommendations) {
+    throw new AppError('recommendations or summary is required', 400);
   }
 
   if (resolvedQuestions.length === 0) {
@@ -236,19 +363,75 @@ export const clearDoctorResponseDraft = async (caseId: string, doctorUserId: str
   );
 };
 
+const concordanceLevelLabel = (
+  level: 'agree' | 'partially_agree' | 'disagree'
+): string => {
+  switch (level) {
+    case 'agree':
+      return 'We agree with your current diagnosis';
+    case 'partially_agree':
+      return 'We partially agree with your current diagnosis';
+    case 'disagree':
+      return 'We disagree with your current diagnosis';
+    default:
+      return level;
+  }
+};
+
 export const composeDoctorOpinionContent = (payload: DoctorResponseSendPayload): string => {
   const sections: string[] = [];
+  const recommendations =
+    (payload.recommendations || '').trim() || (payload.summary || '').trim();
+
+  if (payload.recordsReviewed && payload.recordsReviewed.length > 0) {
+    sections.push('What we reviewed');
+    payload.recordsReviewed.forEach((item) => {
+      const meta = item.meta?.trim() ? ` (${item.meta.trim()})` : '';
+      sections.push(`- ${item.name}${meta}`);
+    });
+  }
+
+  if (payload.clinicalSummary?.trim()) {
+    sections.push('Your case in brief');
+    sections.push(payload.clinicalSummary.trim());
+  }
+
+  if (payload.assessment?.trim()) {
+    sections.push('What your records show');
+    sections.push(payload.assessment.trim());
+  }
+
+  if (payload.concordance?.level) {
+    sections.push('Do we agree with your current diagnosis');
+    sections.push(concordanceLevelLabel(payload.concordance.level));
+    if (payload.concordance.rationale?.trim()) {
+      sections.push(payload.concordance.rationale.trim());
+    }
+  }
+
+  if (recommendations) {
+    sections.push('What to do next');
+    sections.push(recommendations);
+  }
 
   if (payload.questionAnswers.length > 0) {
-    sections.push('Patient Questions & Specialist Responses');
+    sections.push('Your questions, answered');
     payload.questionAnswers.forEach((item, index) => {
       sections.push(`${index + 1}. ${item.question}`);
       sections.push(item.answer.trim());
     });
   }
 
-  sections.push('Clinical Summary & Recommendations');
-  sections.push(payload.summary.trim());
+  if (payload.limitations?.trim()) {
+    sections.push('What this review does and doesn\'t cover');
+    sections.push(payload.limitations.trim());
+  }
+
+  // Legacy fallback when only summary / clinicalResponse-era content exists.
+  if (sections.length === 0 && payload.summary?.trim()) {
+    sections.push('What to do next');
+    sections.push(payload.summary.trim());
+  }
 
   return sections.join('\n\n');
 };
@@ -301,7 +484,7 @@ export const appendDoctorKeyImage = async (
   }
 ): Promise<{ draft: DoctorResponseDraft; keyImage: DoctorKeyImage }> => {
   const existing = await getDoctorResponse(caseId, doctorUserId);
-  const currentDraft = existing.draft || { questionAnswers: [], summary: '', keyImages: [] };
+  const currentDraft = existing.draft || { ...emptyDraft(), keyImages: [] };
 
   const keyImage: DoctorKeyImage = {
     id: uuidv4(),
@@ -319,6 +502,12 @@ export const appendDoctorKeyImage = async (
   const nextDraft = await saveDoctorResponseDraft(caseId, doctorUserId, {
     questionAnswers: currentDraft.questionAnswers,
     summary: currentDraft.summary,
+    recommendations: currentDraft.recommendations,
+    clinicalSummary: currentDraft.clinicalSummary,
+    assessment: currentDraft.assessment,
+    concordance: currentDraft.concordance,
+    limitations: currentDraft.limitations,
+    recordsReviewed: currentDraft.recordsReviewed,
     status: currentDraft.status,
     keyImages: [...(currentDraft.keyImages || []), keyImage],
     aiDraftBaselines: currentDraft.aiDraftBaselines,
