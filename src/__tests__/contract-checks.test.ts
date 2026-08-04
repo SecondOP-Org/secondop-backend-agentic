@@ -84,6 +84,44 @@ describe('contractChecks', () => {
     expect(result.metrics.forbiddenClaimDetected).toBe(false);
   });
 
+  it('requires patient_summary when clinical summary is populated', () => {
+    const missingPlain = validateCaseAnalysisContract({
+      ...validArtifact,
+      patient_summary: {
+        overview: '',
+        what_to_discuss: '',
+        not_a_diagnosis: '',
+      },
+    });
+    expect(missingPlain.passed).toBe(false);
+    expect(missingPlain.violations.some((v) => v.includes('patient_summary must be populated'))).toBe(true);
+  });
+
+  it('requires not_a_diagnosis caveat when clinical summary is populated', () => {
+    const missingCaveat = validateCaseAnalysisContract({
+      ...validArtifact,
+      patient_summary: {
+        overview: 'Your records show chest pain findings to review.',
+        what_to_discuss: 'Ask your specialist about next tests.',
+        not_a_diagnosis: '',
+      },
+    });
+    expect(missingCaveat.passed).toBe(false);
+    expect(missingCaveat.violations.some((v) => v.includes('not_a_diagnosis'))).toBe(true);
+  });
+
+  it('covers patient_summary in forbidden-claim scanning', () => {
+    const withForbiddenPlain = validateCaseAnalysisContract({
+      ...validArtifact,
+      patient_summary: {
+        ...validArtifact.patient_summary,
+        overview: 'You are diagnosed with acute coronary syndrome based on these labs.',
+      },
+    });
+    expect(withForbiddenPlain.passed).toBe(false);
+    expect(withForbiddenPlain.metrics.forbiddenClaimDetected).toBe(true);
+  });
+
   it('fails when disclaimer or grounding is missing', () => {
     const missingDisclaimer = validateCaseAnalysisContract({
       ...validArtifact,

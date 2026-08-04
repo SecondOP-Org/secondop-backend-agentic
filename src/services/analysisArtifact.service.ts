@@ -18,6 +18,13 @@ export interface StructuredSummary {
   limitations_caveats: string;
 }
 
+/** Plain-language patient register (SEC-189). Restates clinical findings only. */
+export interface PatientSummary {
+  overview: string;
+  what_to_discuss: string;
+  not_a_diagnosis: string;
+}
+
 export interface QuestionnaireItem {
   id: string;
   question: string;
@@ -32,6 +39,7 @@ export interface EvidenceRef {
 
 export interface CaseAnalysisArtifact {
   structured_summary: StructuredSummary;
+  patient_summary: PatientSummary;
   questionnaire: {
     specialist_questions: QuestionnaireItem[];
   };
@@ -86,6 +94,57 @@ export const createEmptyStructuredSummary = (): StructuredSummary => ({
   follow_up_discussion_points: '',
   limitations_caveats: '',
 });
+
+export const createEmptyPatientSummary = (): PatientSummary => ({
+  overview: '',
+  what_to_discuss: '',
+  not_a_diagnosis: '',
+});
+
+const patientSummaryKeys: Array<keyof PatientSummary> = ['overview', 'what_to_discuss', 'not_a_diagnosis'];
+
+export const normalizePatientSummary = (value: unknown): PatientSummary => {
+  if (!value || typeof value !== 'object') {
+    return createEmptyPatientSummary();
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return {
+    overview: normalizeText(candidate.overview),
+    what_to_discuss: normalizeText(candidate.what_to_discuss),
+    not_a_diagnosis: normalizeText(candidate.not_a_diagnosis),
+  };
+};
+
+export const isPatientSummaryPopulated = (summary: PatientSummary): boolean =>
+  patientSummaryKeys.some((key) => Boolean(normalizeText(summary[key])));
+
+export const isStructuredSummaryPopulated = (summary: StructuredSummary): boolean =>
+  sectionOrder.some((key) => Boolean(normalizeText(summary[key])));
+
+/** Minimal paired plain register for builders/tests when patientSummary is omitted. */
+export const buildDefaultPatientSummaryForClinical = (structuredSummary: StructuredSummary): PatientSummary => {
+  if (!isStructuredSummaryPopulated(structuredSummary)) {
+    return createEmptyPatientSummary();
+  }
+
+  const overview = [structuredSummary.chief_concern, structuredSummary.key_report_findings]
+    .map((part) => normalizeText(part))
+    .filter(Boolean)
+    .join(' ');
+  const whatToDiscuss = [structuredSummary.red_flags_to_discuss, structuredSummary.follow_up_discussion_points]
+    .map((part) => normalizeText(part))
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    overview: overview || 'Your records include findings your specialist will review with you.',
+    what_to_discuss:
+      whatToDiscuss || 'Please discuss these findings and next steps with your specialist.',
+    not_a_diagnosis:
+      'This is not a diagnosis. Your specialist reviews the full records and decides what it means for you.',
+  };
+};
 
 export const formatStructuredSummary = (structuredSummary: StructuredSummary): string => {
   return sectionOrder
@@ -320,6 +379,7 @@ const normalizeUncertaintyFlags = (flags: string[] | undefined): string[] =>
 
 export const buildCaseAnalysisArtifact = (input: {
   structuredSummary: StructuredSummary;
+  patientSummary?: PatientSummary | null;
   specialistQuestions: string[];
   confidenceScore?: number;
   uncertaintyFlags?: string[];
@@ -336,6 +396,11 @@ export const buildCaseAnalysisArtifact = (input: {
     limitations_caveats: normalizeText(input.structuredSummary.limitations_caveats),
   };
 
+  const patientSummary =
+    input.patientSummary === undefined
+      ? buildDefaultPatientSummaryForClinical(structuredSummary)
+      : normalizePatientSummary(input.patientSummary);
+
   const questions = input.specialistQuestions.map((question, index) => ({
     id: `q${index + 1}`,
     question: normalizeText(question),
@@ -343,6 +408,7 @@ export const buildCaseAnalysisArtifact = (input: {
 
   return {
     structured_summary: structuredSummary,
+    patient_summary: patientSummary,
     questionnaire: {
       specialist_questions: questions,
     },
@@ -404,7 +470,8 @@ const isStructuredSummary = (value: unknown): value is StructuredSummary => {
   return sectionOrder.every((sectionKey) => typeof (value as Record<string, unknown>)[sectionKey] === 'string');
 };
 
-const isCaseAnalysisArtifact = (value: unknown): value is CaseAnalysisArtifact => {
+/** Legacy artifacts may omit patient_summary; treat as hydrateable if clinical shape is present. */
+const isLegacyOrCurrentCaseAnalysisArtifact = (value: unknown): boolean => {
   if (!value || typeof value !== 'object') {
     return false;
   }
@@ -435,10 +502,11 @@ export const hydrateCaseAnalysisArtifact = (input: {
   questions: string[] | null;
   model: string | null;
 }): CaseAnalysisArtifact | null => {
-  if (isCaseAnalysisArtifact(input.artifact)) {
-    const artifact = input.artifact as CaseAnalysisArtifact;
+  if (isLegacyOrCurrentCaseAnalysisArtifact(input.artifact)) {
+    const artifact = input.artifact as CaseAnalysisArtifact & { patient_summary?: unknown };
     return {
       ...artifact,
+      patient_summary: normalizePatientSummary(artifact.patient_summary),
       uncertainty_flags: Array.isArray(artifact.uncertainty_flags) ? artifact.uncertainty_flags : [],
       evidence_refs: Array.isArray(artifact.evidence_refs) ? artifact.evidence_refs : [],
     };

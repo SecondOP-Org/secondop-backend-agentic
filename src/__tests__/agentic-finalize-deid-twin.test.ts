@@ -16,6 +16,11 @@ const buildDeidentifiedArtifact = (): CaseAnalysisArtifact => ({
     follow_up_discussion_points: 'Confirm history with <PERSON_1>',
     limitations_caveats: 'OCR limited; requires clinician review',
   },
+  patient_summary: {
+    overview: 'Your records mention follow-up for <PERSON_1> with possible heart-related findings.',
+    what_to_discuss: 'Please discuss ongoing chest pain and next steps for <PERSON_1> with your specialist.',
+    not_a_diagnosis: 'This is not a diagnosis. Your specialist reviews the full records and decides next steps.',
+  },
   questionnaire: {
     specialist_questions: [
       { id: 'q1', question: 'Any prior imaging for <PERSON_1> that clarifies ischemia?' },

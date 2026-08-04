@@ -85,6 +85,11 @@ describe('LLM gateway service integration', () => {
         follow_up_discussion_points: 'Discuss diagnostics',
         limitations_caveats: 'Requires clinician review',
       },
+      patient_summary: {
+        overview: 'Your records mention chest pressure findings for your specialist to review.',
+        what_to_discuss: 'Ask about worsening symptoms and which tests to discuss next.',
+        not_a_diagnosis: 'This is not a diagnosis. Your specialist reviews the full records and decides next steps.',
+      },
       questionnaire: {
         specialist_questions: [
           { question: 'What diagnostic testing is recommended now?' },

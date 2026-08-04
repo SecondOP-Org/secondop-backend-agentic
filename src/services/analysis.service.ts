@@ -5,6 +5,7 @@ import {
   buildCaseAnalysisArtifact,
   CaseAnalysisArtifact,
   extractObservationsFromArtifact,
+  normalizePatientSummary,
   TokenUsageMetrics,
   defaultMedicalDisclaimer,
 } from './analysisArtifact.service';
@@ -24,7 +25,7 @@ import {
   upsertDeidVault,
 } from './deidVault.service';
 import { getPresidioConfig } from './presidioConfig.service';
-export interface CaseIntakeData {
+import { PATIENT_VOICE_GUIDANCE } from './patientFacingDraft.service';export interface CaseIntakeData {
   age: number;
   sex: string;
   specialtyContext: string;
@@ -85,6 +86,16 @@ const buildSystemPrompt = (): string => {
     'Confidence score must be between 0 and 1.',
     'Include uncertainty_flags as explicit short statements when confidence is low or evidence is sparse.',
     'Questionnaire items must be actionable specialist-facing questions.',
+    'Produce two registers in the same response:',
+    '1) structured_summary — clinical language for licensed specialists (unchanged role).',
+    '2) patient_summary — plain-language register for the patient (grade 6–8 reading level).',
+    'patient_summary rules:',
+    PATIENT_VOICE_GUIDANCE,
+    'patient_summary may only restate findings already present in structured_summary — never add, upgrade, or soften findings.',
+    'patient_summary.overview: plain restatement of chief concern + key findings.',
+    'patient_summary.what_to_discuss: plain restatement of red flags + follow-up points (frame as discussion, not orders).',
+    'patient_summary.not_a_diagnosis: short non-diagnostic caveat that the specialist decides; must be non-empty when the clinical summary is populated.',
+    'If structured_summary sections are empty, leave patient_summary fields empty too.',
     'Do not output markdown code fences.',
   ].join('\n');
 };
@@ -127,7 +138,7 @@ export const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport
       ? 'One or more reports were extracted via OCR from scans or photos. Use cautious language and uncertainty_flags when source text may be incomplete.'
       : '',
     guidance ? `Agentic Guidance: ${guidance}` : '',
-    'Generate a structured_summary, questionnaire with exactly 3 specialist_questions, confidence_score, uncertainty_flags, and disclaimer.',
+    'Generate a structured_summary, patient_summary (plain-language twin), questionnaire with exactly 3 specialist_questions, confidence_score, uncertainty_flags, and disclaimer.',
   ]
     .filter((line) => line !== '')
     .join('\n');
@@ -152,6 +163,7 @@ const parseAndValidateOutput = (
   }
 
   const structuredSummary = (parsed as { structured_summary?: unknown }).structured_summary;
+  const patientSummaryRaw = (parsed as { patient_summary?: unknown }).patient_summary;
   const questionnaire = (parsed as { questionnaire?: unknown }).questionnaire;
   const confidenceScore = (parsed as { confidence_score?: unknown }).confidence_score;
   const disclaimer = (parsed as { disclaimer?: unknown }).disclaimer;
@@ -183,6 +195,8 @@ const parseAndValidateOutput = (
         ? (structuredSummary as { limitations_caveats: string }).limitations_caveats.trim()
         : '',
   };
+
+  const normalizedPatientSummary = normalizePatientSummary(patientSummaryRaw);
 
   const specialistQuestions = (
     questionnaire &&
@@ -229,6 +243,7 @@ const parseAndValidateOutput = (
 
   const artifact = buildCaseAnalysisArtifact({
     structuredSummary: normalizedStructuredSummary,
+    patientSummary: normalizedPatientSummary,
     specialistQuestions,
     confidenceScore: resolvedConfidence,
     uncertaintyFlags: resolvedUncertaintyFlags,
@@ -332,6 +347,16 @@ export const generateCaseAnalysis = async (
                 'limitations_caveats',
               ],
             },
+            patient_summary: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                overview: { type: 'string' },
+                what_to_discuss: { type: 'string' },
+                not_a_diagnosis: { type: 'string' },
+              },
+              required: ['overview', 'what_to_discuss', 'not_a_diagnosis'],
+            },
             questionnaire: {
               type: 'object',
               additionalProperties: false,
@@ -359,7 +384,14 @@ export const generateCaseAnalysis = async (
             },
             disclaimer: { type: 'string' },
           },
-          required: ['structured_summary', 'questionnaire', 'confidence_score', 'uncertainty_flags', 'disclaimer'],
+          required: [
+            'structured_summary',
+            'patient_summary',
+            'questionnaire',
+            'confidence_score',
+            'uncertainty_flags',
+            'disclaimer',
+          ],
         },
       },
     },

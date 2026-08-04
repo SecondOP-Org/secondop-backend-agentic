@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-04 - SEC-189 - Plain-language patient register (dual register)
+
+- Status: Implementation complete; draft PR pending human merge approval.
+- Human approval: Required before merge/deploy.
+- Branch/worktree: `sec-189-patient-summary-register`
+- Files changed: `analysisArtifact.service.ts` (`PatientSummary` + hydrate/build); `analysis.service.ts` (prompts/schema/parse); `analysisDeidentification.service.ts`; `contractChecks.ts`; `docs/AI_CONTRACT.md`; tests; agentic empty stub; companion FE PR for role-based rendering + landing SVG
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/100 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/131
+- Checks: `npm test`, `npm run eval:harness`, `tsc --noEmit`
+- Deployment: Not started
+- Verification: Contract co-presence + forbidden-claim coverage for plain register; FE unit tests for patient/doctor views
+- Blockers: None for code
+- Follow-ups: Re-run analysis on existing cases to populate `patient_summary`; merge FE companion PR together
+
 ## 2026-08-03 - SEC-26 - Deployment runbook exception + rollback
 
 - Status: Implementation complete; draft PR pending human merge approval.

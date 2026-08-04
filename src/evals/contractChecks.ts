@@ -1,7 +1,11 @@
 import {
   CaseAnalysisArtifact,
+  PatientSummary,
   StructuredSummary,
   defaultMedicalDisclaimer,
+  isPatientSummaryPopulated,
+  isStructuredSummaryPopulated,
+  normalizePatientSummary,
 } from '../services/analysisArtifact.service';
 import { ExtractedReport } from '../services/reportExtraction.service';
 import { incrementGroundingRejects } from '../observability/phoenix.service';
@@ -18,6 +22,8 @@ const sectionOrder: Array<keyof StructuredSummary> = [
   'follow_up_discussion_points',
   'limitations_caveats',
 ];
+
+const patientSummaryKeys: Array<keyof PatientSummary> = ['overview', 'what_to_discuss', 'not_a_diagnosis'];
 
 const forbiddenClaimPatterns: Array<{ id: string; pattern: RegExp }> = [
   { id: 'diagnosis_directive', pattern: /\b(you are diagnosed with|confirmed diagnosis|diagnosis is)\b/i },
@@ -49,6 +55,14 @@ const isStructuredSummary = (value: unknown): value is StructuredSummary => {
   return sectionOrder.every((sectionKey) => typeof (value as Record<string, unknown>)[sectionKey] === 'string');
 };
 
+const isPatientSummaryShape = (value: unknown): value is PatientSummary => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  return patientSummaryKeys.every((key) => typeof (value as Record<string, unknown>)[key] === 'string');
+};
+
 export const isValidCaseAnalysisArtifactShape = (value: unknown): value is CaseAnalysisArtifact => {
   if (!value || typeof value !== 'object') {
     return false;
@@ -63,9 +77,14 @@ export const isValidCaseAnalysisArtifactShape = (value: unknown): value is CaseA
       : null;
 
   const uncertaintyFlags = Array.isArray(candidate.uncertainty_flags) ? candidate.uncertainty_flags : null;
+  const patientSummary =
+    candidate.patient_summary === undefined
+      ? normalizePatientSummary(undefined)
+      : candidate.patient_summary;
 
   return (
     isStructuredSummary(candidate.structured_summary) &&
+    isPatientSummaryShape(patientSummary) &&
     specialistQuestions !== null &&
     typeof candidate.confidence_score === 'number' &&
     Number.isFinite(candidate.confidence_score) &&
@@ -203,10 +222,33 @@ export const computeEvidenceGroundedness = (
 
 export const collectContractText = (artifact: CaseAnalysisArtifact): string => {
   const summaryText = sectionOrder.map((section) => artifact.structured_summary[section]).join('\n');
+  const patientSummary = normalizePatientSummary(artifact.patient_summary);
+  const patientText = patientSummaryKeys.map((key) => patientSummary[key]).join('\n');
   const questionText = artifact.questionnaire.specialist_questions.map((item) => item.question).join('\n');
   const uncertaintyText = collectUncertaintySignals(artifact).join('\n');
 
-  return [summaryText, questionText, uncertaintyText, artifact.disclaimer].join('\n');
+  return [summaryText, patientText, questionText, uncertaintyText, artifact.disclaimer].join('\n');
+};
+
+export const validatePatientSummaryContract = (artifact: CaseAnalysisArtifact): string[] => {
+  const violations: string[] = [];
+  const patientSummary = normalizePatientSummary(artifact.patient_summary);
+  const clinicalPopulated = isStructuredSummaryPopulated(artifact.structured_summary);
+  const plainPopulated = isPatientSummaryPopulated(patientSummary);
+
+  if (clinicalPopulated !== plainPopulated) {
+    violations.push(
+      clinicalPopulated
+        ? 'patient_summary must be populated whenever structured_summary is populated.'
+        : 'patient_summary must be empty when structured_summary is empty.'
+    );
+  }
+
+  if (clinicalPopulated && !patientSummary.not_a_diagnosis.trim()) {
+    violations.push('patient_summary.not_a_diagnosis must be present when the clinical summary is populated.');
+  }
+
+  return violations;
 };
 
 export const validateCaseAnalysisContract = (
@@ -236,6 +278,8 @@ export const validateCaseAnalysisContract = (
 
   const forbiddenClaims = detectForbiddenClaims(collectContractText(artifact));
   violations.push(...forbiddenClaims);
+
+  violations.push(...validatePatientSummaryContract(artifact));
 
   const lowConfidenceHasUncertaintyFlags = validateLowConfidenceUncertainty(
     artifact.confidence_score,
