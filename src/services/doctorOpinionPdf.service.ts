@@ -133,7 +133,7 @@ export const resolveLogoPath = (): string | null => {
 /** Draw a simple brand tile when the PNG cannot be embedded. */
 const drawAppBrandMarkFallback = (doc: PDFKit.PDFDocument, x: number, y: number, size: number): void => {
   doc.save();
-  doc.roundedRect(x, y, size, size, size * 0.22).fill('#1B5CF5');
+  doc.roundedRect(x, y, size, size, size * 0.22).fill('#223B6C');
   doc.restore();
 };
 
