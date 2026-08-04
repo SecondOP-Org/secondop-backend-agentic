@@ -112,7 +112,7 @@ const resolveUploadDir = (): string => {
   return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
 };
 
-/** High-res app mark (navy square + white shield) — same chrome as UnifiedHeader. */
+/** High-res official S mark — same chrome as UnifiedHeader / favicon. */
 export const resolveLogoPath = (): string | null => {
   const candidates = [
     path.resolve(process.cwd(), 'assets/secondop-logo.png'),
@@ -130,19 +130,10 @@ export const resolveLogoPath = (): string | null => {
   return null;
 };
 
-/** Draw the in-app brand mark when the PNG cannot be embedded. */
+/** Draw a simple brand tile when the PNG cannot be embedded. */
 const drawAppBrandMarkFallback = (doc: PDFKit.PDFDocument, x: number, y: number, size: number): void => {
   doc.save();
-  doc.translate(x, y);
-  const scale = size / 64;
-  doc.scale(scale);
-  doc.roundedRect(0, 0, 64, 64, 14).fill(BRAND_COLOR);
-  // Same shield path as public/secondop-favicon.svg / header icon.
-  doc
-    .path(
-      'M32 13.5 16 20.2v12.6c0 10 6.8 19.3 16 22.2 9.2-2.9 16-12.2 16-22.2V20.2L32 13.5Zm0 5.4 10.7 4.5v9.4c0 7.3-4.7 14.7-10.7 17.4-6-2.7-10.7-10.1-10.7-17.4v-9.4L32 18.9Z'
-    )
-    .fill('#FFFFFF');
+  doc.roundedRect(x, y, size, size, size * 0.22).fill('#1B5CF5');
   doc.restore();
 };
 
