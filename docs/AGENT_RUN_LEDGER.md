@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-04 - SEC-194 - Official SecondOp S logo in PDF letterhead
+
+- Status: Implementation complete on feature branch; awaiting draft PR + human merge approval.
+- Human approval: Required before merge/deploy.
+- Branch/worktree: `sec-194-official-s-logo`
+- Files changed: `assets/secondop-logo.png`, `assets/secondop-mark.svg`, `doctorOpinionPdf.service.ts` (logo comments + fallback tile color), this ledger entry
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/102 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/136
+- Checks: `npm test -- --testPathPattern=doctorOpinionPdf` (14 passed); `npm run lint`
+- Deployment: Not started
+- Verification: `resolveLogoPath` still resolves `assets/secondop-logo.png`; letterhead embeds new S mark
+- Blockers: None for backend code; FE companion swaps chrome + home PDF sample
+- Follow-ups: Merge with FE PR; regenerate a sample opinion PDF for visual QA
+
 ## 2026-08-04 - SEC-190 - Doctor opinion comprehensive report (backend)
 
 - Status: Backend implementation complete on feature branch; awaiting FE companion + draft PR.
