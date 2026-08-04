@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Required before merge/deploy.
 - Branch/worktree: `sec-189-patient-summary-register`
 - Files changed: `analysisArtifact.service.ts` (`PatientSummary` + hydrate/build); `analysis.service.ts` (prompts/schema/parse); `analysisDeidentification.service.ts`; `contractChecks.ts`; `docs/AI_CONTRACT.md`; tests; agentic empty stub; companion FE PR for role-based rendering + landing SVG
-- PR: (link after open)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/100 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/131
 - Checks: `npm test`, `npm run eval:harness`, `tsc --noEmit`
 - Deployment: Not started
 - Verification: Contract co-presence + forbidden-claim coverage for plain register; FE unit tests for patient/doctor views
