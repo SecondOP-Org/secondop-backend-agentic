@@ -34,8 +34,8 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Required before merge/deploy.
 - Branch/worktree: `sec-194-official-s-logo`
 - Files changed: `assets/secondop-logo.png`, `assets/secondop-mark.svg`, `doctorOpinionPdf.service.ts` (logo comments + fallback tile color), this ledger entry
-- PR: Not opened yet
-- Checks: Pending `npm test -- --testPathPattern=doctorOpinionPdf`
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/102 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/136
+- Checks: `npm test -- --testPathPattern=doctorOpinionPdf` (14 passed); `npm run lint`
 - Deployment: Not started
 - Verification: `resolveLogoPath` still resolves `assets/secondop-logo.png`; letterhead embeds new S mark
 - Blockers: None for backend code; FE companion swaps chrome + home PDF sample
