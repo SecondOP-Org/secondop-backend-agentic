@@ -91,6 +91,11 @@ export const reidentifyArtifact = (
   const nextArtifact: CaseAnalysisArtifact = {
     ...artifact,
     structured_summary: structuredSummary,
+    patient_summary: {
+      overview: reidentifyText(artifact.patient_summary?.overview || '', mapping),
+      what_to_discuss: reidentifyText(artifact.patient_summary?.what_to_discuss || '', mapping),
+      not_a_diagnosis: reidentifyText(artifact.patient_summary?.not_a_diagnosis || '', mapping),
+    },
     questionnaire: {
       specialist_questions: specialistQuestions,
     },

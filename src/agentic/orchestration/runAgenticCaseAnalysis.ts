@@ -138,6 +138,11 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
             follow_up_discussion_points: '',
             limitations_caveats: '',
           },
+          patient_summary: {
+            overview: '',
+            what_to_discuss: '',
+            not_a_diagnosis: '',
+          },
           questionnaire: {
             specialist_questions: [],
           },

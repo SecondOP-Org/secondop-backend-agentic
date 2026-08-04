@@ -86,6 +86,11 @@ describe('doctor response workflow', () => {
             follow_up_discussion_points: 'Follow up',
             limitations_caveats: 'Limits',
           },
+          patient_summary: {
+            overview: 'Plain overview',
+            what_to_discuss: 'Plain discuss',
+            not_a_diagnosis: 'This is not a diagnosis.',
+          },
           questionnaire: {
             specialist_questions: [{ id: 'ai-q-1', question: 'AI question' }],
           },
@@ -113,6 +118,11 @@ describe('doctor response workflow', () => {
             red_flags_to_discuss: 'Flag',
             follow_up_discussion_points: 'Follow up',
             limitations_caveats: 'Limits',
+          },
+          patient_summary: {
+            overview: 'Plain overview',
+            what_to_discuss: 'Plain discuss',
+            not_a_diagnosis: 'This is not a diagnosis.',
           },
           questionnaire: {
             specialist_questions: [{ id: 'ai-q-1', question: 'AI question' }],

@@ -216,6 +216,11 @@ describe('clinician reidentify + prompt PHI leak', () => {
         follow_up_discussion_points: 'Confirm history with <PERSON_1>',
         limitations_caveats: 'OCR limited',
       },
+      patient_summary: {
+        overview: 'Your records mention follow-up for <PERSON_1>.',
+        what_to_discuss: 'Discuss next steps for <PERSON_1> with your specialist.',
+        not_a_diagnosis: 'This is not a diagnosis. Your specialist decides next steps.',
+      },
       questionnaire: {
         specialist_questions: [
           { id: 'q1', question: 'Any prior imaging for <PERSON_1>?' },
@@ -240,6 +245,7 @@ describe('clinician reidentify + prompt PHI leak', () => {
     const clinician = reidentifyArtifact(artifact, mapping);
 
     expect(clinician.artifact.structured_summary.chief_concern).toContain('Jane Doe');
+    expect(clinician.artifact.patient_summary.overview).toContain('Jane Doe');
     expect(clinician.artifact.evidence_refs[0].snippet).toContain('Jane Doe');
     expect(clinician.topQuestions[0]).toContain('Jane Doe');
 
