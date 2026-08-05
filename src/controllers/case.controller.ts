@@ -990,7 +990,8 @@ export const getDoctorDashboardStats = async (req: AuthRequest, res: Response, n
     );
 
     const rows = result.rows as Array<{ status: string; effective_due_date: string | Date | null }>;
-    const pendingCases = rows.filter((row) => row.status === 'pending').length;
+    // Open caseload (not yet completed) — avoids "Pending 0 / Total 2" when cases are in_review.
+    const pendingCases = rows.filter((row) => row.status !== 'completed').length;
     const responsesDueToday = rows.filter((row) => {
       if (row.status === 'completed') {
         return false;
@@ -1454,10 +1455,12 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
       ]
     );
 
+    // Cast $1::text in the CASE compare so Postgres does not infer conflicting
+    // types for the same bind (varchar from cases.status vs text from 'completed').
     await query(
       `UPDATE cases
        SET status = $1,
-           completed_date = CASE WHEN $1 = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_date END,
+           completed_date = CASE WHEN $1::text = 'completed' THEN CURRENT_TIMESTAMP ELSE completed_date END,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $2`,
       [nextStatus, caseId]

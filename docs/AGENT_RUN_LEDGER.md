@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-05 - SEC-198 - Doctor opinion E2E P0–P2 fixes
+
+- Status: Implementation complete on feature branch; awaiting draft PR + human merge approval.
+- Human approval: Required before merge/deploy.
+- Branch/worktree: `sec-198-doctor-opinion-e2e-fixes`
+- Files changed: `case.controller.ts` (status UPDATE `$1::text` cast; open-cases stats), `extractedReportSanitize.service.ts` (PDF operator junk + citation sanitize), `analysisArtifact.service.ts` (filter junk evidence_refs), `doctor-response.test.ts`, `extracted-report-sanitize.test.ts`, this ledger
+- PR: pending
+- Checks: `npm run lint`; `npm test -- --testPathPattern='doctor-response|extracted-report-sanitize'` (22 passed); `npm run build`
+- Deployment: Not started (P0 prod send-500 needs deploy after merge)
+- Verification: unit coverage for `$1::text` cast and PDF-operator junk rejection
+- Blockers: none for code; prod case `c9fce3de` orphaned `doctor_opinion` messages need ops cleanup after deploy
+- Follow-ups: FE sibling PR for AI-draft replace, cite sanitize, preview open-in-tab, dashboard labels, patient plain register; seed typo "panic attacs" not in repo seeds (prod data only)
+
 ## 2026-08-04 - SEC-194 - Official SecondOp S logo in PDF letterhead
 
 - Status: Implementation complete on feature branch; awaiting draft PR + human merge approval.

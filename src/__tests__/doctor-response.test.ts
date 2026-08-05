@@ -675,5 +675,82 @@ describe('doctor response workflow', () => {
         ['case-1', 'doctor-1']
       );
     });
+
+    it('marks the case completed with a typed status compare (SEC-198 Postgres 42P08)', async () => {
+      mockedQuery
+        .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+        .mockResolvedValueOnce({
+          rows: [{ id: 'doctor-row', verification_status: 'verified' }],
+        } as any)
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'case-1',
+              title: 'Cardiology case',
+              case_number: 'SO-1001',
+              submitted_date: '2026-01-01',
+              specialist_questions: ['Question 1'],
+              analysis_questions: null,
+              analysis_artifact: null,
+              analysis_summary: null,
+              analysis_model: null,
+              share_ai_analysis_with_specialists: true,
+              analysis_status: 'succeeded',
+              patient_user_id: 'user-patient-1',
+              patient_first_name: 'Pat',
+              patient_last_name: 'Smith',
+              doctor_first_name: 'Doc',
+              doctor_last_name: 'Jones',
+              doctor_specialty: 'Cardiology',
+            },
+          ],
+        } as any)
+        .mockResolvedValueOnce({ rows: [{ id: 'message-1' }] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({ rows: [{ id: 'doctor-1' }] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      mockedGenerateDoctorOpinionPdf.mockResolvedValue({
+        reportId: 'report-1',
+        filePath: '/tmp/report-1.pdf',
+        filename: 'report-1.pdf',
+        originalName: 'SecondOp-Opinion-SO-1001.pdf',
+        size: 1024,
+      } as any);
+
+      const req = createDoctorRequest(
+        {
+          questionAnswers: [
+            {
+              questionId: 'sq-1',
+              question: 'Question 1',
+              answer: 'Answer 1',
+            },
+          ],
+          summary: 'Overall summary',
+          ...structuredSendFields,
+          attestationAccepted: true,
+        },
+        { caseId: 'case-1' }
+      );
+      const res = createMockResponse();
+      const next = jest.fn();
+
+      await sendDoctorOpinion(req, res, next);
+
+      expect(next).not.toHaveBeenCalled();
+
+      const caseStatusUpdate = mockedQuery.mock.calls.find(
+        ([sql]) =>
+          typeof sql === 'string' &&
+          sql.includes('UPDATE cases') &&
+          sql.includes('completed_date') &&
+          sql.includes("CASE WHEN")
+      );
+      expect(caseStatusUpdate).toBeDefined();
+      expect(caseStatusUpdate![0]).toContain("$1::text = 'completed'");
+      expect(caseStatusUpdate![1]).toEqual(['completed', 'case-1']);
+    });
   });
 });
