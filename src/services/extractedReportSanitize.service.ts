@@ -11,7 +11,22 @@ const SNAKE_OR_UI_TOKEN_RE = /\b[A-Za-z]{2,}_[A-Za-z0-9]{1,}\b/;
 
 const ALL_CAPS_TOKEN_RE = /\b[A-Z]{4,}\b/g;
 
+/** Raw PDF content-stream / xref markers that must never become patient-facing citations. */
+const PDF_STREAM_OPERATOR_RE =
+  /\/Type\s*\/Page\b|\/MediaBox\b|\/Parent\s+\d+\s+\d+\s+R\b|\b(endstream|endobj|xref|trailer|startxref)\b|\/F\d+\s+\d+(\.\d+)?\s+Tf\b|\bstream\b.{0,40}\bBT\b|\bBT\b.{0,80}\bET\b/i;
+
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
+
+const stripControlChars = (value: string): string => {
+  let out = '';
+  for (let i = 0; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code === 9 || code === 10 || code === 13 || (code >= 32 && code !== 127)) {
+      out += value[i];
+    }
+  }
+  return out;
+};
 
 const letterStats = (value: string): { letters: number; lowercase: number; digits: number } => {
   let letters = 0;
@@ -33,11 +48,15 @@ const letterStats = (value: string): { letters: number; lowercase: number; digit
 const wordTokens = (value: string): string[] =>
   value.split(/[^A-Za-z0-9]+/).filter((token) => token.length > 0);
 
-/** True when a candidate looks like portal/OCR chrome rather than clinical prose. */
+/** True when a candidate looks like portal/OCR chrome or raw PDF operators rather than clinical prose. */
 export const isNavOrOcrJunkSnippet = (value: string): boolean => {
-  const trimmed = normalizeWhitespace(value);
+  const trimmed = normalizeWhitespace(stripControlChars(value));
   if (trimmed.length < 8) {
     return false;
+  }
+
+  if (PDF_STREAM_OPERATOR_RE.test(trimmed)) {
+    return true;
   }
 
   if (UI_NAV_CHROME_RE.test(trimmed)) {
@@ -124,6 +143,24 @@ export const isProseLikeEvidenceSnippet = (value: string): boolean => {
   }
 
   return false;
+};
+
+/**
+ * Normalize and gate evidence snippets before they reach cite/insert UI.
+ * Returns empty string when the snippet is non-prose (PDF operators, chrome, etc.).
+ */
+export const sanitizeEvidenceSnippetForCitation = (
+  value: string,
+  maxLength = 280
+): string => {
+  const cleaned = normalizeWhitespace(stripControlChars(value || ''));
+  if (!cleaned) {
+    return '';
+  }
+  if (isNavOrOcrJunkSnippet(cleaned) || !isProseLikeEvidenceSnippet(cleaned)) {
+    return '';
+  }
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength).trim()}…` : cleaned;
 };
 
 /**

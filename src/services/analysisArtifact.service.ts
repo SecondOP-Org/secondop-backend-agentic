@@ -2,6 +2,7 @@ import { ExtractedReport } from './reportExtraction.service';
 import {
   isNavOrOcrJunkSnippet,
   isProseLikeEvidenceSnippet,
+  sanitizeEvidenceSnippetForCitation,
 } from './extractedReportSanitize.service';
 
 export interface TokenUsageMetrics {
@@ -364,6 +365,11 @@ const buildEvidenceRefs = (
         return null;
       }
 
+      // Drop non-prose / PDF-operator snippets; keep original text for groundedness.
+      if (!sanitizeEvidenceSnippetForCitation(grounded.snippet)) {
+        return null;
+      }
+
       return {
         file_id: grounded.fileId,
         file_name: grounded.fileName,
@@ -508,7 +514,9 @@ export const hydrateCaseAnalysisArtifact = (input: {
       ...artifact,
       patient_summary: normalizePatientSummary(artifact.patient_summary),
       uncertainty_flags: Array.isArray(artifact.uncertainty_flags) ? artifact.uncertainty_flags : [],
-      evidence_refs: Array.isArray(artifact.evidence_refs) ? artifact.evidence_refs : [],
+      evidence_refs: Array.isArray(artifact.evidence_refs)
+        ? artifact.evidence_refs.filter((ref) => !isNavOrOcrJunkSnippet(ref.snippet || ''))
+        : [],
     };
   }
 

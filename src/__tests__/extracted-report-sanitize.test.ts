@@ -1,6 +1,7 @@
 import {
   isNavOrOcrJunkSnippet,
   isProseLikeEvidenceSnippet,
+  sanitizeEvidenceSnippetForCitation,
   sanitizeExtractedReportText,
 } from '../services/extractedReportSanitize.service';
 import {
@@ -20,6 +21,19 @@ describe('extracted report sanitize (SEC-145)', () => {
   it('flags portal/OCR chrome as junk', () => {
     expect(isNavOrOcrJunkSnippet(junk)).toBe(true);
     expect(isProseLikeEvidenceSnippet(junk)).toBe(false);
+  });
+
+  it('flags raw PDF stream operators as junk (SEC-198)', () => {
+    const pdfJunk =
+      'SecondOp Storage Smoke /Type /Page /Parent 2 0 R /MediaBox stream BT /F1 18 Tf (hello) Tj ET';
+    expect(isNavOrOcrJunkSnippet(pdfJunk)).toBe(true);
+    expect(isProseLikeEvidenceSnippet(pdfJunk)).toBe(false);
+    expect(sanitizeEvidenceSnippetForCitation(pdfJunk)).toBe('');
+  });
+
+  it('sanitizes clinical prose for citation', () => {
+    expect(sanitizeEvidenceSnippetForCitation(`  ${clinical}  `)).toContain('temporal lobe');
+    expect(sanitizeEvidenceSnippetForCitation('hs-CRP 3.2 mg/L')).toBe('hs-CRP 3.2 mg/L');
   });
 
   it('accepts clinical prose and short lab values', () => {
