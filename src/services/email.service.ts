@@ -31,6 +31,20 @@ export const getAppPublicUrl = (): string => {
   return raw.replace(/\/$/, '');
 };
 
+/** Public API origin for one-click ops links (signup approve/reject). */
+export const getApiPublicUrl = (): string => {
+  const configured = process.env.API_PUBLIC_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+  const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
+  if (railwayDomain) {
+    return `https://${railwayDomain.replace(/^https?:\/\//, '').replace(/\/$/, '')}`;
+  }
+  const port = process.env.PORT || '8081';
+  return `http://localhost:${port}`;
+};
+
 const getTransporter = () => {
   if (!isEmailConfigured()) {
     return null;
@@ -150,6 +164,54 @@ export const buildWelcomeVerifyEmail = (input: {
     <p>Or paste this link into your browser:<br/>${escapeHtml(input.verifyUrl)}</p>
     <p>If you did not create this account, you can ignore this message.</p>
     <p>— The SecondOp team</p>
+  `.trim();
+  return { subject, text, html };
+};
+
+export const buildSignupApprovalNotifyEmail = (input: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  userType: string;
+  userId: string;
+  approveUrl: string;
+  rejectUrl: string;
+}): { subject: string; text: string; html: string } => {
+  const name = `${input.firstName.trim()} ${input.lastName.trim()}`.trim() || 'Unknown';
+  const subject = `[SecondOp] Approve signup — ${input.userType}: ${input.email}`;
+  const text = [
+    'A new SecondOp signup is awaiting approval (by-request beta).',
+    '',
+    `Name: ${name}`,
+    `Email: ${input.email}`,
+    `Type: ${input.userType}`,
+    `User ID: ${input.userId}`,
+    '',
+    `Approve (activates account + sends welcome email):`,
+    input.approveUrl,
+    '',
+    `Reject (keeps account inactive, no welcome email):`,
+    input.rejectUrl,
+    '',
+    '— SecondOp signup gate',
+  ].join('\n');
+  const html = `
+    <p>A new SecondOp signup is awaiting approval (by-request beta).</p>
+    <ul>
+      <li><strong>Name:</strong> ${escapeHtml(name)}</li>
+      <li><strong>Email:</strong> ${escapeHtml(input.email)}</li>
+      <li><strong>Type:</strong> ${escapeHtml(input.userType)}</li>
+      <li><strong>User ID:</strong> ${escapeHtml(input.userId)}</li>
+    </ul>
+    <p>
+      <a href="${escapeAttr(input.approveUrl)}" style="display:inline-block;padding:10px 16px;background:#223B6C;color:#fff;text-decoration:none;border-radius:6px;">
+        Approve signup
+      </a>
+    </p>
+    <p style="font-size:0.9rem;">
+      Or <a href="${escapeAttr(input.rejectUrl)}">reject</a> (keeps account inactive; no welcome email).
+    </p>
+    <p style="color:#666;font-size:0.85rem;">Approve activates the account and queues the welcome / email-confirmation message to the user.</p>
   `.trim();
   return { subject, text, html };
 };
