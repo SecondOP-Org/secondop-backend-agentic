@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Required before merge/deploy.
 - Branch/worktree: `sec-198-doctor-opinion-e2e-fixes`
 - Files changed: `case.controller.ts` (status UPDATE `$1::text` cast; open-cases stats), `extractedReportSanitize.service.ts` (PDF operator junk + citation sanitize), `analysisArtifact.service.ts` (filter junk evidence_refs), `doctor-response.test.ts`, `extracted-report-sanitize.test.ts`, this ledger
-- PR: pending
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/103 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/142
 - Checks: `npm run lint`; `npm test -- --testPathPattern='doctor-response|extracted-report-sanitize'` (22 passed); `npm run build`
 - Deployment: Not started (P0 prod send-500 needs deploy after merge)
 - Verification: unit coverage for `$1::text` cast and PDF-operator junk rejection
