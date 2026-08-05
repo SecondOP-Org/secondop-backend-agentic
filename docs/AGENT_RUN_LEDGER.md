@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-05 - SEC-199 - Lock production signup (approval gate)
+
+- Status: Implementation complete on feature branch; awaiting draft PR + human merge/deploy approval.
+- Human approval: Required before merge/deploy. Production needs `API_PUBLIC_URL` set for one-click approve links.
+- Branch/worktree: `sec-199-signup-approval-gate`
+- Files changed: `signupApproval.service.ts` (new), `auth.controller.ts`, `auth.routes.ts`, `email.service.ts`, `.env.example`, `signup-approval*.test.ts`, this ledger
+- PR: (pending)
+- Checks: `npm test -- --testPathPattern='signup-approval'` (9 passed); lint/build pending in this run
+- Deployment: Not started — gate defaults on when `NODE_ENV=production`
+- Verification: register with gate → `pendingApproval`, no tokens/welcome; approve HTML path; ops notify email builder
+- Blockers: None for code; deploy needs Railway `API_PUBLIC_URL` + optional explicit `SIGNUP_REQUIRES_APPROVAL=true`
+- Follow-ups: FE companion PR; after merge set prod env and smoke register → Vinodh approve email → welcome
+
 ## 2026-08-05 - SEC-198 - Doctor opinion E2E P0–P2 fixes
 
 - Status: Implementation complete on feature branch; awaiting draft PR + human merge approval.

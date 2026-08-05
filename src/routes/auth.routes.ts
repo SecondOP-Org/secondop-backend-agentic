@@ -10,6 +10,8 @@ import {
   resetPassword,
   changePassword,
   verifyEmail,
+  approveSignup,
+  rejectSignup,
 } from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth';
 import { authRateLimiter } from '../middleware/rateLimiter';
@@ -18,6 +20,10 @@ const router = Router();
 
 // Public routes
 router.post('/register', authRateLimiter, register);
+router.get('/signup-approvals/:token/approve', authRateLimiter, approveSignup);
+router.post('/signup-approvals/:token/approve', authRateLimiter, approveSignup);
+router.get('/signup-approvals/:token/reject', authRateLimiter, rejectSignup);
+router.post('/signup-approvals/:token/reject', authRateLimiter, rejectSignup);
 router.post('/login', authRateLimiter, login);
 router.post('/login/phone', authRateLimiter, loginWithPhone);
 router.post('/verify-otp', authRateLimiter, verifyOTP);

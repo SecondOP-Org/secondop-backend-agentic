@@ -21,6 +21,13 @@ import {
   parseOrganizationSignupInput,
   resolveInviteForDoctorRegistration,
 } from '../services/organization.service';
+import {
+  createSignupApprovalToken,
+  decideSignupApproval,
+  queueSignupApprovalNotify,
+  renderSignupApprovalHtml,
+  signupRequiresApproval,
+} from '../services/signupApproval.service';
 
 // Helper function to generate JWT token
 const generateToken = (
@@ -92,15 +99,16 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, bcryptRounds);
+    const requiresApproval = signupRequiresApproval();
 
     // Create user and profile in transaction
     const result = await transaction(async (client) => {
-      // Create user
+      // Create user — pending approval keeps is_active false (SEC-199).
       const userResult = await client.query(
-        `INSERT INTO users (email, phone, password_hash, user_type, is_verified)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, email, user_type, is_verified, created_at`,
-        [email, phone || null, passwordHash, userType, false]
+        `INSERT INTO users (email, phone, password_hash, user_type, is_verified, is_active)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, email, user_type, is_verified, is_active, created_at`,
+        [email, phone || null, passwordHash, userType, false, !requiresApproval]
       );
 
       const user = userResult.rows[0];
@@ -196,11 +204,53 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       return user;
     });
 
-    // Generate tokens
+    logger.info(`User registered: ${result.email}`, {
+      requiresApproval,
+      isActive: result.is_active,
+    });
+
+    if (requiresApproval) {
+      try {
+        const approvalToken = await createSignupApprovalToken({
+          userId: result.id,
+          email: result.email,
+        });
+        queueSignupApprovalNotify({
+          token: approvalToken,
+          userId: result.id,
+          email: result.email,
+          firstName: String(firstName),
+          lastName: String(lastName),
+          userType: result.user_type,
+        });
+      } catch (approvalError) {
+        logger.error('Failed to queue signup approval notify', {
+          email: result.email,
+          error: approvalError instanceof Error ? approvalError.message : String(approvalError),
+        });
+      }
+
+      res.status(201).json({
+        status: 'success',
+        message:
+          'Registration received. Your account is pending approval — we will email you when it is ready.',
+        data: {
+          pendingApproval: true,
+          user: {
+            id: result.id,
+            email: result.email,
+            userType: result.user_type,
+            isVerified: result.is_verified,
+          },
+          emailVerificationSent: false,
+        },
+      });
+      return;
+    }
+
+    // Generate tokens (open signup / non-production)
     const token = generateToken(result.id, result.email, result.user_type);
     const refreshToken = generateRefreshToken(result.id);
-
-    logger.info(`User registered: ${result.email}`);
 
     // Persist verify token synchronously; SMTP must not block the HTTP response.
     let emailVerificationQueued = false;
@@ -237,6 +287,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       status: 'success',
       message: 'User registered successfully',
       data: {
+        pendingApproval: false,
         user: {
           id: result.id,
           email: result.email,
@@ -247,6 +298,52 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         refreshToken,
         emailVerificationSent: emailVerificationQueued,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const approveSignup = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.params;
+    const result = await decideSignupApproval(String(token || ''), 'approve');
+    const acceptsHtml =
+      req.method === 'GET' || String(req.headers.accept || '').includes('text/html');
+    if (acceptsHtml) {
+      res
+        .status(200)
+        .type('html')
+        .send(renderSignupApprovalHtml('approve', result));
+      return;
+    }
+    res.status(200).json({
+      status: 'success',
+      message: 'Signup approved',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const rejectSignup = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token } = req.params;
+    const result = await decideSignupApproval(String(token || ''), 'reject');
+    const acceptsHtml =
+      req.method === 'GET' || String(req.headers.accept || '').includes('text/html');
+    if (acceptsHtml) {
+      res
+        .status(200)
+        .type('html')
+        .send(renderSignupApprovalHtml('reject', result));
+      return;
+    }
+    res.status(200).json({
+      status: 'success',
+      message: 'Signup rejected',
+      data: result,
     });
   } catch (error) {
     next(error);
