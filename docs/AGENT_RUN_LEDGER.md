@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-05 - SEC-201 - Primary domain secondop.ai
+
+- Status: Implementation on feature branch; awaiting draft PR + human merge/deploy.
+- Human approval: Required before merge/deploy. Railway must set `APP_PUBLIC_URL=https://secondop.ai` and CORS to include `https://secondop.ai` (optionally keep `https://secondop.in` during cutover).
+- Branch/worktree: `sec-201-secondop-ai-primary`
+- Files changed: PDF footer brand, service-health default FE URL, CORS unit examples, `.env.example`, runbook/phoenix docs, ledger
+- PR: (pending)
+- Checks: pending
+- Deployment: Not started — FE companion PR owns `vercel.json` `.in` → `.ai` redirects
+- Verification: unit CORS parse still green after domain swap
+- Blockers: Vercel must attach `secondop.ai` as primary; DNS for `.in` must stay on Vercel for redirects to fire
+- Follow-ups: Update Railway prod `CORS_ORIGIN` / `SOCKET_IO_CORS_ORIGIN` / `APP_PUBLIC_URL`; mailboxes for `@secondop.ai`
+
 ## 2026-08-05 - SEC-199 - Lock production signup (approval gate)
 
 - Status: Implementation complete on feature branch; awaiting draft PR + human merge/deploy approval.

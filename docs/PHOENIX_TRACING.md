@@ -32,7 +32,7 @@ Auth is **enabled** on the Phoenix service (`PHOENIX_ENABLE_AUTH=True`). Treat t
 
 1. Trigger case analysis in production  
 2. In Phoenix UI → project **secondop-agent-analysis** → traces/spans  
-3. Also use platform UI: `https://secondop.in/analysis-observability?caseId=...` (DB ledger)
+3. Also use platform UI: `https://secondop.ai/analysis-observability?caseId=...` (DB ledger)
 
 ## Local
 

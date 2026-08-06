@@ -44,7 +44,7 @@ const DEFAULT_PRODUCTION_TARGETS: ServiceHealthTarget[] = [
   {
     id: 'fe',
     label: 'Frontend',
-    url: 'https://secondop.in',
+    url: 'https://secondop.ai',
     probe: 'http',
   },
   {
