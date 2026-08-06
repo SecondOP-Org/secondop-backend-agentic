@@ -629,7 +629,7 @@ const drawFooter = (
     );
   }
   const disclaimer = disclaimerParts.join(' ');
-  const metaLine = `Generated ${formatDisplayDateTime(generatedAt)} · secondop.in`;
+  const metaLine = `Generated ${formatDisplayDateTime(generatedAt)} · secondop.ai`;
 
   const range = doc.bufferedPageRange();
   for (let pageIndex = range.start; pageIndex < range.start + range.count; pageIndex += 1) {

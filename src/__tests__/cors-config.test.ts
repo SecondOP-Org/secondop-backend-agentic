@@ -7,12 +7,12 @@ describe('parseCorsOrigins', () => {
   });
 
   it('returns a single origin as a string', () => {
-    expect(parseCorsOrigins('https://secondop.in')).toBe('https://secondop.in');
+    expect(parseCorsOrigins('https://secondop.ai')).toBe('https://secondop.ai');
   });
 
   it('returns multiple comma-separated origins as an array', () => {
-    expect(parseCorsOrigins('https://secondop.in, https://secondop-staging.vercel.app')).toEqual([
-      'https://secondop.in',
+    expect(parseCorsOrigins('https://secondop.ai, https://secondop-staging.vercel.app')).toEqual([
+      'https://secondop.ai',
       'https://secondop-staging.vercel.app',
     ]);
   });

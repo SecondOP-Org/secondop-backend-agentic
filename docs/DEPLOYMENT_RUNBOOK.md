@@ -355,7 +355,7 @@ vercel ls --prod --scope <team>
 vercel rollback <deployment-url-or-id> --scope <team>
 ```
 
-4. Verify `https://secondop.in` returns 200 and:
+4. Verify `https://secondop.ai` returns 200 and:
 
 ```js
 window.__SECONDOP_BUILD__
