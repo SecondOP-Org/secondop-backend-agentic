@@ -20,6 +20,7 @@ import {
   getDoctorResponseDraft,
   saveDoctorResponseDraftHandler,
   generatePatientFacingAiDraftHandler,
+  streamPatientFacingAiDraftHandler,
   uploadDoctorKeyImageHandler,
   previewDoctorOpinion,
   startCaseReviewHandler,
@@ -63,6 +64,11 @@ router.post(
   '/:caseId/doctor-response/ai-draft',
   authorize('doctor'),
   generatePatientFacingAiDraftHandler
+);
+router.post(
+  '/:caseId/doctor-response/ai-draft/stream',
+  authorize('doctor'),
+  streamPatientFacingAiDraftHandler
 );
 router.post(
   '/:caseId/doctor-response/key-images',

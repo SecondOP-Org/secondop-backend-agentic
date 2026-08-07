@@ -431,6 +431,45 @@ const deidentifyPromptBundle = async (
   return { parts: next, mapping };
 };
 
+export type PatientFacingDraftStreamEvent =
+  | {
+      type: 'started';
+      kind: PatientFacingDraftKind;
+      questionId?: string;
+    }
+  | { type: 'delta'; text: string }
+  | {
+      type: 'done';
+      draft: string;
+      kind: PatientFacingDraftKind;
+      source: 'llm' | 'template';
+      questionId?: string;
+    }
+  | { type: 'error'; message: string };
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** Chunk fixed template text so UI still feels progressive when LLM is unavailable. */
+export async function* emitTextAsDeltas(
+  text: string,
+  options: { chunkSize?: number; delayMs?: number; signal?: AbortSignal } = {}
+): AsyncGenerator<string> {
+  const chunkSize = Math.max(8, options.chunkSize ?? 28);
+  const delayMs = Math.max(0, options.delayMs ?? 12);
+  for (let index = 0; index < text.length; index += chunkSize) {
+    if (options.signal?.aborted) {
+      return;
+    }
+    yield text.slice(index, index + chunkSize);
+    if (delayMs > 0 && index + chunkSize < text.length) {
+      await sleep(delayMs);
+    }
+  }
+}
+
 const runPatientVoiceLlm = async (params: {
   systemPrompt: string;
   userPrompt: string;
@@ -488,6 +527,103 @@ const runPatientVoiceLlm = async (params: {
     return null;
   }
 };
+
+/**
+ * Token stream for patient-voice drafts. Yields raw model deltas (may contain de-id tokens).
+ * Caller re-identifies and validates the full text before treating it as final.
+ */
+export async function* runPatientVoiceLlmStream(params: {
+  systemPrompt: string;
+  userPrompt: string;
+  caseId: string;
+  signal?: AbortSignal;
+}): AsyncGenerator<string> {
+  const client = getOpenAIClient({ optional: true });
+  if (!client) {
+    return;
+  }
+
+  const selectedModel = getModelName();
+  try {
+    validateLiteLlmModelAlias(selectedModel);
+  } catch (error) {
+    logger.warn('Patient-facing draft stream: model alias rejected', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  const completionRequest: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming & {
+    metadata?: Record<string, string>;
+  } = {
+    model: selectedModel,
+    temperature: 0.35,
+    stream: true,
+    stream_options: { include_usage: true },
+    messages: [
+      { role: 'system', content: params.systemPrompt },
+      { role: 'user', content: params.userPrompt },
+    ],
+  };
+
+  if (isLiteLlmMode()) {
+    completionRequest.metadata = buildLlmRequestMetadata({
+      workflow: 'patient_facing_draft',
+      modelAlias: selectedModel,
+      caseId: params.caseId,
+    });
+  }
+
+  const abortError = (): Error => {
+    const error = new Error('Patient-facing draft stream aborted');
+    error.name = 'AbortError';
+    return error;
+  };
+
+  if (params.signal?.aborted) {
+    throw abortError();
+  }
+
+  let stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> | null = null;
+  try {
+    stream = (await client.chat.completions.create(completionRequest, {
+      signal: params.signal,
+    })) as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
+  } catch (error) {
+    if (params.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+      throw abortError();
+    }
+    logger.warn('Patient-facing draft LLM stream failed; falling back to template', {
+      error: error instanceof Error ? error.message : String(error),
+      caseIdHash: params.caseId.slice(0, 8),
+    });
+    return;
+  }
+
+  const deadline = Date.now() + timeoutMs();
+  try {
+    for await (const chunk of stream) {
+      if (params.signal?.aborted) {
+        throw abortError();
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`Patient-facing draft timed out after ${timeoutMs()}ms`);
+      }
+      const piece = chunk.choices[0]?.delta?.content;
+      if (typeof piece === 'string' && piece.length > 0) {
+        yield piece;
+      }
+    }
+  } catch (error) {
+    if (params.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
+      throw abortError();
+    }
+    logger.warn('Patient-facing draft LLM stream interrupted; falling back to template', {
+      error: error instanceof Error ? error.message : String(error),
+      caseIdHash: params.caseId.slice(0, 8),
+    });
+  }
+}
 
 const appendEvidenceFootnote = (draft: string, evidence: EvidenceRef | null): string => {
   if (!evidence) {
@@ -752,3 +888,352 @@ export const generatePatientFacingDraftForCase = async (
     questionId: question.id,
   };
 };
+
+type LoadedDraftCase = {
+  artifact: CaseAnalysisArtifact;
+  questions: ReturnType<typeof resolveSpecialistQuestions>;
+};
+
+const loadDraftCaseContext = async (
+  caseId: string,
+  doctorUserId: string,
+  request: PatientFacingDraftRequest
+): Promise<
+  LoadedDraftCase & {
+    question?: { id: string; question: string };
+    questionIndex?: number;
+  }
+> => {
+  const allowedKinds: PatientFacingDraftKind[] = [
+    'question',
+    'summary',
+    'clinical_summary',
+    'assessment',
+    'recommendations',
+    'limitations',
+  ];
+  if (!allowedKinds.includes(request.kind)) {
+    throw new AppError(
+      'kind must be one of: question, summary, clinical_summary, assessment, recommendations, limitations',
+      400
+    );
+  }
+
+  const caseResult = await query(
+    `SELECT c.id,
+            c.specialist_questions,
+            c.analysis_questions,
+            c.analysis_artifact,
+            c.analysis_summary,
+            c.analysis_model,
+            c.share_ai_analysis_with_specialists,
+            c.analysis_status
+     FROM cases c
+     JOIN case_assignments ca ON ca.case_id = c.id
+     JOIN doctors d ON d.id = ca.doctor_id
+     WHERE c.id = $1 AND d.user_id = $2
+     LIMIT 1`,
+    [caseId, doctorUserId]
+  );
+
+  if (caseResult.rows.length === 0) {
+    throw new AppError('Case not found for assigned doctor', 404);
+  }
+
+  const row = caseResult.rows[0] as {
+    specialist_questions?: string[] | null;
+    analysis_questions?: string[] | null;
+    analysis_artifact?: unknown;
+    analysis_summary?: string | null;
+    analysis_model?: string | null;
+    share_ai_analysis_with_specialists?: boolean | null;
+    analysis_status?: string | null;
+  };
+
+  if (row.share_ai_analysis_with_specialists === false) {
+    throw new AppError('AI analysis is not shared for this case', 403);
+  }
+
+  if (row.analysis_status !== 'succeeded') {
+    throw new AppError('AI analysis is not available for drafting yet', 400);
+  }
+
+  const artifact = hydrateCaseAnalysisArtifact({
+    artifact: row.analysis_artifact,
+    summary: row.analysis_summary ?? null,
+    questions: row.analysis_questions ?? null,
+    model: row.analysis_model ?? null,
+  });
+
+  if (!artifact) {
+    throw new AppError('No analysis artifact available for AI draft', 400);
+  }
+
+  const questions = resolveSpecialistQuestions(row);
+
+  if (request.kind !== 'question') {
+    return { artifact, questions };
+  }
+
+  const questionId = typeof request.questionId === 'string' ? request.questionId.trim() : '';
+  if (!questionId) {
+    throw new AppError('questionId is required when kind is "question"', 400);
+  }
+
+  const questionIndex =
+    typeof request.questionIndex === 'number' && Number.isFinite(request.questionIndex)
+      ? Math.max(0, Math.floor(request.questionIndex))
+      : Math.max(
+          0,
+          questions.findIndex((item) => item.id === questionId)
+        );
+
+  const question =
+    questions.find((item) => item.id === questionId) ||
+    questions[questionIndex] ||
+    null;
+
+  if (!question) {
+    throw new AppError('Question not found for AI draft', 404);
+  }
+
+  return {
+    artifact,
+    questions,
+    question: { id: question.id, question: question.question },
+    questionIndex,
+  };
+};
+
+/**
+ * NDJSON-friendly async generator for ChatGPT-style AI draft answers.
+ * Partial text is never persisted; only the compose UI holds it until the doctor saves.
+ */
+export async function* streamPatientFacingDraftForCase(
+  caseId: string,
+  doctorUserId: string,
+  request: PatientFacingDraftRequest,
+  options: { signal?: AbortSignal } = {}
+): AsyncGenerator<PatientFacingDraftStreamEvent> {
+  const ctx = await loadDraftCaseContext(caseId, doctorUserId, request);
+  const artifact = ctx.artifact;
+  const summary = artifact.structured_summary;
+
+  if (request.kind === 'clinical_summary') {
+    const draft = composeClinicalSummaryTemplate(summary);
+    yield { type: 'started', kind: 'clinical_summary' };
+    for await (const chunk of emitTextAsDeltas(draft, { signal: options.signal })) {
+      yield { type: 'delta', text: chunk };
+    }
+    yield { type: 'done', draft, kind: 'clinical_summary', source: 'template' };
+    return;
+  }
+
+  if (request.kind === 'assessment') {
+    const draft = composeAssessmentTemplate(summary);
+    yield { type: 'started', kind: 'assessment' };
+    for await (const chunk of emitTextAsDeltas(draft, { signal: options.signal })) {
+      yield { type: 'delta', text: chunk };
+    }
+    yield { type: 'done', draft, kind: 'assessment', source: 'template' };
+    return;
+  }
+
+  if (request.kind === 'limitations') {
+    const draft = composeLimitationsTemplate(summary);
+    yield { type: 'started', kind: 'limitations' };
+    for await (const chunk of emitTextAsDeltas(draft, { signal: options.signal })) {
+      yield { type: 'delta', text: chunk };
+    }
+    yield { type: 'done', draft, kind: 'limitations', source: 'template' };
+    return;
+  }
+
+  if (request.kind === 'summary' || request.kind === 'recommendations') {
+    yield { type: 'started', kind: request.kind };
+    const template =
+      request.kind === 'recommendations'
+        ? composeRecommendationsTemplate(summary)
+        : composePatientFacingSummaryTemplate(summary);
+    const corpus = collectGroundingCorpus(summary, '', null);
+    const deid = await deidentifyPromptBundle({
+      chief_concern: summary.chief_concern || '',
+      key_report_findings: summary.key_report_findings || '',
+      follow_up_discussion_points: summary.follow_up_discussion_points || '',
+      red_flags_to_discuss: summary.red_flags_to_discuss || '',
+      limitations_caveats: summary.limitations_caveats || '',
+    });
+    const userPrompt = [
+      'Grounding material (use ONLY these facts; do not add new findings):',
+      `- Main concern: ${deid.parts.chief_concern || '(none provided)'}`,
+      `- Key findings: ${deid.parts.key_report_findings || '(none provided)'}`,
+      `- Discussion points: ${deid.parts.follow_up_discussion_points || '(none provided)'}`,
+      `- Points for closer look: ${deid.parts.red_flags_to_discuss || '(none provided)'}`,
+      `- Caveats: ${deid.parts.limitations_caveats || '(none provided)'}`,
+    ].join('\n');
+
+    let rawAccum = '';
+    let lastDisplayed = '';
+    let yieldedAny = false;
+    let source: 'llm' | 'template' = 'template';
+    let finalDraft = template;
+
+    try {
+      for await (const piece of runPatientVoiceLlmStream({
+        systemPrompt: buildSummarySystemPrompt(),
+        userPrompt,
+        caseId,
+        signal: options.signal,
+      })) {
+        rawAccum += piece;
+        const cleaned = rawAccum.replace(/^```[a-z]*\n?/i, '').replace(/```$/i, '');
+        const reidentified = reidentifyText(cleaned, deid.mapping);
+        if (reidentified.startsWith(lastDisplayed)) {
+          const suffix = reidentified.slice(lastDisplayed.length);
+          if (suffix) {
+            yieldedAny = true;
+            yield { type: 'delta', text: suffix };
+            lastDisplayed = reidentified;
+          }
+        } else {
+          lastDisplayed = reidentified;
+        }
+      }
+
+      if (rawAccum.trim()) {
+        const reidentified = reidentifyText(
+          rawAccum.replace(/^```[a-z]*\n?/i, '').replace(/```$/i, '').trim(),
+          deid.mapping
+        );
+        const check = validatePatientFacingDraftText(reidentified, corpus);
+        if (check.ok) {
+          source = 'llm';
+          finalDraft = reidentified.trim();
+        } else {
+          logger.warn('Patient-facing summary stream failed contract checks; using template', {
+            violations: check.violations,
+          });
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+    }
+
+    if (source === 'template' && !yieldedAny) {
+      for await (const chunk of emitTextAsDeltas(finalDraft, { signal: options.signal })) {
+        yield { type: 'delta', text: chunk };
+      }
+    }
+
+    yield {
+      type: 'done',
+      draft: finalDraft,
+      kind: request.kind,
+      source,
+    };
+    return;
+  }
+
+  // question
+  const question = ctx.question!;
+  const questionIndex = ctx.questionIndex ?? 0;
+  const evidence = pickEvidenceRef(artifact, questionIndex);
+  const template = composePatientFacingQuestionTemplate(question.question, summary, evidence);
+  const corpus = collectGroundingCorpus(summary, question.question, evidence);
+
+  yield { type: 'started', kind: 'question', questionId: question.id };
+
+  const deid = await deidentifyPromptBundle({
+    question: question.question,
+    chief_concern: summary.chief_concern || '',
+    key_report_findings: summary.key_report_findings || '',
+    follow_up_discussion_points: summary.follow_up_discussion_points || '',
+    red_flags_to_discuss: summary.red_flags_to_discuss || '',
+    limitations_caveats: summary.limitations_caveats || '',
+    evidence_snippet: evidence?.snippet || '',
+    evidence_file: evidence?.file_name || '',
+  });
+
+  const userPrompt = [
+    'Patient question:',
+    deid.parts.question,
+    '',
+    'Grounding material (use ONLY these facts; do not add new findings):',
+    `- Main concern: ${deid.parts.chief_concern || '(none provided)'}`,
+    `- Key findings: ${deid.parts.key_report_findings || '(none provided)'}`,
+    `- Discussion points: ${deid.parts.follow_up_discussion_points || '(none provided)'}`,
+    `- Points for closer look: ${deid.parts.red_flags_to_discuss || '(none provided)'}`,
+    `- Caveats: ${deid.parts.limitations_caveats || '(none provided)'}`,
+    deid.parts.evidence_snippet
+      ? `- Supporting excerpt from ${deid.parts.evidence_file}: "${deid.parts.evidence_snippet}"`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  let rawAccum = '';
+  let lastDisplayed = '';
+  let yieldedAny = false;
+  let source: 'llm' | 'template' = 'template';
+  let finalDraft = template;
+
+  try {
+    for await (const piece of runPatientVoiceLlmStream({
+      systemPrompt: buildQuestionSystemPrompt(),
+      userPrompt,
+      caseId,
+      signal: options.signal,
+    })) {
+      rawAccum += piece;
+      const cleaned = rawAccum.replace(/^```[a-z]*\n?/i, '').replace(/```$/i, '');
+      const reidentified = reidentifyText(cleaned, deid.mapping);
+      if (reidentified.startsWith(lastDisplayed)) {
+        const suffix = reidentified.slice(lastDisplayed.length);
+        if (suffix) {
+          yieldedAny = true;
+          yield { type: 'delta', text: suffix };
+          lastDisplayed = reidentified;
+        }
+      } else {
+        lastDisplayed = reidentified;
+      }
+    }
+
+    if (rawAccum.trim()) {
+      const reidentified = reidentifyText(
+        rawAccum.replace(/^```[a-z]*\n?/i, '').replace(/```$/i, '').trim(),
+        deid.mapping
+      );
+      const withFootnote = appendEvidenceFootnote(reidentified, evidence);
+      const check = validatePatientFacingDraftText(withFootnote, corpus);
+      if (check.ok) {
+        source = 'llm';
+        finalDraft = withFootnote;
+      } else {
+        logger.warn('Patient-facing question stream failed contract checks; using template', {
+          violations: check.violations,
+        });
+      }
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error;
+    }
+  }
+
+  if (source === 'template' && !yieldedAny) {
+    for await (const chunk of emitTextAsDeltas(finalDraft, { signal: options.signal })) {
+      yield { type: 'delta', text: chunk };
+    }
+  }
+
+  yield {
+    type: 'done',
+    draft: finalDraft,
+    kind: 'question',
+    source,
+    questionId: question.id,
+  };
+}

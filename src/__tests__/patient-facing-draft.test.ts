@@ -3,6 +3,7 @@ import {
   composePatientFacingQuestionTemplate,
   composePatientFacingSummaryTemplate,
   draftAppearsGrounded,
+  emitTextAsDeltas,
   formatEvidenceFootnote,
   validatePatientFacingDraftText,
 } from '../services/patientFacingDraft.service';
@@ -90,5 +91,17 @@ describe('patientFacingDraft.service', () => {
         corpus
       )
     ).toBe(false);
+  });
+
+  it('emits progressive text chunks for template streaming UX', async () => {
+    const chunks: string[] = [];
+    for await (const chunk of emitTextAsDeltas('Hello world from SecondOp', {
+      chunkSize: 5,
+      delayMs: 0,
+    })) {
+      chunks.push(chunk);
+    }
+    expect(chunks.join('')).toBe('Hello world from SecondOp');
+    expect(chunks.length).toBeGreaterThan(1);
   });
 });
