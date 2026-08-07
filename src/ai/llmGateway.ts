@@ -114,6 +114,17 @@ const resolveLlmPurpose = (
   return 'chat';
 };
 
+const readUsage = (usage: {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+} | null | undefined): { promptTokens: number; completionTokens: number; totalTokens: number } => {
+  const promptTokens = Number(usage?.prompt_tokens || 0);
+  const completionTokens = Number(usage?.completion_tokens || 0);
+  const totalTokens = Number(usage?.total_tokens || promptTokens + completionTokens);
+  return { promptTokens, completionTokens, totalTokens };
+};
+
 const instrumentChatCompletions = (client: OpenAI): OpenAI => {
   const originalCreate = client.chat.completions.create.bind(client.chat.completions);
 
@@ -130,17 +141,72 @@ const instrumentChatCompletions = (client: OpenAI): OpenAI => {
         'gen_ai.request.model': requestModel,
         'gen_ai.operation.name': 'chat',
         purpose,
+        'gen_ai.request.stream': Boolean(params.stream),
       },
       'LLM'
     );
 
     try {
       const result = await span.run(() => originalCreate(params as any, options));
-      const usage = (result as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } })
-        ?.usage;
-      const promptTokens = Number(usage?.prompt_tokens || 0);
-      const completionTokens = Number(usage?.completion_tokens || 0);
-      const totalTokens = Number(usage?.total_tokens || promptTokens + completionTokens);
+
+      // Streaming completions expose usage on the final chunk (when enabled), not on the stream object.
+      if (params.stream && result && typeof (result as unknown as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function') {
+        const stream = result as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk> & {
+          controller?: AbortController;
+        };
+        let promptTokens = 0;
+        let completionTokens = 0;
+        let totalTokens = 0;
+        let responseModel = requestModel;
+        let settled = false;
+
+        const finishSpan = (status: 'OK' | 'ERROR', errorMessage?: string) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          span.addAttributes({
+            'gen_ai.response.model': responseModel,
+            'gen_ai.usage.prompt_tokens': promptTokens,
+            'gen_ai.usage.completion_tokens': completionTokens,
+            'gen_ai.usage.total_tokens': totalTokens,
+            latency_ms: Date.now() - startedAt,
+            estimated_cost_usd: estimateTokenCostUsd(promptTokens, completionTokens),
+          });
+          span.end(status, errorMessage);
+        };
+
+        const instrumentedStream = async function* (): AsyncGenerator<OpenAI.Chat.Completions.ChatCompletionChunk> {
+          try {
+            for await (const chunk of stream) {
+              if (typeof chunk.model === 'string' && chunk.model.trim()) {
+                responseModel = chunk.model;
+              }
+              if (chunk.usage) {
+                const usage = readUsage(chunk.usage);
+                promptTokens = usage.promptTokens;
+                completionTokens = usage.completionTokens;
+                totalTokens = usage.totalTokens;
+              }
+              yield chunk;
+            }
+            finishSpan('OK');
+          } catch (error) {
+            finishSpan('ERROR', error instanceof Error ? error.message : String(error));
+            throw error;
+          }
+        };
+
+        const wrapped = instrumentedStream();
+        return Object.assign(wrapped, {
+          controller: stream.controller,
+        }) as unknown as typeof result;
+      }
+
+      const usage = readUsage(
+        (result as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } })
+          ?.usage
+      );
       const responseModel =
         typeof (result as { model?: string })?.model === 'string'
           ? (result as { model: string }).model
@@ -148,11 +214,11 @@ const instrumentChatCompletions = (client: OpenAI): OpenAI => {
 
       span.addAttributes({
         'gen_ai.response.model': responseModel,
-        'gen_ai.usage.prompt_tokens': promptTokens,
-        'gen_ai.usage.completion_tokens': completionTokens,
-        'gen_ai.usage.total_tokens': totalTokens,
+        'gen_ai.usage.prompt_tokens': usage.promptTokens,
+        'gen_ai.usage.completion_tokens': usage.completionTokens,
+        'gen_ai.usage.total_tokens': usage.totalTokens,
         latency_ms: Date.now() - startedAt,
-        estimated_cost_usd: estimateTokenCostUsd(promptTokens, completionTokens),
+        estimated_cost_usd: estimateTokenCostUsd(usage.promptTokens, usage.completionTokens),
       });
       span.end('OK');
       return result;

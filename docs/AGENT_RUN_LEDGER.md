@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-06 - SEC-203 - ChatGPT-style streaming AI draft answers
+
+- Status: Implementation complete on feature branch; draft PRs pending human merge approval.
+- Human approval: Required before merge/deploy. Staging smoke: doctor AI Draft streams into compose fields; Stop aborts; non-stream fallback still works. Patient analysis remains stage-progress + full artifact (not token-streamed).
+- Branch/worktree: `sec-203-streaming-ai-draft-answers` (backend + companion FE)
+- Files changed: `llmGateway.ts` stream span instrumentation; `patientFacingDraft.service.ts` NDJSON token stream; `case.controller.ts` / `case.routes.ts` `POST …/ai-draft/stream`; unit test for chunk emitter; FE `cases.ts` stream client + `DoctorResponsePanel` typing UX / Stop
+- PR: (pending)
+- Checks: `npm run lint`, `npm test -- --testPathPattern=patient-facing-draft`, `npm run build` (backend); FE lint/build green
+- Deployment: Not started
+- Verification: local unit + build only; live stream flush through Railway proxy still to confirm in staging
+- Blockers: none for code; human merge approval required
+- Follow-ups: patient AI analyze token streaming intentionally out of scope (contract JSON validation)
+
 ## 2026-08-05 - SEC-201 - Primary domain secondop.ai
 
 - Status: Implementation on feature branch; awaiting draft PR + human merge/deploy.

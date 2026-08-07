@@ -42,7 +42,10 @@ import {
   parseDoctorResponseSend,
 } from '../schemas/doctorResponse.schema';
 import { parsePatientFacingDraftRequest } from '../schemas/patientFacingDraft.schema';
-import { generatePatientFacingDraftForCase } from '../services/patientFacingDraft.service';
+import {
+  generatePatientFacingDraftForCase,
+  streamPatientFacingDraftForCase,
+} from '../services/patientFacingDraft.service';
 import { generateCaseNumber } from '../utils/caseNumber';
 import { resolveCaseId } from '../utils/caseIdentifier';
 import {
@@ -1147,6 +1150,72 @@ export const generatePatientFacingAiDraftHandler = async (
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/** SEC-203 — ChatGPT-style NDJSON token stream for doctor AI draft answers. */
+export const streamPatientFacingAiDraftHandler = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { caseId } = req.params;
+    const userId = req.user!.id;
+
+    await ensureDoctorAssignedToCase(caseId, userId);
+
+    const payload = parsePatientFacingDraftRequest(req.body);
+
+    res.status(200);
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as Response & { flushHeaders?: () => void }).flushHeaders === 'function') {
+      (res as Response & { flushHeaders: () => void }).flushHeaders();
+    }
+
+    const abortController = new AbortController();
+    let clientClosed = false;
+    req.on('close', () => {
+      clientClosed = true;
+      abortController.abort();
+    });
+
+    try {
+      for await (const event of streamPatientFacingDraftForCase(caseId, userId, payload, {
+        signal: abortController.signal,
+      })) {
+        if (clientClosed) {
+          break;
+        }
+        res.write(`${JSON.stringify(event)}\n`);
+        if (typeof (res as Response & { flush?: () => void }).flush === 'function') {
+          (res as Response & { flush: () => void }).flush();
+        }
+      }
+    } catch (error) {
+      if (!clientClosed && !res.writableEnded) {
+        const message =
+          error instanceof Error && error.name === 'AbortError'
+            ? 'Stream aborted'
+            : error instanceof Error
+              ? error.message
+              : 'AI draft stream failed';
+        res.write(`${JSON.stringify({ type: 'error', message })}\n`);
+      }
+    }
+
+    if (!res.writableEnded) {
+      res.end();
+    }
+  } catch (error) {
+    if (!res.headersSent) {
+      next(error);
+      return;
+    }
+    res.end();
   }
 };
 
