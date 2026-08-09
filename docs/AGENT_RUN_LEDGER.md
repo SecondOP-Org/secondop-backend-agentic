@@ -35,12 +35,12 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Branch/worktree: `vinodhpeddi/sec-205-clinical-gold-set-eval-harness-offline-ground-truth-gate-for` (backend + frontend)
 - Files changed (backend): gold schema/harness/CLI; fixture+persist:false adapters; `/version.analysisExecutionMode`; migration `032_gold_eval_runs.sql`; `goldEvalRuns.service` + `/admin/gold-evals`; CI score-only + optional live smoke; nightly `gold-evals.yml`; persist/notify scripts; docs/spec/ledger
 - Files changed (frontend): `/admin/gold-evals` dashboard + Command Center link
-- PR: (pending)
+- PR: backend https://github.com/SecondOP-Org/secondop-backend-agentic/pull/107 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/150
 - Checks: backend unit tests (17) + lint + build; `eval:gold:fast --score-only` gatePassed; FE lint (warnings only) + build
 - Deployment: Not started
-- Verification: local only
-- Blockers: none for draft PR; live nightly needs `OPENAI_API_KEY_EVAL` (+ optional `GOLD_EVAL_DATABASE_URL` / webhook)
-- Follow-ups: clinical gold-v1; confirm prod mode; wire GitHub secrets; merge+migrate
+- Verification: local only; staging `/version` pre-deploy lacks `analysisExecutionMode` (expected until merge)
+- Blockers: none for review; live nightly needs `OPENAI_API_KEY_EVAL` (+ optional `GOLD_EVAL_DATABASE_URL` / webhook)
+- Follow-ups: clinical gold-v1; confirm prod mode post-deploy; wire GitHub secrets; merge+migrate `032`
 
 ## 2026-08-06 - SEC-203 - ChatGPT-style streaming AI draft answers
 
