@@ -7,6 +7,7 @@ import { PersistResultsAgent } from './persist-results.agent';
 import { QuestionGuardAgent } from './question-guard.agent';
 import { ReportExtractionAgent } from './report-extraction.agent';
 import { AnalysisExecutionMode } from '../../agentic/core/executionMode';
+import { AnalysisEvalFixtures, shouldPersistAnalysisSideEffects } from '../../evals/analysisEvalFixtures';
 import {
   buildBaselineValidationPayload,
   buildExtractionPayload,
@@ -17,12 +18,16 @@ import {
 } from '../../services/caseAnalysisRunArtifact.service';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
-interface RunCaseAnalysisOptions {
+export interface RunCaseAnalysisOptions {
   caseId: string;
   runId: string;
   maxCharsPerFile: number;
   maxTotalChars: number;
   executionMode: AnalysisExecutionMode;
+  /** Eval-only: inject intake/reports without DB/disk. */
+  fixtures?: AnalysisEvalFixtures;
+  /** When false, skip DB side effects. Defaults to true. */
+  persist?: boolean;
 }
 
 const resolveErrorCode = (stepName: string): AgentErrorCode => {
@@ -155,12 +160,15 @@ const persistBaselineStageArtifact = async (
 };
 
 export const runCaseAnalysis = async (options: RunCaseAnalysisOptions): Promise<CaseAnalysisPipelineState> => {
+  const persist = shouldPersistAnalysisSideEffects(options.persist);
   const context = createAgentContext({
     caseId: options.caseId,
     runId: options.runId,
     maxCharsPerFile: options.maxCharsPerFile,
     maxTotalChars: options.maxTotalChars,
     executionMode: options.executionMode,
+    fixtures: options.fixtures,
+    persist: options.persist,
   });
 
   const steps = [
@@ -180,6 +188,9 @@ export const runCaseAnalysis = async (options: RunCaseAnalysisOptions): Promise<
     resolveErrorCode,
     buildMetadata,
     onStepCompleted: async (stepName, state) => {
+      if (!persist) {
+        return;
+      }
       await persistBaselineStageArtifact(stepName, state, options.runId);
     },
   });

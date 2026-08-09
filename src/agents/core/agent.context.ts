@@ -1,6 +1,7 @@
 import { insertAnalysisEvent } from '../../services/analysisRun.service';
 import { SpanHandle, startPhoenixSpan } from '../../observability/phoenix.service';
 import { AgentContext, AgentEvent } from './agent.types';
+import { AnalysisEvalFixtures, shouldPersistAnalysisSideEffects } from '../../evals/analysisEvalFixtures';
 
 import { AnalysisExecutionMode, toLegacyExecutionMode } from '../../agentic/core/executionMode';
 
@@ -10,11 +11,14 @@ interface CreateAgentContextOptions {
   maxCharsPerFile: number;
   maxTotalChars: number;
   executionMode: AnalysisExecutionMode;
+  fixtures?: AnalysisEvalFixtures;
+  persist?: boolean;
 }
 
 export const createAgentContext = (options: CreateAgentContextOptions): AgentContext => {
   const stepSpanMap = new Map<string, SpanHandle>();
   let activeStepKey: string | null = null;
+  const persist = shouldPersistAnalysisSideEffects(options.persist);
 
   const emitEvent = async (event: AgentEvent): Promise<void> => {
     const stepSpanKey = `${event.stepName}:${event.startedAt.toISOString()}`;
@@ -68,6 +72,10 @@ export const createAgentContext = (options: CreateAgentContextOptions): AgentCon
       }
     }
 
+    if (!persist) {
+      return;
+    }
+
     await insertAnalysisEvent({
       runId: options.runId,
       caseId: options.caseId,
@@ -96,6 +104,8 @@ export const createAgentContext = (options: CreateAgentContextOptions): AgentCon
     runId: options.runId,
     maxCharsPerFile: options.maxCharsPerFile,
     maxTotalChars: options.maxTotalChars,
+    fixtures: options.fixtures,
+    persist: options.persist,
     emitEvent,
     runWithinActiveStep,
   };

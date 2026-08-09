@@ -8,6 +8,7 @@ import {
 } from '../controllers/commandCenter.controller';
 import { getServiceHealth } from '../controllers/serviceHealth.controller';
 import { getShadowParity } from '../controllers/shadowParity.controller';
+import { getGoldEvalTrends } from '../controllers/goldEval.controller';
 import { getFleetAnalysisRuns } from '../controllers/fleetAnalysisRuns.controller';
 import {
   listDoctorVerifications,
@@ -58,6 +59,12 @@ export const shadowParityRouter = Router();
 shadowParityRouter.use(authenticate);
 shadowParityRouter.use(authorizeCommandCenterOperator);
 shadowParityRouter.get('/', getShadowParity);
+
+/** Sibling admin route: gold-set eval trends + SEC-102 checklist (SEC-205). */
+export const goldEvalRouter = Router();
+goldEvalRouter.use(authenticate);
+goldEvalRouter.use(authorizeCommandCenterOperator);
+goldEvalRouter.get('/', getGoldEvalTrends);
 
 /** Sibling admin route: fleet runs needing attention (SEC-122). */
 export const fleetAnalysisRunsRouter = Router();

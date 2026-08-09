@@ -10,6 +10,10 @@ interface PersistShadowInput {
 }
 
 export const persistShadowTool = async (input: PersistShadowInput): Promise<void> => {
+  if (input.context.persist === false) {
+    return;
+  }
+
   try {
     await createShadowResult({
       caseId: input.context.caseId,

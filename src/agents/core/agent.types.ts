@@ -1,3 +1,5 @@
+import { AnalysisEvalFixtures } from '../../evals/analysisEvalFixtures';
+
 export type AgentStepStatus = 'started' | 'completed' | 'failed';
 
 export type AgentErrorCode =
@@ -22,6 +24,10 @@ export interface AgentContext {
   runId: string;
   maxCharsPerFile: number;
   maxTotalChars: number;
+  /** When set, intake/extract agents skip DB/disk and use these values. */
+  fixtures?: AnalysisEvalFixtures;
+  /** When false, skip DB event/artifact/result writes. Defaults to true. */
+  persist?: boolean;
   emitEvent: (event: AgentEvent) => Promise<void>;
   /** Nest LLM/tool child spans under the currently started baseline step span. */
   runWithinActiveStep: <T>(fn: () => Promise<T>) => Promise<T>;

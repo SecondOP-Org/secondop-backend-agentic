@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import path from 'path';
+import { AnalysisExecutionMode, normalizeExecutionMode } from '../agentic/core/executionMode';
 
 export interface ReleaseMetadata {
   productVersion: string;
@@ -9,6 +10,8 @@ export interface ReleaseMetadata {
   environment: string;
   apiVersion: string;
   deploymentId: string;
+  /** Resolved ANALYSIS_EXECUTION_MODE (baseline | shadow | agentic). */
+  analysisExecutionMode: AnalysisExecutionMode;
 }
 
 const UNKNOWN = 'unknown';
@@ -77,5 +80,8 @@ export const getReleaseMetadata = (env: NodeJS.ProcessEnv = process.env): Releas
     environment,
     apiVersion,
     deploymentId,
+    analysisExecutionMode: normalizeExecutionMode(
+      firstValue(['ANALYSIS_EXECUTION_MODE', 'ANALYSIS_AGENTIC_MODE'], env) || 'baseline'
+    ),
   };
 };

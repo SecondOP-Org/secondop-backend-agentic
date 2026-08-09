@@ -24,6 +24,13 @@ export const validateIntakeTool = async (
   context: AgenticRuntimeContext,
   state: AgenticLoopState
 ): Promise<AgenticLoopState> => {
+  if (context.fixtures?.intake) {
+    return {
+      ...state,
+      intake: context.fixtures.intake,
+    };
+  }
+
   const result = await query(
     `SELECT age_at_submission, sex, specialty_context, symptoms,
             symptom_duration, medical_history, current_medications, allergies

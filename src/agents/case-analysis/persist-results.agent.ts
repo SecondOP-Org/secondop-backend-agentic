@@ -3,6 +3,7 @@ import { markAnalysisRunSucceeded } from '../../services/analysisRun.service';
 import { emitPerCaseLatencyWarnIfNeeded } from '../../services/analysisAttention.service';
 import { clearDeidVault } from '../../services/deidVault.service';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
+import { shouldPersistAnalysisSideEffects } from '../../evals/analysisEvalFixtures';
 import { resolveContractCheckArtifact } from '../../services/analysis.service';
 import { computeOnlineEvalSignals } from '../../services/onlineEvals.service';
 import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
@@ -24,6 +25,10 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
       if (contractArtifact) {
         // Validate tokenized twin against de-identified reports; persist clinician-facing artifact below.
         enforceCaseAnalysisContract(contractArtifact, { reports: input.reports });
+      }
+
+      if (!shouldPersistAnalysisSideEffects(context.persist)) {
+        return input;
       }
 
       const onlineEvals = computeOnlineEvalSignals({

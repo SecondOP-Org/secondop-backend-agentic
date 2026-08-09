@@ -33,7 +33,23 @@ describe('release metadata', () => {
       environment: 'staging',
       apiVersion: 'v1',
       deploymentId: 'railway-deploy-123',
+      analysisExecutionMode: 'baseline',
     });
+  });
+
+  it('reports analysisExecutionMode from ANALYSIS_EXECUTION_MODE', () => {
+    const metadata = getReleaseMetadata({
+      SECONDOP_RELEASE_VERSION: '0.1.0',
+      BACKEND_PACKAGE_VERSION: '1.0.0',
+      BACKEND_GIT_SHA: 'abcdef1234567890',
+      BACKEND_BUILD_TIME: '2026-06-25T23:00:00.000Z',
+      APP_ENV: 'production',
+      API_VERSION: 'v1',
+      BACKEND_DEPLOYMENT_ID: 'railway-deploy-123',
+      ANALYSIS_EXECUTION_MODE: 'shadow',
+    });
+
+    expect(metadata.analysisExecutionMode).toBe('shadow');
   });
 
   it('falls back instead of returning unsafe or secret-like metadata values', () => {
@@ -57,6 +73,7 @@ describe('release metadata', () => {
       environment: 'development',
       apiVersion: 'v1',
       deploymentId: 'unknown',
+      analysisExecutionMode: 'baseline',
     });
     expect(JSON.stringify(metadata)).not.toContain('must-not-appear');
     expect(JSON.stringify(metadata)).not.toContain('postgres://');
@@ -77,6 +94,7 @@ describe('release metadata', () => {
         environment: expect.any(String),
         apiVersion: expect.any(String),
         deploymentId: expect.any(String),
+        analysisExecutionMode: expect.stringMatching(/^(baseline|shadow|agentic)$/),
       }),
     });
   });
@@ -97,6 +115,7 @@ describe('release metadata', () => {
         environment: expect.any(String),
         apiVersion: expect.any(String),
         deploymentId: expect.any(String),
+        analysisExecutionMode: expect.stringMatching(/^(baseline|shadow|agentic)$/),
       }),
     });
   });

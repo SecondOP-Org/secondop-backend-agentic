@@ -1,6 +1,7 @@
 import { CaseAnalysisArtifact } from '../../services/analysisArtifact.service';
 import { CaseAnalysisResult, CaseIntakeData } from '../../services/analysis.service';
 import { ExtractedReport } from '../../services/reportExtraction.service';
+import { AnalysisEvalFixtures } from '../../evals/analysisEvalFixtures';
 import { AnalysisExecutionMode } from './executionMode';
 
 /** @deprecated Use AnalysisExecutionMode instead. */
@@ -91,6 +92,10 @@ export interface AgenticRuntimeContext {
   maxTotalChars: number;
   policy: AgenticPolicy;
   model: string;
+  /** When set, intake/extract tools skip DB/disk and use these values. */
+  fixtures?: AnalysisEvalFixtures;
+  /** When false, skip DB event/artifact/shadow writes. Defaults to true. */
+  persist?: boolean;
 }
 
 export class AgenticError extends Error {

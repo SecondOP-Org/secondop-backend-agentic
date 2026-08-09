@@ -10,10 +10,17 @@ export class ReportExtractionAgent implements AgentStep<CaseAnalysisPipelineStat
       throw new AgentError('validation_error', 'Intake must be available before report extraction.');
     }
 
+    if (context.fixtures?.reports) {
+      return {
+        ...input,
+        reports: context.fixtures.reports,
+      };
+    }
+
     try {
       const reports = await extractCaseReports(context.caseId, context.maxCharsPerFile, context.maxTotalChars, {
-      runId: context.runId,
-    });
+        runId: context.runId,
+      });
 
       return {
         ...input,

@@ -1,4 +1,5 @@
 import { insertAnalysisEvent } from '../../services/analysisRun.service';
+import { shouldPersistAnalysisSideEffects } from '../../evals/analysisEvalFixtures';
 import { PhoenixSpanKind, SpanHandle, startPhoenixSpan } from '../../observability/phoenix.service';
 import { AgenticAction, AgenticRuntimeContext } from '../core/types';
 
@@ -73,6 +74,10 @@ export const emitAgenticStepEvent = async (input: EmitStepInput): Promise<void> 
       span.end(input.stepStatus === 'failed' ? 'ERROR' : 'OK', input.errorText || undefined);
       stepSpanMap.delete(key);
     }
+  }
+
+  if (!shouldPersistAnalysisSideEffects(input.context.persist)) {
+    return;
   }
 
   await insertAnalysisEvent({

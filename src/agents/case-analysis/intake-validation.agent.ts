@@ -1,5 +1,5 @@
 import { query } from '../../database/connection';
-import { AgentError, AgentStep } from '../core/agent.types';
+import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
 interface IntakeRow {
@@ -24,7 +24,17 @@ const requireString = (value: unknown, fieldName: string): string => {
 export class IntakeValidationAgent implements AgentStep<CaseAnalysisPipelineState, CaseAnalysisPipelineState> {
   public readonly name = 'intake-validation';
 
-  public async run(input: CaseAnalysisPipelineState): Promise<CaseAnalysisPipelineState> {
+  public async run(
+    input: CaseAnalysisPipelineState,
+    context: AgentContext
+  ): Promise<CaseAnalysisPipelineState> {
+    if (context.fixtures?.intake) {
+      return {
+        ...input,
+        intake: context.fixtures.intake,
+      };
+    }
+
     const result = await query(
       `SELECT age_at_submission, sex, specialty_context, symptoms,
               symptom_duration, medical_history, current_medications, allergies

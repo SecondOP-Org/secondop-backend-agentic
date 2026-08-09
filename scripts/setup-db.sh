@@ -131,6 +131,15 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/028_imaging_s
 echo "  → Running 029_doctor_credential_verification.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/029_doctor_credential_verification.sql
 
+echo "  → Running 030_organizations_hybrid.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/030_organizations_hybrid.sql
+
+echo "  → Running 031_organization_invites.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/031_organization_invites.sql
+
+echo "  → Running 032_gold_eval_runs.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/032_gold_eval_runs.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory

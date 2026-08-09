@@ -9,6 +9,13 @@ export const extractReportsTool = async (
     throw new AgenticError('validation_error', 'Intake must be validated before extraction.');
   }
 
+  if (context.fixtures?.reports) {
+    return {
+      ...state,
+      reports: context.fixtures.reports,
+    };
+  }
+
   try {
     const reports = await extractCaseReports(context.caseId, context.maxCharsPerFile, context.maxTotalChars, {
       runId: context.runId,

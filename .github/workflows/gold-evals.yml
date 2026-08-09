@@ -1,0 +1,75 @@
+name: Gold-set eval (nightly)
+
+"on":
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gold-eval:
+    name: Full gold-set eval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run full gold-set eval (both engines)
+        id: gold
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_EVAL }}
+          DEID_ENABLED: "false"
+          BACKEND_GIT_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "OPENAI_API_KEY_EVAL secret missing; running score-only self-consistency gate."
+            npm run eval:gold -- --engine=both --subset=full --score-only --json-out=gold-report.json
+          else
+            npm run eval:gold -- --engine=both --subset=full --json-out=gold-report.json
+          fi
+
+      - name: Upload scorecard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gold-report
+          path: gold-report.json
+          if-no-files-found: warn
+
+      - name: Persist scorecard
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.GOLD_EVAL_DATABASE_URL }}
+          BACKEND_GIT_SHA: ${{ github.sha }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          if [ ! -f gold-report.json ]; then
+            echo "No gold-report.json; skip persist."
+            exit 0
+          fi
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "GOLD_EVAL_DATABASE_URL not set; skip persist."
+            exit 0
+          fi
+          npx ts-node scripts/persist-gold-report.ts gold-report.json
+
+      - name: Notify
+        if: always()
+        env:
+          GOLD_EVAL_WEBHOOK_URL: ${{ secrets.GOLD_EVAL_WEBHOOK_URL }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: |
+          if [ -f gold-report.json ]; then
+            node scripts/notify-gold-report.js gold-report.json
+          fi
