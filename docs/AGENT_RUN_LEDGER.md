@@ -28,6 +28,20 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-09 - SEC-205 - Clinical gold-set eval harness (phases 0–5)
+
+- Status: Engineering MVP complete on feature branches (BE + FE). Clinical gold-v1 authorship + prod mode confirm remain.
+- Human approval: Required before merge/deploy. Apply migration `032` on deploy. Confirm production `ANALYSIS_EXECUTION_MODE` via `/version`.
+- Branch/worktree: `vinodhpeddi/sec-205-clinical-gold-set-eval-harness-offline-ground-truth-gate-for` (backend + frontend)
+- Files changed (backend): gold schema/harness/CLI; fixture+persist:false adapters; `/version.analysisExecutionMode`; migration `032_gold_eval_runs.sql`; `goldEvalRuns.service` + `/admin/gold-evals`; CI score-only + optional live smoke; nightly `gold-evals.yml`; persist/notify scripts; docs/spec/ledger
+- Files changed (frontend): `/admin/gold-evals` dashboard + Command Center link
+- PR: backend https://github.com/SecondOP-Org/secondop-backend-agentic/pull/107 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/150
+- Checks: backend unit tests (17) + lint + build; `eval:gold:fast --score-only` gatePassed; FE lint (warnings only) + build
+- Deployment: Not started
+- Verification: local only; staging `/version` pre-deploy lacks `analysisExecutionMode` (expected until merge)
+- Blockers: none for review; live nightly needs `OPENAI_API_KEY_EVAL` (+ optional `GOLD_EVAL_DATABASE_URL` / webhook)
+- Follow-ups: clinical gold-v1; confirm prod mode post-deploy; wire GitHub secrets; merge+migrate `032`
+
 ## 2026-08-06 - SEC-203 - ChatGPT-style streaming AI draft answers
 
 - Status: Implementation complete on feature branch; draft PRs pending human merge approval.

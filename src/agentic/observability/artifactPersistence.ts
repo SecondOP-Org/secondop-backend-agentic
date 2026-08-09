@@ -3,6 +3,7 @@ import {
   AgenticLoopState,
   AgenticRuntimeContext,
 } from '../core/types';
+import { shouldPersistAnalysisSideEffects } from '../../evals/analysisEvalFixtures';
 import {
   buildAgenticFinalPayload,
   buildBaselineValidationPayload,
@@ -33,6 +34,10 @@ export const persistAgenticStageArtifact = async (
   context: AgenticRuntimeContext,
   state: AgenticLoopState
 ): Promise<void> => {
+  if (!shouldPersistAnalysisSideEffects(context.persist)) {
+    return;
+  }
+
   switch (action) {
     case 'VALIDATE_INTAKE':
       if (state.intake) {

@@ -51,5 +51,19 @@ jobs:
       - name: Run eval harness
         run: npm run eval:harness
 
+      - name: Gold-set eval (score-only smoke)
+        run: npm run eval:gold:fast -- --score-only
+
+      - name: Gold-set eval (live smoke)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_EVAL }}
+          DEID_ENABLED: "false"
+        run: |
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "OPENAI_API_KEY_EVAL unset; skipping live gold smoke."
+            exit 0
+          fi
+          npm run eval:gold:fast -- --engine=both --skip-judge
+
       - name: Run build
         run: npm run build

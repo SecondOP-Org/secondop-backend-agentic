@@ -41,6 +41,7 @@ import commandCenterRoutes, {
   organizationVerificationRouter,
   serviceHealthRouter,
   shadowParityRouter,
+  goldEvalRouter,
   fleetAnalysisRunsRouter,
 } from './routes/commandCenter.routes';
 import aiGatewayRoutes from './routes/aiGateway.routes';
@@ -184,6 +185,7 @@ app.use(`/api/${API_VERSION}/organizations`, organizationRoutes);
 app.use(`/api/${API_VERSION}/admin/command-center`, commandCenterRoutes);
 app.use(`/api/${API_VERSION}/admin/service-health`, serviceHealthRouter);
 app.use(`/api/${API_VERSION}/admin/shadow-parity`, shadowParityRouter);
+app.use(`/api/${API_VERSION}/admin/gold-evals`, goldEvalRouter);
 app.use(`/api/${API_VERSION}/admin/analysis-runs`, fleetAnalysisRunsRouter);
 app.use(`/api/${API_VERSION}/admin/doctor-verifications`, doctorVerificationRouter);
 app.use(`/api/${API_VERSION}/admin/organization-verifications`, organizationVerificationRouter);

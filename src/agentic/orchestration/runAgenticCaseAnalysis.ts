@@ -14,13 +14,18 @@ import { AgenticMode, AgenticRuntimeContext } from '../core/types';
 import { buildAgenticRunMetrics } from '../observability/metrics';
 import { isLangChainFallbackAllowed } from '../../config/agenticRuntime';
 import { isLangChainRuntimeEnabled, runAgenticViaLangChain } from '../langchain/adapter';
+import { AnalysisEvalFixtures } from '../../evals/analysisEvalFixtures';
 
-interface RunAgenticCaseAnalysisOptions {
+export interface RunAgenticCaseAnalysisOptions {
   caseId: string;
   runId: string;
   mode: AgenticMode;
   maxCharsPerFile: number;
   maxTotalChars: number;
+  /** Eval-only: inject intake/reports without DB/disk. */
+  fixtures?: AnalysisEvalFixtures;
+  /** When false, skip DB side effects. Defaults to true. */
+  persist?: boolean;
 }
 
 export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOptions) => {
@@ -32,6 +37,8 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
     maxTotalChars: options.maxTotalChars,
     policy: buildAgenticPolicy(),
     model: process.env.AGENTIC_MODEL || process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+    fixtures: options.fixtures,
+    persist: options.persist,
   };
 
   const planner = new PlannerAgent();
