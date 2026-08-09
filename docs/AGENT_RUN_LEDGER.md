@@ -34,7 +34,7 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Human approval: Required before merge/deploy. Apply migration `033` on deploy. Keep `GROUNDING_ENABLED=false` until staged rollout.
 - Branch/worktree: `sec-206-clinical-grounding`
 - Files changed: `src/services/grounding/*` (RxNorm, PubMed, ClinicalTrials, entity normalization); agentic tools `pubmed`/`clinicalTrials`/`groundEvidence`; `GROUND_EVIDENCE` pipeline step; artifact `citations`/`trialMatches`/`citation_links`; PDF References + trials sections; doctor draft keep/drop; migration `033`; `.env.example`; unit/live-gated tests
-- PR: (pending)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/108
 - Checks: `npm run lint`, `npm test`, `npm run build`, `npm run eval:harness` green
 - Deployment: Not started
 - Verification: unit + eval harness only; live APIs behind `RUN_LIVE_GROUNDING=1`
