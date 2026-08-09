@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { getOpenAIClient, isLiteLlmMode, validateLiteLlmModelAlias } from '../../ai/llmGateway';
 import { buildLlmRequestMetadata } from '../../ai/llmRequestMetadata';
+import { isGroundingEnabled } from '../../config/grounding';
 import {
   AgenticAction,
   AgenticActionHistoryItem,
@@ -10,6 +11,26 @@ import {
   AgenticTokenUsage,
 } from '../core/types';
 
+const PLANNER_ACTIONS_BASE: AgenticAction[] = [
+  'VALIDATE_INTAKE',
+  'EXTRACT_REPORTS',
+  'SYNTHESIZE_SUMMARY',
+  'GUARD_QUESTIONS',
+  'FINALIZE',
+];
+
+const plannerActions = (): AgenticAction[] =>
+  isGroundingEnabled()
+    ? [
+        'VALIDATE_INTAKE',
+        'EXTRACT_REPORTS',
+        'GROUND_EVIDENCE',
+        'SYNTHESIZE_SUMMARY',
+        'GUARD_QUESTIONS',
+        'FINALIZE',
+      ]
+    : PLANNER_ACTIONS_BASE;
+
 const fallbackAction = (state: AgenticLoopState): AgenticAction => {
   if (!state.intake) {
     return 'VALIDATE_INTAKE';
@@ -17,6 +38,10 @@ const fallbackAction = (state: AgenticLoopState): AgenticAction => {
 
   if (!state.reports.length) {
     return 'EXTRACT_REPORTS';
+  }
+
+  if (isGroundingEnabled() && !state.groundingCompleted) {
+    return 'GROUND_EVIDENCE';
   }
 
   if (!state.analysis) {
@@ -52,6 +77,7 @@ export class PlannerAgent {
   ): Promise<AgenticPlannerDecision> {
     const client = getOpenAIClient({ optional: true });
     const fallback = fallbackAction(state);
+    const allowed = plannerActions();
 
     if (!client) {
       return {
@@ -78,9 +104,14 @@ export class PlannerAgent {
           content: [
             'You are a bounded planner for medical analysis workflow execution.',
             'Return strict JSON: {"action": <allowed_action>, "rationale": <string>}.',
-            'Only choose from: VALIDATE_INTAKE, EXTRACT_REPORTS, SYNTHESIZE_SUMMARY, GUARD_QUESTIONS, FINALIZE.',
+            `Only choose from: ${allowed.join(', ')}.`,
             'Never invent actions.',
-          ].join('\n'),
+            isGroundingEnabled()
+              ? 'Run GROUND_EVIDENCE after EXTRACT_REPORTS and before SYNTHESIZE_SUMMARY when grounding is not yet completed.'
+              : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
         },
         {
           role: 'user',
@@ -90,6 +121,8 @@ export class PlannerAgent {
             `Refinements: ${state.refinementCount}`,
             `Has intake: ${Boolean(state.intake)}`,
             `Report count: ${state.reports.length}`,
+            `Grounding completed: ${Boolean(state.groundingCompleted)}`,
+            `Citation count: ${state.citations?.length || 0}`,
             `Has analysis: ${Boolean(state.analysis)}`,
             `Question count: ${state.analysis?.topQuestions.length || 0}`,
             `Observation count: ${state.observations.length}`,
@@ -109,7 +142,7 @@ export class PlannerAgent {
             properties: {
               action: {
                 type: 'string',
-                enum: ['VALIDATE_INTAKE', 'EXTRACT_REPORTS', 'SYNTHESIZE_SUMMARY', 'GUARD_QUESTIONS', 'FINALIZE'],
+                enum: allowed,
               },
               rationale: { type: 'string' },
             },
@@ -141,10 +174,10 @@ export class PlannerAgent {
 
     try {
       const parsed = JSON.parse(raw) as AgenticPlannerDecision;
-      if (!parsed.action) {
+      if (!parsed.action || !allowed.includes(parsed.action)) {
         return {
           action: fallback,
-          rationale: 'Planner action missing; fallback selected.',
+          rationale: 'Planner action missing or disallowed; fallback selected.',
           usage: mapUsage(completion.usage),
         };
       }

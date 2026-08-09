@@ -321,4 +321,45 @@ describe('doctorOpinionPdf.service', () => {
     // Footer markers must remain present on a multi-page report.
     expect(text).toMatch(/Page \d+ of \d+/);
   });
+
+  it('renders References and Potentially relevant trials when grounding present', async () => {
+    const buffer = await generateDoctorOpinionPdfBuffer({
+      ...baseInput(),
+      citations: [
+        {
+          id: 'pmid:999',
+          title: 'Example grounding paper',
+          journal: 'NEJM',
+          year: 2023,
+          url: 'https://pubmed.ncbi.nlm.nih.gov/999/',
+          pmid: '999',
+        },
+      ],
+      trialMatches: [
+        {
+          id: 'nct:NCT999',
+          title: 'Example trial',
+          nctId: 'NCT99999999',
+          phase: 'PHASE2',
+          status: 'RECRUITING',
+          url: 'https://clinicaltrials.gov/study/NCT99999999',
+        },
+      ],
+    });
+
+    const text = extractPdfText(buffer);
+    expect(text).toContain('References');
+    expect(text).toContain('Example grounding paper');
+    expect(text).toContain('https://pubmed.ncbi.nlm.nih.gov/999/');
+    expect(text).toContain('Potentially relevant trials');
+    expect(text).toContain('NCT99999999');
+    expect(text).toContain('[1]');
+  });
+
+  it('omits References section when no grounding citations', async () => {
+    const buffer = await generateDoctorOpinionPdfBuffer(baseInput());
+    const text = extractPdfText(buffer);
+    expect(text).not.toContain('References');
+    expect(text).not.toContain('Potentially relevant trials');
+  });
 });

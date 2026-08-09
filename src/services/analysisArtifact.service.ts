@@ -38,6 +38,33 @@ export interface EvidenceRef {
   snippet: string;
 }
 
+export interface ArtifactCitation {
+  id: string;
+  source: 'pubmed';
+  pmid: string;
+  title: string;
+  journal: string;
+  year: number;
+  url: string;
+  relevanceNote?: string;
+}
+
+export interface ArtifactTrialMatch {
+  id: string;
+  source: 'clinicaltrials';
+  nctId: string;
+  title: string;
+  phase?: string;
+  status: string;
+  url: string;
+  eligibilitySummary?: string;
+}
+
+export interface ArtifactCitationLink {
+  section: string;
+  citationIds: string[];
+}
+
 export interface CaseAnalysisArtifact {
   structured_summary: StructuredSummary;
   patient_summary: PatientSummary;
@@ -48,6 +75,12 @@ export interface CaseAnalysisArtifact {
   uncertainty_flags: string[];
   disclaimer: string;
   evidence_refs: EvidenceRef[];
+  /** External PubMed citations (API-sourced only). */
+  citations?: ArtifactCitation[];
+  /** ClinicalTrials.gov matches (API-sourced only). */
+  trialMatches?: ArtifactTrialMatch[];
+  /** Links from summary sections / claims to citation ids. */
+  citation_links?: ArtifactCitationLink[];
   model: string;
   token_usage: TokenUsageMetrics | null;
 }
@@ -422,6 +455,9 @@ export const buildCaseAnalysisArtifact = (input: {
     uncertainty_flags: normalizeUncertaintyFlags(input.uncertaintyFlags),
     disclaimer: normalizeText(input.disclaimer) || defaultMedicalDisclaimer,
     evidence_refs: buildEvidenceRefs(structuredSummary, input.reports),
+    citations: [],
+    trialMatches: [],
+    citation_links: [],
     model: input.model,
     token_usage: input.tokenUsage || null,
   };
@@ -517,6 +553,9 @@ export const hydrateCaseAnalysisArtifact = (input: {
       evidence_refs: Array.isArray(artifact.evidence_refs)
         ? artifact.evidence_refs.filter((ref) => !isNavOrOcrJunkSnippet(ref.snippet || ''))
         : [],
+      citations: Array.isArray(artifact.citations) ? artifact.citations : [],
+      trialMatches: Array.isArray(artifact.trialMatches) ? artifact.trialMatches : [],
+      citation_links: Array.isArray(artifact.citation_links) ? artifact.citation_links : [],
     };
   }
 

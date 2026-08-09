@@ -289,6 +289,76 @@ describe('doctor response workflow', () => {
       expect(draft.summary).toBe('New recommendations text');
     });
 
+    it('persists citation keep/drop and droppedCitationIds (SEC-206)', async () => {
+      mockedQuery
+        .mockResolvedValueOnce({ rows: [{ id: 'doctor-1' }] } as any)
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              response_draft: {
+                questionAnswers: [],
+                summary: 'Existing',
+                citations: [
+                  {
+                    id: 'pmid:1',
+                    pmid: '1',
+                    title: 'Keep me',
+                    journal: 'J',
+                    year: 2020,
+                    url: 'https://pubmed.ncbi.nlm.nih.gov/1/',
+                    kept: true,
+                  },
+                  {
+                    id: 'pmid:2',
+                    pmid: '2',
+                    title: 'Drop me',
+                    journal: 'J',
+                    year: 2021,
+                    url: 'https://pubmed.ncbi.nlm.nih.gov/2/',
+                    kept: true,
+                  },
+                ],
+              },
+            },
+          ],
+        } as any)
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      const draft = await saveDoctorResponseDraft('case-1', 'user-doctor-1', {
+        questionAnswers: [],
+        summary: 'Existing',
+        citations: [
+          {
+            id: 'pmid:1',
+            pmid: '1',
+            title: 'Keep me',
+            journal: 'J',
+            year: 2020,
+            url: 'https://pubmed.ncbi.nlm.nih.gov/1/',
+            kept: true,
+          },
+          {
+            id: 'pmid:2',
+            pmid: '2',
+            title: 'Drop me',
+            journal: 'J',
+            year: 2021,
+            url: 'https://pubmed.ncbi.nlm.nih.gov/2/',
+            kept: false,
+          },
+        ],
+        droppedCitationIds: ['pmid:2'],
+      });
+
+      expect(draft.citations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'pmid:1', kept: true }),
+          expect.objectContaining({ id: 'pmid:2', kept: false }),
+        ])
+      );
+      expect(draft.droppedCitationIds).toEqual(['pmid:2']);
+    });
+
     it('preserves keyImages when PUT omits them', async () => {
       mockedQuery
         .mockResolvedValueOnce({ rows: [{ id: 'doctor-1' }] } as any)

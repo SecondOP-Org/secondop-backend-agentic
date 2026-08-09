@@ -5,7 +5,9 @@ import { runAgenticRuntime } from '../core/runtime';
 import { PlannerAgent } from '../planner/planner.agent';
 import { CriticAgent } from '../critic/critic.agent';
 import { FinalizerAgent } from '../finalizer/finalizer.agent';
+import { isGroundingEnabled } from '../../config/grounding';
 import { extractReportsTool } from '../tools/extract.tool';
+import { groundEvidenceTool } from '../tools/groundEvidence.tool';
 import { guardQuestionsTool } from '../tools/question_guard.tool';
 import { validateIntakeTool } from '../tools/intake.tool';
 import { persistShadowTool } from '../tools/persist_shadow.tool';
@@ -70,6 +72,7 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
         tools: {
           VALIDATE_INTAKE: validateIntakeTool,
           EXTRACT_REPORTS: extractReportsTool,
+          ...(isGroundingEnabled() ? { GROUND_EVIDENCE: groundEvidenceTool } : {}),
           SYNTHESIZE_SUMMARY: synthesizeSummaryTool,
           GUARD_QUESTIONS: async (_context, state) => guardQuestionsTool(state),
         },
@@ -157,6 +160,9 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
           uncertainty_flags: [],
           disclaimer: '',
           evidence_refs: [],
+          citations: [],
+          trialMatches: [],
+          citation_links: [],
           model: context.model,
           token_usage: null,
         },

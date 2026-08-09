@@ -3,19 +3,29 @@ import {
   AgenticLoopState,
   AgenticRuntimeContext,
 } from '../core/types';
+import { listRegisteredGroundingTools } from '../../config/grounding';
 import { shouldPersistAnalysisSideEffects } from '../../evals/analysisEvalFixtures';
 import {
   buildAgenticFinalPayload,
   buildBaselineValidationPayload,
   buildExtractionPayload,
+  buildGroundingPayload,
   buildGuardPayload,
+  buildNormalizedEntitiesPayload,
   buildSynthesisPayload,
   insertCaseAnalysisArtifact,
 } from '../../services/caseAnalysisRunArtifact.service';
 
 const persistAgenticArtifact = async (
   context: AgenticRuntimeContext,
-  artifactType: 'validation' | 'extraction' | 'synthesis' | 'guard' | 'final',
+  artifactType:
+    | 'validation'
+    | 'extraction'
+    | 'normalized_entities'
+    | 'grounding'
+    | 'synthesis'
+    | 'guard'
+    | 'final',
   stageName: string,
   payload: Record<string, unknown>
 ): Promise<void> => {
@@ -56,6 +66,36 @@ export const persistAgenticStageArtifact = async (
           'extraction',
           'agentic:extract_reports',
           buildExtractionPayload(state.reports)
+        );
+      }
+      if (state.normalizedEntities) {
+        await persistAgenticArtifact(
+          context,
+          'normalized_entities',
+          'agentic:normalize_entities',
+          buildNormalizedEntitiesPayload(state.normalizedEntities as unknown as Record<string, unknown>)
+        );
+      }
+      return;
+    case 'GROUND_EVIDENCE':
+      await persistAgenticArtifact(
+        context,
+        'grounding',
+        'agentic:ground_evidence',
+        buildGroundingPayload({
+          citations: state.citations || [],
+          trialMatches: state.trialMatches || [],
+          registeredTools: listRegisteredGroundingTools({
+            specialtyContext: state.intake?.specialtyContext || '',
+          }),
+        })
+      );
+      if (state.normalizedEntities) {
+        await persistAgenticArtifact(
+          context,
+          'normalized_entities',
+          'agentic:normalize_entities',
+          buildNormalizedEntitiesPayload(state.normalizedEntities as unknown as Record<string, unknown>)
         );
       }
       return;

@@ -163,11 +163,12 @@ describe('LangGraph agentic adapter', () => {
     expect(result.history.map((item) => item.action)).toEqual([
       'VALIDATE_INTAKE',
       'EXTRACT_REPORTS',
+      'GROUND_EVIDENCE',
       'SYNTHESIZE_SUMMARY',
       'GUARD_QUESTIONS',
       'FINALIZE',
     ]);
-    expect(mockedEmitAgenticStepEvent).toHaveBeenCalledTimes(10);
+    expect(mockedEmitAgenticStepEvent).toHaveBeenCalledTimes(12);
     expect(mockedEmitAgenticStepEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         stepName: 'agentic:validate_intake',

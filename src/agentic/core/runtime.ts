@@ -15,6 +15,7 @@ import { FinalizerAgent } from '../finalizer/finalizer.agent';
 interface RuntimeTools {
   VALIDATE_INTAKE: (context: AgenticRuntimeContext, state: AgenticLoopState) => Promise<AgenticLoopState>;
   EXTRACT_REPORTS: (context: AgenticRuntimeContext, state: AgenticLoopState) => Promise<AgenticLoopState>;
+  GROUND_EVIDENCE?: (context: AgenticRuntimeContext, state: AgenticLoopState) => Promise<AgenticLoopState>;
   SYNTHESIZE_SUMMARY: (context: AgenticRuntimeContext, state: AgenticLoopState) => Promise<AgenticLoopState>;
   GUARD_QUESTIONS: (context: AgenticRuntimeContext, state: AgenticLoopState) => Promise<AgenticLoopState>;
 }
@@ -120,7 +121,11 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
         continue;
       }
 
-      const tool = input.tools[action as Exclude<AgenticAction, 'FINALIZE'>];
+      const toolKey = action as Exclude<AgenticAction, 'FINALIZE'>;
+      const tool = input.tools[toolKey];
+      if (!tool) {
+        throw new AgenticError('policy_error', `No tool registered for action: ${action}`);
+      }
       state = await runWithinAgenticStepSpan({ stepName, startedAt }, () => tool(input.context, state));
 
       await emitAgenticStepEvent({

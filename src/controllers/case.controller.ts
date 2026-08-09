@@ -1324,6 +1324,9 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
       const recommendations =
         (payload.recommendations || '').trim() || (payload.summary || '').trim();
 
+      const keptCitations = (payload.citations || []).filter((c) => c.kept !== false);
+      const keptTrials = (payload.trialMatches || []).filter((t) => t.kept !== false);
+
       pdfInput = {
         caseTitle: row.title,
         caseNumber: row.case_number,
@@ -1346,6 +1349,22 @@ export const previewDoctorOpinion = async (req: AuthRequest, res: Response, next
         patientAge,
         patientSex: row.patient_sex || null,
         isDraft: true,
+        citations: keptCitations.map((c) => ({
+          id: c.id,
+          title: c.title,
+          journal: c.journal,
+          year: c.year,
+          url: c.url,
+          pmid: c.pmid,
+        })),
+        trialMatches: keptTrials.map((t) => ({
+          id: t.id,
+          title: t.title,
+          nctId: t.nctId,
+          phase: t.phase,
+          status: t.status,
+          url: t.url,
+        })),
       };
     } else {
       const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
@@ -1447,6 +1466,9 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
       const recommendations =
         (payload.recommendations || '').trim() || (payload.summary || '').trim();
 
+      const keptCitations = (payload.citations || []).filter((c) => c.kept !== false);
+      const keptTrials = (payload.trialMatches || []).filter((t) => t.kept !== false);
+
       pdfInput = {
         caseTitle: row.title,
         caseNumber: row.case_number,
@@ -1470,6 +1492,22 @@ export const sendDoctorOpinion = async (req: AuthRequest, res: Response, next: N
         patientSex: row.patient_sex || null,
         isDraft: false,
         signedAt,
+        citations: keptCitations.map((c) => ({
+          id: c.id,
+          title: c.title,
+          journal: c.journal,
+          year: c.year,
+          url: c.url,
+          pmid: c.pmid,
+        })),
+        trialMatches: keptTrials.map((t) => ({
+          id: t.id,
+          title: t.title,
+          nctId: t.nctId,
+          phase: t.phase,
+          status: t.status,
+          url: t.url,
+        })),
       };
     } else {
       const legacyContent = typeof req.body.content === 'string' ? req.body.content : '';
