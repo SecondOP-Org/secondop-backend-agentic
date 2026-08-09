@@ -231,6 +231,45 @@ export const getDoctorResponse = async (caseId: string, doctorUserId: string) =>
     draft = parseDoctorResponseDraft(row.response_draft);
   }
 
+  // Seed citations/trials from analysis artifact when draft has none yet (SEC-206).
+  const artifact = hydrateCaseAnalysisArtifact({
+    artifact: row.analysis_artifact,
+    summary: row.analysis_summary ?? null,
+    questions: row.analysis_questions ?? null,
+    model: row.analysis_model ?? null,
+  });
+
+  if (artifact && (artifact.citations?.length || artifact.trialMatches?.length)) {
+    const seeded: DoctorResponseDraft = draft || emptyDraft();
+    if (!seeded.citations?.length && artifact.citations?.length) {
+      seeded.citations = artifact.citations.map((c) => ({
+        id: c.id,
+        source: 'pubmed' as const,
+        pmid: c.pmid,
+        title: c.title,
+        journal: c.journal,
+        year: c.year,
+        url: c.url,
+        relevanceNote: c.relevanceNote,
+        kept: true,
+      }));
+    }
+    if (!seeded.trialMatches?.length && artifact.trialMatches?.length) {
+      seeded.trialMatches = artifact.trialMatches.map((t) => ({
+        id: t.id,
+        source: 'clinicaltrials' as const,
+        nctId: t.nctId,
+        title: t.title,
+        phase: t.phase,
+        status: t.status,
+        url: t.url,
+        eligibilitySummary: t.eligibilitySummary,
+        kept: true,
+      }));
+    }
+    draft = seeded;
+  }
+
   return {
     resolvedQuestions,
     draft,
@@ -293,6 +332,11 @@ export const saveDoctorResponseDraft = async (
         ? parsed.concordance
         : currentDraft.concordance ?? null,
     limitations: parsed.limitations !== '' ? parsed.limitations : currentDraft.limitations || '',
+    // Client owns citation keep/drop lists (omit preserves existing).
+    citations: parsed.citations ?? currentDraft.citations,
+    trialMatches: parsed.trialMatches ?? currentDraft.trialMatches,
+    droppedCitationIds: parsed.droppedCitationIds ?? currentDraft.droppedCitationIds,
+    droppedTrialIds: parsed.droppedTrialIds ?? currentDraft.droppedTrialIds,
   };
 
   await query(

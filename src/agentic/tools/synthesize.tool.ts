@@ -1,4 +1,5 @@
 import { extractObservationsFromSummary, generateCaseAnalysis } from '../../services/analysis.service';
+import { attachGroundingToArtifact } from '../../services/grounding/attachGrounding';
 import { AgenticError, AgenticLoopState, AgenticRuntimeContext } from '../core/types';
 
 export const synthesizeSummaryTool = async (
@@ -22,9 +23,18 @@ export const synthesizeSummaryTool = async (
       runId: context.runId,
     });
 
+    const artifact = attachGroundingToArtifact(analysis.artifact, {
+      citations: state.citations || [],
+      trialMatches: state.trialMatches || [],
+      citationLinks: state.citationLinks,
+    });
+
     return {
       ...state,
-      analysis,
+      analysis: {
+        ...analysis,
+        artifact,
+      },
       observations: extractObservationsFromSummary(analysis.summary),
       finalArtifact: null,
       criticScore: null,

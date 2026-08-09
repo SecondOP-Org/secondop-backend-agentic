@@ -1,3 +1,4 @@
+import { isGroundingEnabled } from '../../config/grounding';
 import { AgenticAction, AgenticError, AgenticPolicy } from './types';
 import { AnalysisExecutionMode, resolveExecutionMode } from './executionMode';
 
@@ -8,11 +9,20 @@ export type { AnalysisExecutionMode, LegacyAnalysisExecutionMode } from './execu
 export const resolveAgenticMode = (): AnalysisExecutionMode => resolveExecutionMode();
 
 export const buildAgenticPolicy = (): AgenticPolicy => {
-  const maxSteps = Math.max(1, parseInt(process.env.AGENTIC_MAX_STEPS || '8', 10));
+  const maxSteps = Math.max(1, parseInt(process.env.AGENTIC_MAX_STEPS || '10', 10));
   const maxRefinements = Math.max(0, parseInt(process.env.AGENTIC_MAX_REFINEMENTS || '1', 10));
 
+  const allowedActions: AgenticAction[] = [
+    'VALIDATE_INTAKE',
+    'EXTRACT_REPORTS',
+    ...(isGroundingEnabled() ? (['GROUND_EVIDENCE'] as AgenticAction[]) : []),
+    'SYNTHESIZE_SUMMARY',
+    'GUARD_QUESTIONS',
+    'FINALIZE',
+  ];
+
   return {
-    allowedActions: ['VALIDATE_INTAKE', 'EXTRACT_REPORTS', 'SYNTHESIZE_SUMMARY', 'GUARD_QUESTIONS', 'FINALIZE'],
+    allowedActions,
     maxSteps,
     maxRefinements,
   };

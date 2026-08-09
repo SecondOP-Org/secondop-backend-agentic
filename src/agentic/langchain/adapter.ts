@@ -11,6 +11,7 @@ import { CriticAgent } from '../critic/critic.agent';
 import { FinalizerAgent } from '../finalizer/finalizer.agent';
 import { emitAgenticStepEvent } from '../observability/eventEmitter';
 import { extractReportsTool } from '../tools/extract.tool';
+import { groundEvidenceTool } from '../tools/groundEvidence.tool';
 import { guardQuestionsTool } from '../tools/question_guard.tool';
 import { validateIntakeTool } from '../tools/intake.tool';
 import { synthesizeSummaryTool } from '../tools/synthesize.tool';
@@ -132,6 +133,7 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
   private readonly finalizer = new FinalizerAgent();
 
   public async run(context: AgenticRuntimeContext, initialState: AgenticLoopState): Promise<LangChainRunResult> {
+    // Always register ground_evidence so StateGraph node types stay stable; the tool no-ops when disabled.
     const workflow = new StateGraph(GraphState)
       .addNode('validate_intake', (graphState: LangGraphRuntimeState) =>
         runGraphStep(context, graphState, 'VALIDATE_INTAKE', 'LangGraph node validates case intake.', (state) =>
@@ -141,6 +143,15 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
       .addNode('extract_reports', (graphState: LangGraphRuntimeState) =>
         runGraphStep(context, graphState, 'EXTRACT_REPORTS', 'LangGraph node extracts available case reports.', (state) =>
           extractReportsTool(context, state)
+        )
+      )
+      .addNode('ground_evidence', (graphState: LangGraphRuntimeState) =>
+        runGraphStep(
+          context,
+          graphState,
+          'GROUND_EVIDENCE',
+          'LangGraph node grounds analysis with external clinical references.',
+          (state) => groundEvidenceTool(context, state)
         )
       )
       .addNode('synthesize_summary', (graphState: LangGraphRuntimeState) =>
@@ -156,7 +167,8 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
       .addNode('finalize', (graphState: LangGraphRuntimeState) => this.finalize(context, graphState))
       .addEdge(START, 'validate_intake')
       .addEdge('validate_intake', 'extract_reports')
-      .addEdge('extract_reports', 'synthesize_summary')
+      .addEdge('extract_reports', 'ground_evidence')
+      .addEdge('ground_evidence', 'synthesize_summary')
       .addEdge('synthesize_summary', 'guard_questions')
       .addEdge('guard_questions', 'finalize')
       .addConditionalEdges('finalize', (graphState: LangGraphRuntimeState) => graphState.nextRoute, {

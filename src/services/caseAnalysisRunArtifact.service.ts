@@ -12,6 +12,8 @@ export const CASE_ANALYSIS_ARTIFACT_VERSION = '1';
 export type CaseAnalysisStageArtifactType =
   | 'validation'
   | 'extraction'
+  | 'normalized_entities'
+  | 'grounding'
   | 'synthesis'
   | 'guard'
   | 'final';
@@ -198,6 +200,24 @@ export const buildGuardPayload = (analysis: CaseAnalysisResult): Record<string, 
   questionCount: analysis.topQuestions.length,
   uniqueQuestionCount: new Set(analysis.topQuestions.map((question) => question.toLowerCase())).size,
   questions: analysis.topQuestions,
+});
+
+export const buildNormalizedEntitiesPayload = (
+  entities: Record<string, unknown>
+): Record<string, unknown> => ({
+  ...entities,
+});
+
+export const buildGroundingPayload = (input: {
+  citations: unknown[];
+  trialMatches: unknown[];
+  registeredTools: string[];
+}): Record<string, unknown> => ({
+  citations: input.citations,
+  trialMatches: input.trialMatches,
+  registeredTools: input.registeredTools,
+  citationCount: input.citations.length,
+  trialCount: input.trialMatches.length,
 });
 
 export const buildFinalPayload = (analysis: CaseAnalysisResult): Record<string, unknown> => ({

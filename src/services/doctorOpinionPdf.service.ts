@@ -26,6 +26,24 @@ export interface DoctorOpinionConcordance {
   rationale: string;
 }
 
+export interface DoctorOpinionCitation {
+  id: string;
+  title: string;
+  journal?: string;
+  year?: number;
+  url: string;
+  pmid?: string;
+}
+
+export interface DoctorOpinionTrialMatch {
+  id: string;
+  title: string;
+  nctId: string;
+  phase?: string;
+  status: string;
+  url: string;
+}
+
 export interface DoctorOpinionPdfInput {
   caseTitle: string;
   caseNumber: string;
@@ -59,6 +77,10 @@ export interface DoctorOpinionPdfInput {
   /** Prefer over summary for "What to do next". */
   recommendations?: string;
   limitations?: string;
+  /** Kept clinical grounding citations (SEC-206). */
+  citations?: DoctorOpinionCitation[];
+  /** Kept potentially relevant trials (SEC-206). */
+  trialMatches?: DoctorOpinionTrialMatch[];
 }
 
 export interface DoctorOpinionPdfFile {
@@ -686,6 +708,18 @@ const withCustomerFacingFields = (input: DoctorOpinionPdfInput): DoctorOpinionPd
   caseNumber: toPatientFacingCaseRef(input.caseNumber),
 });
 
+/** Append [1]…[n] markers when recommendations lack them and citations exist. */
+const appendCitationMarkers = (text: string, citationCount: number): string => {
+  if (!text || citationCount <= 0) {
+    return text;
+  }
+  if (/\[\d+]/.test(text)) {
+    return text;
+  }
+  const markers = Array.from({ length: citationCount }, (_, i) => `[${i + 1}]`).join('');
+  return `${text} ${markers}`.trim();
+};
+
 const renderDoctorOpinionPdf = (
   doc: PDFKit.PDFDocument,
   input: DoctorOpinionPdfInput,
@@ -718,8 +752,13 @@ const renderDoctorOpinionPdf = (
   const structuredAnswers = (input.questionAnswers || []).filter(
     (item) => item.question.trim() && item.answer.trim()
   );
-  const recommendations =
+  const recommendationsRaw =
     input.recommendations?.trim() || input.summary?.trim() || '';
+  const citations = (input.citations || []).filter((c) => c.title?.trim() && c.url?.trim());
+  const trialMatches = (input.trialMatches || []).filter(
+    (t) => t.title?.trim() && t.nctId?.trim() && t.url?.trim()
+  );
+  const recommendations = appendCitationMarkers(recommendationsRaw, citations.length);
   const clinicalSummary = input.clinicalSummary?.trim() || '';
   const assessment = input.assessment?.trim() || '';
   const limitations = input.limitations?.trim() || '';
@@ -791,6 +830,30 @@ const renderDoctorOpinionPdf = (
     drawSectionHeader(doc, "What this review does and doesn't cover");
     drawBodyText(doc, limitations);
     space(doc, 10);
+  }
+
+  if (citations.length > 0) {
+    drawSectionHeader(doc, 'References');
+    citations.forEach((citation, index) => {
+      const yearPart = citation.year ? ` (${citation.year})` : '';
+      const journalPart = citation.journal?.trim() ? `. ${citation.journal.trim()}` : '';
+      const pmidPart = citation.pmid ? ` PMID: ${citation.pmid}.` : '';
+      const line = `[${index + 1}] ${citation.title.trim()}${journalPart}${yearPart}.${pmidPart} ${citation.url}`;
+      drawBodyText(doc, line);
+      space(doc, 4);
+    });
+    space(doc, 6);
+  }
+
+  if (trialMatches.length > 0) {
+    drawSectionHeader(doc, 'Potentially relevant trials');
+    trialMatches.forEach((trial) => {
+      const phasePart = trial.phase?.trim() ? ` · ${trial.phase.trim()}` : '';
+      const line = `${trial.title.trim()} (${trial.nctId}${phasePart} · ${trial.status}). ${trial.url}`;
+      drawBodyText(doc, line);
+      space(doc, 4);
+    });
+    space(doc, 6);
   }
 
   // Always render signature block (body populated from doctor fields; draft shows pending).

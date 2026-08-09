@@ -67,6 +67,8 @@ describe('LLM gateway service integration', () => {
       LLM_GATEWAY_API_KEY: 'service-virtual-key',
       OPENAI_MODEL: 'secondop-case-analysis-primary',
       AGENTIC_MODEL: 'secondop-agentic-planner',
+      // Keep this suite hermetic even if a local .env enables Presidio.
+      DEID_ENABLED: 'false',
     };
     resetOpenAIClientForTests();
   });

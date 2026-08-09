@@ -28,6 +28,32 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-09 - SEC-206 - Clinical grounding bundle (Phases 1–3)
+
+- Status: Implementation complete on feature branch; draft PR pending human merge approval.
+- Human approval: Required before merge/deploy. Apply migration `033` on deploy. Keep `GROUNDING_ENABLED=false` until staged rollout.
+- Branch/worktree: `sec-206-clinical-grounding`
+- Files changed: `src/services/grounding/*` (RxNorm, PubMed, ClinicalTrials, entity normalization); agentic tools `pubmed`/`clinicalTrials`/`groundEvidence`; `GROUND_EVIDENCE` pipeline step; artifact `citations`/`trialMatches`/`citation_links`; PDF References + trials sections; doctor draft keep/drop; migration `033`; `.env.example`; unit/live-gated tests
+- PR: (pending)
+- Checks: `npm run lint`, `npm test`, `npm run build`, `npm run eval:harness` green
+- Deployment: Not started
+- Verification: unit + eval harness only; live APIs behind `RUN_LIVE_GROUNDING=1`
+- Blockers: none for review
+- Follow-ups: Phase 4 gold-set cite/trial assertions; Phase 5 openFDA interactions; FE keep/drop UI polish if needed
+
+## 2026-08-09 - SEC-205 - Merge + deploy gold-set eval harness
+
+- Status: Merged and deployed (staging + production). Linear Done.
+- Human approval: User requested merge and deploy.
+- Branch/worktree: merged to `main` via BE #107 / FE #150
+- Files changed: gold eval harness + `/version.analysisExecutionMode` + migration `032` + admin gold-evals API/UI (see prior ledger entry)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/107 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/150
+- Checks: CI green before merge
+- Deployment: Railway staging `a066c97f…` + production `21e431b3…` SUCCESS; migration `032` on staging Postgres-k0Us + prod Postgres-I7v9; Vercel production Ready (GitHub auto) → https://secondop.ai
+- Verification: staging/prod `/health` 200; `/version.analysisExecutionMode=agentic` (legacy `ANALYSIS_AGENTIC_MODE=direct`); `/admin/gold-evals` 200
+- Blockers: none
+- Follow-ups: optional `OPENAI_API_KEY_EVAL` for nightly live gold; clinical gold-v1 authorship; `/version` gitSha still stale via `BACKEND_GIT_SHA` env
+
 ## 2026-08-09 - SEC-205 - Clinical gold-set eval harness (phases 0–5)
 
 - Status: Engineering MVP complete on feature branches (BE + FE). Clinical gold-v1 authorship + prod mode confirm remain.

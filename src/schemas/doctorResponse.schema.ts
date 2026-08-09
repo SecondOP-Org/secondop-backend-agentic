@@ -33,6 +33,31 @@ export const concordanceSchema = z.object({
   rationale: z.string(),
 });
 
+export const doctorCitationSchema = z.object({
+  id: z.string().min(1),
+  source: z.literal('pubmed').optional().default('pubmed'),
+  pmid: z.string().min(1),
+  title: z.string().min(1),
+  journal: z.string().default(''),
+  year: z.number().optional().default(0),
+  url: z.string().url(),
+  relevanceNote: z.string().optional(),
+  /** Specialist keep/drop — default keep. */
+  kept: z.boolean().optional().default(true),
+});
+
+export const doctorTrialMatchSchema = z.object({
+  id: z.string().min(1),
+  source: z.literal('clinicaltrials').optional().default('clinicaltrials'),
+  nctId: z.string().min(1),
+  title: z.string().min(1),
+  phase: z.string().optional(),
+  status: z.string().min(1),
+  url: z.string().url(),
+  eligibilitySummary: z.string().optional(),
+  kept: z.boolean().optional().default(true),
+});
+
 export const doctorResponseDraftSchema = z.object({
   questionAnswers: z.array(doctorQuestionAnswerSchema).default([]),
   summary: z.string().default(''),
@@ -48,6 +73,12 @@ export const doctorResponseDraftSchema = z.object({
   /** Dual-write with summary (recommendations is the preferred field going forward). */
   recommendations: z.string().default(''),
   limitations: z.string().default(''),
+  /** Clinical grounding citations — specialist may keep/drop (SEC-206). */
+  citations: z.array(doctorCitationSchema).optional(),
+  trialMatches: z.array(doctorTrialMatchSchema).optional(),
+  /** Quality signal: citation ids the specialist removed. */
+  droppedCitationIds: z.array(z.string()).optional(),
+  droppedTrialIds: z.array(z.string()).optional(),
 });
 
 const doctorResponseSendBaseSchema = doctorResponseDraftSchema.extend({

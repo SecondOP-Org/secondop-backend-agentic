@@ -1,5 +1,11 @@
 import { CaseAnalysisArtifact } from '../../services/analysisArtifact.service';
 import { CaseAnalysisResult, CaseIntakeData } from '../../services/analysis.service';
+import {
+  Citation,
+  CitationLink,
+  NormalizedEntities,
+  TrialMatch,
+} from '../../services/grounding/types';
 import { ExtractedReport } from '../../services/reportExtraction.service';
 import { AnalysisEvalFixtures } from '../../evals/analysisEvalFixtures';
 import { AnalysisExecutionMode } from './executionMode';
@@ -9,6 +15,7 @@ export type AgenticMode = AnalysisExecutionMode;
 export type AgenticAction =
   | 'VALIDATE_INTAKE'
   | 'EXTRACT_REPORTS'
+  | 'GROUND_EVIDENCE'
   | 'SYNTHESIZE_SUMMARY'
   | 'GUARD_QUESTIONS'
   | 'FINALIZE';
@@ -68,6 +75,13 @@ export interface AgenticLoopState {
   observations: string[];
   finalArtifact: AgenticFinalArtifact | null;
   criticScore: AgenticCriticScore | null;
+  /** De-identified entities for external grounding APIs (SEC-206). */
+  normalizedEntities?: NormalizedEntities | null;
+  citations?: Citation[];
+  trialMatches?: TrialMatch[];
+  citationLinks?: CitationLink[];
+  /** True after GROUND_EVIDENCE ran (or was skipped when grounding disabled). */
+  groundingCompleted?: boolean;
 }
 
 export interface AgenticPlannerDecision {
