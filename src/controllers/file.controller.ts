@@ -1,7 +1,6 @@
 import { Response, NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
 import {
@@ -31,7 +30,6 @@ import { computeFileSha256 } from '../services/fileHash.service';
 import {
   paginationMeta,
   parsePaginationQuery,
-  splitTotalCount,
 } from '../utils/pagination';
 import {
   invalidateCaseAnalysisAfterPdfChange,
@@ -50,90 +48,7 @@ import {
   listStudyInstancesForDownload,
   streamStudyZipToResponse,
 } from '../services/imagingStudyDownload.service';
-
-interface AuthorizedFileRow {
-  id: string;
-  case_id: string | null;
-  patient_id: string;
-  uploaded_by: string;
-  file_name: string;
-  file_type: string;
-  file_size: number;
-  file_url: string;
-  file_category: string | null;
-  description: string | null;
-  metadata: unknown;
-  is_dicom: boolean;
-  dicom_extraction_status?: 'pending' | 'succeeded' | 'failed' | null;
-  dicom_extraction_error?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-const findAccessibleCasePatientId = async (caseId: string, userId: string): Promise<string> => {
-  const result = await query(
-    `SELECT c.patient_id
-     FROM cases c
-     JOIN patients p ON p.id = c.patient_id
-     LEFT JOIN case_assignments ca ON ca.case_id = c.id
-     LEFT JOIN doctors d ON d.id = ca.doctor_id
-     WHERE c.id = $1
-       AND (p.user_id = $2 OR d.user_id = $2)
-     LIMIT 1`,
-    [caseId, userId]
-  );
-
-  if (result.rows.length === 0) {
-    throw new AppError('Case not found or access denied', 403);
-  }
-
-  return result.rows[0].patient_id;
-};
-
-const getAccessibleFileById = async (fileId: string, userId: string): Promise<AuthorizedFileRow> => {
-  const result = await query(
-    `SELECT mf.*,
-            di.dicom_extraction_status,
-            di.dicom_extraction_error
-     FROM medical_files mf
-     JOIN patients p ON p.id = mf.patient_id
-     LEFT JOIN cases c ON c.id = mf.case_id
-     LEFT JOIN case_assignments ca ON ca.case_id = c.id
-     LEFT JOIN doctors d ON d.id = ca.doctor_id
-     LEFT JOIN dicom_instances di ON di.file_id = mf.id
-     WHERE mf.id = $1
-       AND (p.user_id = $2 OR d.user_id = $2)
-     ORDER BY mf.created_at DESC
-     LIMIT 1`,
-    [fileId, userId]
-  );
-
-  if (result.rows.length === 0) {
-    throw new AppError('File not found or access denied', 404);
-  }
-
-  return result.rows[0] as AuthorizedFileRow;
-};
-
-const ensurePatientOwnsDraftCase = async (caseId: string, userId: string): Promise<void> => {
-  const result = await query(
-    `SELECT c.status
-     FROM cases c
-     JOIN patients p ON p.id = c.patient_id
-     WHERE c.id = $1
-       AND p.user_id = $2`,
-    [caseId, userId]
-  );
-
-  if (result.rows.length === 0) {
-    throw new AppError('Case not found or access denied', 403);
-  }
-
-  const status = String(result.rows[0].status || '');
-  if (status !== 'draft') {
-    throw new AppError('Files can only be deleted while the case is still a draft', 403);
-  }
-};
+import * as fileService from '../services/file.service';
 
 const isDicomUpload = (file: Express.Multer.File): boolean => {
   const extension = path.extname(file.originalname).toLowerCase();
@@ -163,7 +78,7 @@ export const uploadImagingStudy = async (req: AuthRequest, res: Response, next: 
       throw new AppError('caseId is required', 400);
     }
 
-    const patientId = await findAccessibleCasePatientId(caseId, userId);
+    const patientId = await fileService.resolveAccessibleCasePatientId(caseId, userId);
     const uploadedFiles = (req.files as Express.Multer.File[] | undefined) || [];
     const singleFile = req.file;
     const ingestOptions = { signal: abortController.signal };
@@ -238,7 +153,7 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
       throw new AppError('caseId is required', 400);
     }
 
-    const patientId = await findAccessibleCasePatientId(caseId, userId);
+    const patientId = await fileService.resolveAccessibleCasePatientId(caseId, userId);
     const fileUrl = `/uploads/${req.file.filename}`;
     const isDicom = isDicomUpload(req.file);
     const isPdf = isPdfMedicalFile(req.file.mimetype, req.file.originalname);
@@ -251,7 +166,6 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
       deidResult = await deidentifyDicomFileInPlace(filePath, createDicomDeidContext(caseId));
     }
 
-    // Pixel PHI redaction BEFORE storage / vision-OCR (SEC-129). Fail closed when enabled.
     try {
       if (isDicom && isImageDeidEnabled()) {
         await redactDicomPixelsInPlace(filePath);
@@ -268,54 +182,27 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
     const storedStats = fs.statSync(filePath);
     const fileSha256 = await computeFileSha256(filePath);
 
-    const result = await query(
-      `INSERT INTO medical_files (
-        case_id,
-        patient_id,
-        uploaded_by,
-        file_name,
-        file_type,
-        file_size,
-        file_url,
-        file_category,
-        description,
-        is_dicom,
-        file_sha256,
-        pdf_validation_status,
-        pdf_extraction_status
-      )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-       RETURNING *`,
-      [
-        caseId,
-        patientId,
-        userId,
-        req.file.originalname,
-        req.file.mimetype,
-        storedStats.size,
-        fileUrl,
-        category,
-        description,
-        isDicom,
-        fileSha256,
-        isReport ? 'pending' : null,
-        isReport ? 'pending' : null,
-      ]
-    );
-
-    const fileRecord = result.rows[0] as {
-      id: string;
-      case_id: string;
-      file_name: string;
-      file_type: string;
-      file_url: string;
-    };
+    const fileRecord = await fileService.insertMedicalFile({
+      caseId,
+      patientId,
+      uploadedBy: userId,
+      fileName: req.file.originalname,
+      fileType: req.file.mimetype,
+      fileSize: storedStats.size,
+      fileUrl,
+      fileCategory: category,
+      description,
+      isDicom,
+      fileSha256,
+      pdfValidationStatus: isReport ? 'pending' : null,
+      pdfExtractionStatus: isReport ? 'pending' : null,
+    });
 
     if (isDicom) {
       if (deidResult) {
         await upsertDicomDeidVault({
           fileId: fileRecord.id,
-          caseId: fileRecord.case_id,
+          caseId: fileRecord.case_id!,
           studyInstanceUid: deidResult.remappedStudyUid,
           mapping: deidResult.mapping,
           audit: deidResult.audit,
@@ -324,7 +211,7 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
 
       await extractAndPersistDicomMetadata({
         fileId: fileRecord.id,
-        caseId: fileRecord.case_id,
+        caseId: fileRecord.case_id!,
         filePath,
       });
     } else if (isReport) {
@@ -346,7 +233,7 @@ export const uploadFile = async (req: AuthRequest, res: Response, next: NextFunc
 
       await invalidateCaseAnalysisAfterPdfChange(caseId);
       queueReportExtraction({
-        caseId: fileRecord.case_id,
+        caseId: fileRecord.case_id!,
         fileSha256,
         row: {
           id: fileRecord.id,
@@ -377,42 +264,7 @@ export const getFiles = async (req: AuthRequest, res: Response, next: NextFuncti
     const { caseId } = req.query;
     const userId = req.user!.id;
     const { page, pageSize, offset } = parsePaginationQuery(req.query);
-    const params: unknown[] = [userId];
-    let innerWhere = 'WHERE (p.user_id = $1 OR d.user_id = $1)';
-
-    if (caseId && typeof caseId !== 'string') {
-      throw new AppError('caseId must be a string', 400);
-    }
-
-    if (caseId) {
-      params.push(caseId);
-      innerWhere += ` AND mf.case_id = $${params.length}`;
-    }
-
-    params.push(pageSize, offset);
-    const limitIdx = params.length - 1;
-    const offsetIdx = params.length;
-
-    // DISTINCT in a subquery avoids join fan-out before LIMIT/OFFSET + total count.
-    const queryStr = `
-      SELECT paged.*, COUNT(*) OVER() AS __total_count
-      FROM (
-        SELECT DISTINCT mf.*,
-               di.dicom_extraction_status,
-               di.dicom_extraction_error
-        FROM medical_files mf
-        JOIN patients p ON p.id = mf.patient_id
-        LEFT JOIN cases c ON c.id = mf.case_id
-        LEFT JOIN case_assignments ca ON ca.case_id = c.id
-        LEFT JOIN doctors d ON d.id = ca.doctor_id
-        LEFT JOIN dicom_instances di ON di.file_id = mf.id
-        ${innerWhere}
-      ) paged
-      ORDER BY paged.created_at DESC
-      LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
-
-    const result = await query(queryStr, params);
-    const { rows, total } = splitTotalCount(result.rows as Array<Record<string, unknown>>);
+    const { rows, total } = await fileService.getFiles(userId, caseId, pageSize, offset);
 
     res.json({
       status: 'success',
@@ -427,7 +279,7 @@ export const getFiles = async (req: AuthRequest, res: Response, next: NextFuncti
 export const getFileById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { fileId } = req.params;
-    const file = await getAccessibleFileById(fileId, req.user!.id);
+    const file = await fileService.getAccessibleFileById(fileId, req.user!.id);
 
     res.json({
       status: 'success',
@@ -441,7 +293,7 @@ export const getFileById = async (req: AuthRequest, res: Response, next: NextFun
 export const downloadFile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { fileId } = req.params;
-    const file = await getAccessibleFileById(fileId, req.user!.id);
+    const file = await fileService.getAccessibleFileById(fileId, req.user!.id);
     const filePath = resolveStoredFilePath(file.file_url);
 
     if (!fs.existsSync(filePath)) {
@@ -495,7 +347,7 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
       throw new AppError('Only patients can delete uploaded case files', 403);
     }
 
-    const file = await getAccessibleFileById(fileId, userId);
+    const file = await fileService.getAccessibleFileById(fileId, userId);
     const isReport = isReportMedicalFile(file.file_type, file.file_name);
     const caseId = file.case_id;
 
@@ -503,14 +355,14 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
       throw new AppError('File is not attached to a case', 400);
     }
 
-    await ensurePatientOwnsDraftCase(caseId, userId);
+    await fileService.ensurePatientOwnsDraftCase(caseId, userId);
 
     const filePath = resolveStoredFilePath(file.file_url);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
-    await query('DELETE FROM medical_files WHERE id = $1', [fileId]);
+    await fileService.deleteMedicalFileRecord(fileId);
 
     const analysisInvalidated = isReport ? await invalidateCaseAnalysisAfterPdfChange(caseId) : false;
 
@@ -530,7 +382,7 @@ export const deleteFile = async (req: AuthRequest, res: Response, next: NextFunc
 export const getFileAnnotations = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { fileId } = req.params;
-    const file = await getAccessibleFileById(fileId, req.user!.id);
+    const file = await fileService.getAccessibleFileById(fileId, req.user!.id);
     const persisted = await getPersistedAnnotations(file.id);
 
     res.json({
@@ -551,7 +403,7 @@ export const getFileAnnotations = async (req: AuthRequest, res: Response, next: 
 export const saveFileAnnotations = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { fileId } = req.params;
-    const file = await getAccessibleFileById(fileId, req.user!.id);
+    const file = await fileService.getAccessibleFileById(fileId, req.user!.id);
 
     const annotations = parseDicomAnnotations(req.body.annotations);
     const viewport = parseDicomViewport(req.body.viewport);

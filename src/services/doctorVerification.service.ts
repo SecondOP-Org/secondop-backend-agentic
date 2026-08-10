@@ -1,5 +1,12 @@
-import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
+import {
+  findDoctorSignEligibilityByDoctorId,
+  findDoctorSignEligibilityByUserId,
+  findDoctorsForVerification,
+  findDoctorVerificationStatusById,
+  insertDoctorVerificationEvent,
+  updateDoctorVerificationStatus,
+} from '../repositories/doctor.repository';
 
 export type DoctorVerificationStatus = 'pending' | 'verified' | 'rejected';
 export type OrganizationVerificationStatus = 'pending' | 'verified' | 'rejected';
@@ -58,77 +65,30 @@ export const assertCanSignOpinion = (doctor: {
   }
 };
 
-const DOCTOR_SIGN_ELIGIBILITY_SELECT = `
-  SELECT d.id,
-         d.verification_status,
-         d.organization_id,
-         o.verification_status AS organization_verification_status
-  FROM doctors d
-  LEFT JOIN organizations o ON o.id = d.organization_id
-`;
-
 /** Load doctor by user id and refuse when unified sign gate fails. */
 export const ensureDoctorCredentialVerifiedByUserId = async (userId: string): Promise<void> => {
-  const result = await query(
-    `${DOCTOR_SIGN_ELIGIBILITY_SELECT}
-     WHERE d.user_id = $1
-     LIMIT 1`,
-    [userId]
-  );
+  const rows = await findDoctorSignEligibilityByUserId(userId);
 
-  if (result.rows.length === 0) {
+  if (rows.length === 0) {
     throw new AppError('Doctor profile not found', 404);
   }
 
-  assertCanSignOpinion(result.rows[0] as DoctorSignEligibility);
+  assertCanSignOpinion(rows[0] as DoctorSignEligibility);
 };
 
 /** Load doctor by doctors.id and refuse when unified sign gate fails. */
 export const ensureDoctorCredentialVerifiedByDoctorId = async (doctorId: string): Promise<void> => {
-  const result = await query(
-    `${DOCTOR_SIGN_ELIGIBILITY_SELECT}
-     WHERE d.id = $1
-     LIMIT 1`,
-    [doctorId]
-  );
+  const rows = await findDoctorSignEligibilityByDoctorId(doctorId);
 
-  if (result.rows.length === 0) {
+  if (rows.length === 0) {
     throw new AppError('Doctor not found', 404);
   }
 
-  assertCanSignOpinion(result.rows[0] as DoctorSignEligibility);
+  assertCanSignOpinion(rows[0] as DoctorSignEligibility);
 };
 
 export const listDoctorsForVerification = async (status?: DoctorVerificationStatus) => {
-  const params: string[] = [];
-  let where = '';
-  if (status) {
-    params.push(status);
-    where = `WHERE d.verification_status = $1`;
-  }
-
-  const result = await query(
-    `SELECT d.id, d.user_id, d.first_name, d.last_name, d.specialty,
-            d.license_number, d.registration_council, d.country, d.npi,
-            d.organization_id, d.verification_status, d.verification_reason,
-            d.verified_at, d.verified_by, d.created_at, u.email,
-            o.verification_status AS organization_verification_status,
-            o.name AS organization_name
-     FROM doctors d
-     JOIN users u ON u.id = d.user_id
-     LEFT JOIN organizations o ON o.id = d.organization_id
-     ${where}
-     ORDER BY
-       CASE d.verification_status
-         WHEN 'pending' THEN 0
-         WHEN 'rejected' THEN 1
-         ELSE 2
-       END,
-       d.created_at ASC`,
-    params
-  );
-
-  return result.rows;
+  return findDoctorsForVerification(status);
 };
 
 export const setDoctorVerificationStatus = async (input: {
@@ -144,42 +104,31 @@ export const setDoctorVerificationStatus = async (input: {
     throw new AppError('A reason is required when rejecting a doctor', 400);
   }
 
-  const existing = await query(
-    `SELECT id, verification_status
-     FROM doctors
-     WHERE id = $1
-     LIMIT 1`,
-    [doctorId]
-  );
+  const existing = await findDoctorVerificationStatusById(doctorId);
 
-  if (existing.rows.length === 0) {
+  if (existing.length === 0) {
     throw new AppError('Doctor not found', 404);
   }
 
-  const fromStatus = (existing.rows[0] as { verification_status: DoctorVerificationStatus })
+  const fromStatus = (existing[0] as { verification_status: DoctorVerificationStatus })
     .verification_status;
   const isVerifiedFlag = toStatus === 'verified';
 
-  const updated = await query(
-    `UPDATE doctors
-     SET verification_status = $1,
-         verification_reason = $2,
-         verified_at = CASE WHEN $1 = 'verified' THEN CURRENT_TIMESTAMP ELSE verified_at END,
-         verified_by = $3,
-         is_verified = $4,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = $5
-     RETURNING id, user_id, first_name, last_name, specialty, license_number,
-               registration_council, country, npi, organization_id, verification_status,
-               verification_reason, verified_at, verified_by, is_verified`,
-    [toStatus, reason || null, actorUserId, isVerifiedFlag, doctorId]
-  );
+  const updated = await updateDoctorVerificationStatus({
+    toStatus,
+    reason: reason || null,
+    actorUserId,
+    isVerifiedFlag,
+    doctorId,
+  });
 
-  await query(
-    `INSERT INTO doctor_verification_events (doctor_id, actor_user_id, from_status, to_status, reason)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [doctorId, actorUserId, fromStatus, toStatus, reason || null]
-  );
+  await insertDoctorVerificationEvent({
+    doctorId,
+    actorUserId,
+    fromStatus,
+    toStatus,
+    reason: reason || null,
+  });
 
-  return updated.rows[0];
+  return updated[0];
 };

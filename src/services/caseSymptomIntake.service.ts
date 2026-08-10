@@ -1,5 +1,8 @@
 import type { PoolClient } from 'pg';
-import { query } from '../database/connection';
+import {
+  findLatestCaseSymptomIntake,
+  upsertCaseSymptomIntake as upsertCaseSymptomIntakeRow,
+} from '../repositories/case.repository';
 
 /** Loose structured symptom intake payload from the FE (SEC-208). */
 export type SymptomIntakePayload = {
@@ -30,45 +33,21 @@ export async function upsertCaseSymptomIntake(
       ? payload.triageLevel.trim()
       : null;
 
-  const sql = `
-    INSERT INTO case_symptom_intake (case_id, version, payload, triage_level, updated_at)
-    VALUES ($1, 1, $2::jsonb, $3, CURRENT_TIMESTAMP)
-    ON CONFLICT (case_id, version)
-    DO UPDATE SET
-      payload = EXCLUDED.payload,
-      triage_level = EXCLUDED.triage_level,
-      updated_at = CURRENT_TIMESTAMP
-  `;
-
-  const params = [caseId, JSON.stringify(payload), triageLevel];
-
-  if (client) {
-    await client.query(sql, params);
-    return;
-  }
-
-  await query(sql, params);
+  await upsertCaseSymptomIntakeRow(caseId, JSON.stringify(payload), triageLevel, client);
 }
 
 export async function getLatestCaseSymptomIntake(
   caseId: string
 ): Promise<{ payload: SymptomIntakePayload; triageLevel: string | null } | null> {
-  const result = await query(
-    `SELECT payload, triage_level
-     FROM case_symptom_intake
-     WHERE case_id = $1
-     ORDER BY version DESC
-     LIMIT 1`,
-    [caseId]
-  );
+  const rows = await findLatestCaseSymptomIntake(caseId);
 
-  if (result.rows.length === 0) {
+  if (rows.length === 0) {
     return null;
   }
 
   return {
-    payload: result.rows[0].payload as SymptomIntakePayload,
-    triageLevel: (result.rows[0].triage_level as string | null) ?? null,
+    payload: rows[0].payload as SymptomIntakePayload,
+    triageLevel: (rows[0].triage_level as string | null) ?? null,
   };
 }
 

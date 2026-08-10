@@ -1,20 +1,14 @@
 import { Response, NextFunction } from 'express';
-import { query } from '../database/connection';
-import { AppError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-});
+import * as billingService from '../services/billing.service';
 
 export const getSubscriptionPlans = async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const result = await query('SELECT * FROM subscription_plans WHERE is_active = true ORDER BY price ASC');
+    const data = await billingService.getSubscriptionPlans();
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data,
     });
   } catch (error) {
     next(error);
@@ -26,29 +20,11 @@ export const subscribe = async (req: AuthRequest, res: Response, next: NextFunct
     const { planId, paymentMethodId } = req.body;
     const userId = req.user!.id;
 
-    const planResult = await query('SELECT * FROM subscription_plans WHERE id = $1', [planId]);
-    if (planResult.rows.length === 0) {
-      throw new AppError('Plan not found', 404);
-    }
-
-    const plan = planResult.rows[0];
-
-    // Create Stripe subscription
-    const subscription = await stripe.subscriptions.create({
-      customer: paymentMethodId,
-      items: [{ price: plan.stripe_price_id }],
-    });
-
-    const result = await query(
-      `INSERT INTO user_subscriptions (user_id, plan_id, stripe_subscription_id, status, current_period_start, current_period_end)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [userId, planId, subscription.id, 'active', new Date(subscription.current_period_start * 1000), new Date(subscription.current_period_end * 1000)]
-    );
+    const data = await billingService.subscribe(userId, planId, paymentMethodId);
 
     res.status(201).json({
       status: 'success',
-      data: result.rows[0],
+      data,
     });
   } catch (error) {
     next(error);
@@ -59,22 +35,7 @@ export const cancelSubscription = async (req: AuthRequest, res: Response, next: 
   try {
     const userId = req.user!.id;
 
-    const subResult = await query(
-      'SELECT * FROM user_subscriptions WHERE user_id = $1 AND status = $2',
-      [userId, 'active']
-    );
-
-    if (subResult.rows.length === 0) {
-      throw new AppError('No active subscription found', 404);
-    }
-
-    const subscription = subResult.rows[0];
-    await stripe.subscriptions.cancel(subscription.stripe_subscription_id);
-
-    await query(
-      'UPDATE user_subscriptions SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      ['cancelled', subscription.id]
-    );
+    await billingService.cancelSubscription(userId);
 
     res.json({
       status: 'success',
@@ -89,17 +50,11 @@ export const getSubscription = async (req: AuthRequest, res: Response, next: Nex
   try {
     const userId = req.user!.id;
 
-    const result = await query(
-      `SELECT us.*, sp.name as plan_name, sp.price, sp.features
-       FROM user_subscriptions us
-       JOIN subscription_plans sp ON us.plan_id = sp.id
-       WHERE us.user_id = $1 AND us.status = 'active'`,
-      [userId]
-    );
+    const data = await billingService.getSubscription(userId);
 
     res.json({
       status: 'success',
-      data: result.rows[0] || null,
+      data,
     });
   } catch (error) {
     next(error);
@@ -111,16 +66,11 @@ export const addPaymentMethod = async (req: AuthRequest, res: Response, next: Ne
     const { stripePaymentMethodId, isDefault } = req.body;
     const userId = req.user!.id;
 
-    const result = await query(
-      `INSERT INTO payment_methods (user_id, stripe_payment_method_id, is_default)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [userId, stripePaymentMethodId, isDefault || false]
-    );
+    const data = await billingService.addPaymentMethod(userId, stripePaymentMethodId, isDefault);
 
     res.status(201).json({
       status: 'success',
-      data: result.rows[0],
+      data,
     });
   } catch (error) {
     next(error);
@@ -130,11 +80,11 @@ export const addPaymentMethod = async (req: AuthRequest, res: Response, next: Ne
 export const getPaymentMethods = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
-    const result = await query('SELECT * FROM payment_methods WHERE user_id = $1', [userId]);
+    const data = await billingService.getPaymentMethods(userId);
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data,
     });
   } catch (error) {
     next(error);
@@ -144,7 +94,7 @@ export const getPaymentMethods = async (req: AuthRequest, res: Response, next: N
 export const deletePaymentMethod = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { paymentMethodId } = req.params;
-    await query('DELETE FROM payment_methods WHERE id = $1', [paymentMethodId]);
+    await billingService.deletePaymentMethod(paymentMethodId);
 
     res.json({
       status: 'success',
@@ -158,11 +108,11 @@ export const deletePaymentMethod = async (req: AuthRequest, res: Response, next:
 export const getInvoices = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
-    const result = await query('SELECT * FROM invoices WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    const data = await billingService.getInvoices(userId);
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data,
     });
   } catch (error) {
     next(error);
@@ -172,11 +122,11 @@ export const getInvoices = async (req: AuthRequest, res: Response, next: NextFun
 export const getPaymentHistory = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
-    const result = await query('SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+    const data = await billingService.getPaymentHistory(userId);
 
     res.json({
       status: 'success',
-      data: result.rows,
+      data,
     });
   } catch (error) {
     next(error);
@@ -187,16 +137,11 @@ export const createPaymentIntent = async (req: AuthRequest, res: Response, next:
   try {
     const { amount, currency } = req.body;
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency: currency || 'usd',
-    });
+    const data = await billingService.createPaymentIntent(amount, currency);
 
     res.json({
       status: 'success',
-      data: {
-        clientSecret: paymentIntent.client_secret,
-      },
+      data,
     });
   } catch (error) {
     next(error);
@@ -206,21 +151,9 @@ export const createPaymentIntent = async (req: AuthRequest, res: Response, next:
 export const handleWebhook = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const sig = req.headers['stripe-signature'] as string;
-    const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+    const result = await billingService.handleWebhook(req.body, sig);
 
-    // Handle different event types
-    switch (event.type) {
-      case 'payment_intent.succeeded':
-        // Handle successful payment
-        break;
-      case 'customer.subscription.updated':
-        // Handle subscription update
-        break;
-      default:
-        console.log(`Unhandled event type ${event.type}`);
-    }
-
-    res.json({ received: true });
+    res.json(result);
   } catch (error) {
     next(error);
   }
