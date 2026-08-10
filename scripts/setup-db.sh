@@ -147,6 +147,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/033_grounding
 echo "  → Running 034_case_symptom_intake.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/034_case_symptom_intake.sql
 
+echo "  → Running 035_case_records_connect.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/035_case_records_connect.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
