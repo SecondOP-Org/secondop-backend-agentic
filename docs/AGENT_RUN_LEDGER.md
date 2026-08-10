@@ -28,6 +28,32 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-09 - SEC-210 - Service SQL → repositories (phase 2 batch)
+
+- Status: Priority service batch extracted on shared branch; analysis* deferred.
+- Human approval: Continuing from SEC-209 task; merge/PR pending.
+- Branch/worktree: `sec-209-repository-pattern`
+- Files changed: Extended case/doctor repos; added practice, caseInternalNotes, doctorResponse, organization, signupApproval, medicalFileAnalysis repos; thinned matching services.
+- PR: none yet
+- Checks: lint/build pass; full Jest green after batch
+- Deployment: none
+- Verification: Priority list items 1–9 from SEC-210 extracted; analysis*/dicom* deferred
+- Blockers: Awaiting commit + draft PR approval
+- Follow-ups: analysisRun/analysisWorker and remaining imaging/deid/demo services
+
+## 2026-08-09 - SEC-209 - Controller SQL → repository pattern (phase 1)
+
+- Status: Implementation complete on branch; flow tests green; not committed/PR'd yet.
+- Human approval: Spec approved via task brief; merge/PR pending.
+- Branch/worktree: `sec-209-repository-pattern`
+- Files changed: New `src/repositories/*` + domain services; thinned 11 priority controllers; added `repository-pattern-flows.test.ts`.
+- PR: none yet
+- Checks: lint/build pass; full Jest **356 passed** / 3 skipped (incl. case/auth/file/doctor flows + new domain flow suite)
+- Deployment: none
+- Verification: Zero controller `database/connection` imports; live local e2e smoke blocked (Postgres down, Docker daemon down)
+- Blockers: Awaiting commit + draft PR approval; local DB needed for `e2e:smoke`
+- Follow-ups: Extract SQL still living in non-controller services; run local e2e smoke when Postgres/Docker available
+
 ## 2026-08-09 - SEC-206 - Merge + deploy clinical grounding
 
 - Status: Merged and deployed (staging + production). Linear Done.

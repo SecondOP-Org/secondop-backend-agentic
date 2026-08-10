@@ -1,8 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
+import {
+  clearResponseDraftByCaseAndDoctor,
+  findCaseRowForDoctor,
+  findDoctorIdByUserId,
+  findResponseDraftByCaseAndDoctor,
+  updateResponseDraft,
+} from '../repositories/doctorResponse.repository';
 import { resolveUploadDir } from '../utils/uploadPath';
 import {
   artifactQuestionsToStrings,
@@ -188,38 +194,23 @@ export const resolveSpecialistQuestions = (
 };
 
 const getDoctorIdForUser = async (userId: string): Promise<string> => {
-  const result = await query('SELECT id FROM doctors WHERE user_id = $1', [userId]);
+  const rows = await findDoctorIdByUserId(userId);
 
-  if (result.rows.length === 0) {
+  if (rows.length === 0) {
     throw new AppError('Doctor profile not found', 404);
   }
 
-  return result.rows[0].id as string;
+  return rows[0].id as string;
 };
 
 const fetchCaseRowForDoctor = async (caseId: string, doctorUserId: string) => {
-  const result = await query(
-    `SELECT c.id,
-            c.specialist_questions,
-            c.analysis_questions,
-            c.analysis_artifact,
-            c.analysis_summary,
-            c.analysis_model,
-            c.share_ai_analysis_with_specialists,
-            ca.response_draft
-     FROM cases c
-     JOIN case_assignments ca ON ca.case_id = c.id
-     JOIN doctors d ON d.id = ca.doctor_id
-     WHERE c.id = $1 AND d.user_id = $2
-     LIMIT 1`,
-    [caseId, doctorUserId]
-  );
+  const rows = await findCaseRowForDoctor(caseId, doctorUserId);
 
-  if (result.rows.length === 0) {
+  if (rows.length === 0) {
     throw new AppError('Case not found for assigned doctor', 404);
   }
 
-  return result.rows[0] as CaseRowForQuestionResolution & { response_draft: unknown };
+  return rows[0] as CaseRowForQuestionResolution & { response_draft: unknown };
 };
 
 export const getDoctorResponse = async (caseId: string, doctorUserId: string) => {
@@ -284,20 +275,15 @@ export const saveDoctorResponseDraft = async (
   const parsed = parseDoctorResponseDraft(payload);
   const doctorId = await getDoctorIdForUser(doctorUserId);
 
-  const existing = await query(
-    `SELECT response_draft
-     FROM case_assignments
-     WHERE case_id = $1 AND doctor_id = $2`,
-    [caseId, doctorId]
-  );
+  const existing = await findResponseDraftByCaseAndDoctor(caseId, doctorId);
 
-  if (existing.rows.length === 0) {
+  if (existing.length === 0) {
     throw new AppError('Case not found for assigned doctor', 404);
   }
 
   const currentDraft =
-    existing.rows[0].response_draft && typeof existing.rows[0].response_draft === 'object'
-      ? parseDoctorResponseDraft(existing.rows[0].response_draft)
+    existing[0].response_draft && typeof existing[0].response_draft === 'object'
+      ? parseDoctorResponseDraft(existing[0].response_draft)
       : emptyDraft();
 
   const mergedAnswers = new Map(
@@ -339,12 +325,10 @@ export const saveDoctorResponseDraft = async (
     droppedTrialIds: parsed.droppedTrialIds ?? currentDraft.droppedTrialIds,
   };
 
-  await query(
-    `UPDATE case_assignments
-     SET response_draft = $3,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE case_id = $1 AND doctor_id = $2`,
-    [caseId, doctorId, JSON.stringify({ ...nextDraft, updatedAt: new Date().toISOString() })]
+  await updateResponseDraft(
+    caseId,
+    doctorId,
+    JSON.stringify({ ...nextDraft, updatedAt: new Date().toISOString() })
   );
 
   return nextDraft;
@@ -398,13 +382,7 @@ export const validateDoctorResponseForSend = (
 export const clearDoctorResponseDraft = async (caseId: string, doctorUserId: string): Promise<void> => {
   const doctorId = await getDoctorIdForUser(doctorUserId);
 
-  await query(
-    `UPDATE case_assignments
-     SET response_draft = NULL,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE case_id = $1 AND doctor_id = $2`,
-    [caseId, doctorId]
-  );
+  await clearResponseDraftByCaseAndDoctor(caseId, doctorId);
 };
 
 const concordanceLevelLabel = (

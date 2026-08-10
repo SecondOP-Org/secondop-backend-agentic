@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 import {
   buildSignupApprovalNotifyEmail,
@@ -11,6 +10,7 @@ import {
   queueEmail,
 } from './email.service';
 import logger from '../utils/logger';
+import * as signupApprovalRepo from '../repositories/signupApproval.repository';
 
 const APPROVAL_PURPOSE = 'signup_approval';
 const APPROVAL_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -44,11 +44,13 @@ export const createSignupApprovalToken = async (input: {
 }): Promise<string> => {
   const token = uuidv4();
   const expiresAt = new Date(Date.now() + APPROVAL_TTL_MS);
-  await query(
-    `INSERT INTO otp_verifications (user_id, email, otp_code, purpose, expires_at)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [input.userId, input.email, hashSecret(token), APPROVAL_PURPOSE, expiresAt]
-  );
+  await signupApprovalRepo.insertSignupApprovalToken({
+    userId: input.userId,
+    email: input.email,
+    tokenHash: hashSecret(token),
+    purpose: APPROVAL_PURPOSE,
+    expiresAt,
+  });
   return token;
 };
 
@@ -96,11 +98,12 @@ const queueWelcomeVerifyForUser = async (input: {
 }): Promise<boolean> => {
   const verifyToken = uuidv4();
   const verifyExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await query(
-    `INSERT INTO otp_verifications (user_id, email, otp_code, purpose, expires_at)
-     VALUES ($1, $2, $3, 'email_verify', $4)`,
-    [input.userId, input.email, hashSecret(verifyToken), verifyExpiresAt]
-  );
+  await signupApprovalRepo.insertEmailVerifyToken({
+    userId: input.userId,
+    email: input.email,
+    tokenHash: hashSecret(verifyToken),
+    expiresAt: verifyExpiresAt,
+  });
 
   if (!isEmailConfigured()) {
     return false;
@@ -128,21 +131,16 @@ const resolveApprovalToken = async (token: string) => {
     throw new AppError('Approval token is required', 400);
   }
 
-  const result = await query(
-    `SELECT id, user_id, email
-     FROM otp_verifications
-     WHERE otp_code = $1
-       AND purpose = $2
-       AND is_used = false
-       AND expires_at > CURRENT_TIMESTAMP`,
-    [hashSecret(trimmed), APPROVAL_PURPOSE]
+  const row = await signupApprovalRepo.findValidApprovalToken(
+    hashSecret(trimmed),
+    APPROVAL_PURPOSE
   );
 
-  if (result.rows.length === 0) {
+  if (!row) {
     throw new AppError('Approval link is invalid or has expired', 400);
   }
 
-  return result.rows[0] as { id: string; user_id: string; email: string };
+  return row as { id: string; user_id: string; email: string };
 };
 
 export const decideSignupApproval = async (
@@ -151,67 +149,38 @@ export const decideSignupApproval = async (
 ): Promise<{ email: string; userId: string; welcomeQueued: boolean }> => {
   const row = await resolveApprovalToken(token);
 
-  await query('UPDATE otp_verifications SET is_used = true WHERE id = $1', [row.id]);
+  await signupApprovalRepo.markOtpVerificationUsed(row.id);
   // Invalidate any other outstanding approval tokens for this user.
-  await query(
-    `UPDATE otp_verifications
-     SET is_used = true
-     WHERE user_id = $1
-       AND purpose = $2
-       AND is_used = false`,
-    [row.user_id, APPROVAL_PURPOSE]
-  );
+  await signupApprovalRepo.invalidateRemainingApprovalTokens(row.user_id, APPROVAL_PURPOSE);
 
   if (decision === 'reject') {
-    await query(
-      `UPDATE users
-       SET is_active = false,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1`,
-      [row.user_id]
-    );
+    await signupApprovalRepo.deactivateUser(row.user_id);
     logger.info('Signup rejected', { userId: row.user_id, email: row.email });
     return { email: row.email, userId: row.user_id, welcomeQueued: false };
   }
 
-  const userResult = await query(
-    `UPDATE users
-     SET is_active = true,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1
-     RETURNING id, email, user_type`,
-    [row.user_id]
-  );
+  const user = await signupApprovalRepo.activateUser(row.user_id);
 
-  if (userResult.rows.length === 0) {
+  if (!user) {
     throw new AppError('User not found', 404);
   }
 
-  const user = userResult.rows[0] as { id: string; email: string; user_type: string };
   let firstName = 'there';
   if (user.user_type === 'patient') {
-    const profile = await query(`SELECT first_name FROM patients WHERE user_id = $1`, [user.id]);
-    firstName = profile.rows[0]?.first_name || firstName;
+    firstName = (await signupApprovalRepo.findPatientFirstNameByUserId(user.id as string)) || firstName;
   } else if (user.user_type === 'doctor') {
-    const profile = await query(`SELECT first_name FROM doctors WHERE user_id = $1`, [user.id]);
-    firstName = profile.rows[0]?.first_name || firstName;
+    firstName = (await signupApprovalRepo.findDoctorFirstNameByUserId(user.id as string)) || firstName;
   } else if (user.user_type === 'organization') {
-    const profile = await query(
-      `SELECT contact_first_name AS first_name
-       FROM organizations
-       WHERE id = (
-         SELECT organization_id FROM organization_members WHERE user_id = $1 LIMIT 1
-       )`,
-      [user.id]
-    );
-    firstName = profile.rows[0]?.first_name || firstName;
+    firstName =
+      (await signupApprovalRepo.findOrganizationContactFirstNameByUserId(user.id as string)) ||
+      firstName;
   }
 
   let welcomeQueued = false;
   try {
     welcomeQueued = await queueWelcomeVerifyForUser({
-      userId: user.id,
-      email: user.email,
+      userId: user.id as string,
+      email: user.email as string,
       firstName: String(firstName),
     });
   } catch (error) {
@@ -223,7 +192,7 @@ export const decideSignupApproval = async (
   }
 
   logger.info('Signup approved', { userId: user.id, email: user.email, welcomeQueued });
-  return { email: user.email, userId: user.id, welcomeQueued };
+  return { email: user.email as string, userId: user.id as string, welcomeQueued };
 };
 
 export const renderSignupApprovalHtml = (

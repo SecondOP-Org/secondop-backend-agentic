@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { PoolClient } from 'pg';
-import { query } from '../database/connection';
 import { AppError } from '../middleware/errorHandler';
 import {
   buildOrganizationInviteEmail,
@@ -9,24 +8,12 @@ import {
   isEmailConfigured,
   queueEmail,
 } from './email.service';
+import * as organizationRepo from '../repositories/organization.repository';
 
-export type OrganizationVerificationStatus = 'pending' | 'verified' | 'rejected';
+export type OrganizationVerificationStatus = organizationRepo.OrganizationVerificationStatus;
 export type OrganizationMemberRole = 'owner' | 'member';
 
-export type CreateOrganizationInput = {
-  name: string;
-  contactFirstName: string;
-  contactLastName: string;
-  contactEmail: string;
-  contactPhone?: string | null;
-  addressLine1: string;
-  addressLine2?: string | null;
-  city: string;
-  state?: string | null;
-  postalCode?: string | null;
-  country: string;
-  logoUrl?: string | null;
-};
+export type CreateOrganizationInput = organizationRepo.InsertPendingOrganizationInput;
 
 const hashSecret = (value: string): string =>
   crypto.createHash('sha256').update(value).digest('hex');
@@ -68,62 +55,25 @@ export const createPendingOrganizationWithOwner = async (
   input: CreateOrganizationInput,
   ownerUserId: string
 ) => {
-  const orgResult = await client.query(
-    `INSERT INTO organizations (
-       name, contact_first_name, contact_last_name, contact_email, contact_phone,
-       address_line1, address_line2, city, state, postal_code, country, logo_url,
-       verification_status
-     )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending')
-     RETURNING id, name, verification_status, contact_email, created_at`,
-    [
-      input.name,
-      input.contactFirstName,
-      input.contactLastName,
-      input.contactEmail,
-      input.contactPhone,
-      input.addressLine1,
-      input.addressLine2,
-      input.city,
-      input.state,
-      input.postalCode,
-      input.country,
-      input.logoUrl,
-    ]
+  const organization = await organizationRepo.insertPendingOrganization(input, client);
+
+  await organizationRepo.insertOrganizationOwnerMember(
+    organization.id as string,
+    ownerUserId,
+    client
   );
 
-  const organization = orgResult.rows[0] as {
+  return organization as {
     id: string;
     name: string;
     verification_status: OrganizationVerificationStatus;
     contact_email: string;
     created_at: Date;
   };
-
-  await client.query(
-    `INSERT INTO organization_members (organization_id, user_id, role)
-     VALUES ($1, $2, 'owner')`,
-    [organization.id, ownerUserId]
-  );
-
-  return organization;
 };
 
 export const getOrganizationForOwnerUser = async (userId: string) => {
-  const result = await query(
-    `SELECT o.id, o.name, o.verification_status, o.verification_reason, o.created_at,
-            om.role
-     FROM organizations o
-     JOIN organization_members om ON om.organization_id = o.id
-     WHERE om.user_id = $1
-     ORDER BY
-       CASE om.role WHEN 'owner' THEN 0 ELSE 1 END,
-       o.created_at ASC
-     LIMIT 1`,
-    [userId]
-  );
-
-  return result.rows[0] ?? null;
+  return organizationRepo.findOrganizationForOwnerUser(userId);
 };
 
 export const createOrganizationInvite = async (input: {
@@ -150,37 +100,21 @@ export const createOrganizationInvite = async (input: {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   // Replace any prior pending invite for the same email.
-  await query(
-    `UPDATE organization_invites
-     SET status = 'revoked', updated_at = CURRENT_TIMESTAMP
-     WHERE organization_id = $1
-       AND lower(email) = $2
-       AND status = 'pending'`,
-    [membership.id, email]
-  );
+  await organizationRepo.revokePendingInvitesForEmail(membership.id as string, email);
 
-  const inserted = await query(
-    `INSERT INTO organization_invites (
-       organization_id, email, invited_by, token_hash, status, expires_at
-     )
-     VALUES ($1, $2, $3, $4, 'pending', $5)
-     RETURNING id, email, status, expires_at, created_at`,
-    [membership.id, email, input.ownerUserId, tokenHash, expiresAt]
-  );
-
-  const invite = inserted.rows[0] as {
-    id: string;
-    email: string;
-    status: string;
-    expires_at: Date;
-    created_at: Date;
-  };
+  const invite = await organizationRepo.insertOrganizationInvite({
+    organizationId: membership.id as string,
+    email,
+    invitedBy: input.ownerUserId,
+    tokenHash,
+    expiresAt,
+  });
 
   let emailQueued = false;
   if (isEmailConfigured()) {
     const inviteUrl = `${getAppPublicUrl()}/accept-invite?token=${encodeURIComponent(token)}`;
     const mail = buildOrganizationInviteEmail({
-      organizationName: membership.name,
+      organizationName: membership.name as string,
       inviteUrl,
     });
     queueEmail({
@@ -213,52 +147,22 @@ export const listOrganizationInvitesForOwner = async (ownerUserId: string) => {
     throw new AppError('Organization not found for this account', 404);
   }
 
-  const result = await query(
-    `SELECT id, email, status, expires_at, accepted_at, created_at
-     FROM organization_invites
-     WHERE organization_id = $1
-     ORDER BY created_at DESC
-     LIMIT 100`,
-    [membership.id]
-  );
-
-  return result.rows;
+  return organizationRepo.listOrganizationInvitesByOrganizationId(membership.id as string);
 };
 
 export const getOrganizationInvitePreview = async (rawToken: string) => {
   const token = requiredString(rawToken, 'Invite token');
-  const result = await query(
-    `SELECT i.id, i.email, i.status, i.expires_at, o.id AS organization_id, o.name AS organization_name,
-            o.verification_status AS organization_verification_status
-     FROM organization_invites i
-     JOIN organizations o ON o.id = i.organization_id
-     WHERE i.token_hash = $1
-     LIMIT 1`,
-    [hashSecret(token)]
-  );
+  const row = await organizationRepo.findOrganizationInviteByTokenHash(hashSecret(token));
 
-  if (result.rows.length === 0) {
+  if (!row) {
     throw new AppError('Invite not found', 404);
   }
-
-  const row = result.rows[0] as {
-    id: string;
-    email: string;
-    status: string;
-    expires_at: Date;
-    organization_id: string;
-    organization_name: string;
-    organization_verification_status: OrganizationVerificationStatus;
-  };
 
   if (row.status !== 'pending') {
     throw new AppError('Invite is no longer valid', 410);
   }
-  if (new Date(row.expires_at).getTime() < Date.now()) {
-    await query(
-      `UPDATE organization_invites SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [row.id]
-    );
+  if (new Date(row.expires_at as Date).getTime() < Date.now()) {
+    await organizationRepo.expireOrganizationInvite(row.id as string);
     throw new AppError('Invite has expired', 410);
   }
   if (row.organization_verification_status !== 'verified') {
@@ -283,42 +187,23 @@ export const resolveInviteForDoctorRegistration = async (
 ) => {
   const token = requiredString(input.inviteToken, 'Invite token');
   const email = requiredString(input.email, 'Email').toLowerCase();
-  const result = await client.query(
-    `SELECT i.id, i.email, i.status, i.expires_at, i.organization_id,
-            o.verification_status AS organization_verification_status, o.name AS organization_name
-     FROM organization_invites i
-     JOIN organizations o ON o.id = i.organization_id
-     WHERE i.token_hash = $1
-     LIMIT 1
-     FOR UPDATE OF i`,
-    [hashSecret(token)]
+  const row = await organizationRepo.findOrganizationInviteForRegistration(
+    hashSecret(token),
+    client
   );
 
-  if (result.rows.length === 0) {
+  if (!row) {
     throw new AppError('Invite not found', 404);
   }
-
-  const row = result.rows[0] as {
-    id: string;
-    email: string;
-    status: string;
-    expires_at: Date;
-    organization_id: string;
-    organization_verification_status: OrganizationVerificationStatus;
-    organization_name: string;
-  };
 
   if (row.status !== 'pending') {
     throw new AppError('Invite is no longer valid', 410);
   }
-  if (new Date(row.expires_at).getTime() < Date.now()) {
-    await client.query(
-      `UPDATE organization_invites SET status = 'expired', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [row.id]
-    );
+  if (new Date(row.expires_at as Date).getTime() < Date.now()) {
+    await organizationRepo.expireOrganizationInvite(row.id as string, client);
     throw new AppError('Invite has expired', 410);
   }
-  if (row.email.toLowerCase() !== email) {
+  if ((row.email as string).toLowerCase() !== email) {
     throw new AppError('Invite email does not match registration email', 400);
   }
   if (row.organization_verification_status !== 'verified') {
@@ -337,44 +222,13 @@ export const markOrganizationInviteAccepted = async (
   inviteId: string,
   userId: string
 ) => {
-  await client.query(
-    `UPDATE organization_invites
-     SET status = 'accepted',
-         accepted_user_id = $2,
-         accepted_at = CURRENT_TIMESTAMP,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1`,
-    [inviteId, userId]
-  );
+  await organizationRepo.markOrganizationInviteAccepted(inviteId, userId, client);
 };
 
 export const listOrganizationsForVerification = async (
   status?: OrganizationVerificationStatus
 ) => {
-  const params: string[] = [];
-  let where = '';
-  if (status) {
-    params.push(status);
-    where = `WHERE o.verification_status = $1`;
-  }
-
-  const result = await query(
-    `SELECT o.id, o.name, o.contact_first_name, o.contact_last_name, o.contact_email,
-            o.contact_phone, o.city, o.country, o.verification_status, o.verification_reason,
-            o.verified_at, o.verified_by, o.created_at
-     FROM organizations o
-     ${where}
-     ORDER BY
-       CASE o.verification_status
-         WHEN 'pending' THEN 0
-         WHEN 'rejected' THEN 1
-         ELSE 2
-       END,
-       o.created_at ASC`,
-    params
-  );
-
-  return result.rows;
+  return organizationRepo.listOrganizationsForVerification(status);
 };
 
 export const setOrganizationVerificationStatus = async (input: {
@@ -390,26 +244,15 @@ export const setOrganizationVerificationStatus = async (input: {
     throw new AppError('A reason is required when rejecting an organization', 400);
   }
 
-  const existing = await query(
-    `SELECT id, verification_status FROM organizations WHERE id = $1 LIMIT 1`,
-    [organizationId]
-  );
-  if (existing.rows.length === 0) {
+  const existing = await organizationRepo.findOrganizationVerificationStatus(organizationId);
+  if (!existing) {
     throw new AppError('Organization not found', 404);
   }
 
-  const updated = await query(
-    `UPDATE organizations
-     SET verification_status = $1,
-         verification_reason = $2,
-         verified_at = CASE WHEN $1 = 'verified' THEN CURRENT_TIMESTAMP ELSE verified_at END,
-         verified_by = $3,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE id = $4
-     RETURNING id, name, contact_email, verification_status, verification_reason,
-               verified_at, verified_by, created_at`,
-    [toStatus, reason || null, actorUserId, organizationId]
-  );
-
-  return updated.rows[0];
+  return organizationRepo.updateOrganizationVerificationStatus({
+    organizationId,
+    toStatus,
+    actorUserId,
+    reason: reason || null,
+  });
 };
