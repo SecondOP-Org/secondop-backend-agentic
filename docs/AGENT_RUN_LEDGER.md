@@ -1,6 +1,19 @@
 # Agent Run Ledger
 
 
+## 2026-08-10 - SEC-216 - Backend records-connect API (§5 Synthea mock)
+
+- Status: Draft PR pending; Linear issue creation blocked (MCP unreachable); user authorized "go" after SEC-215 FE merge
+- Human approval: coding approved via chat; merge/deploy not requested yet
+- Branch/worktree: `sec-216-records-connect-api`
+- Files changed: migration 035, `caseRecords` controller/service/repository, `recordsConnect` provider adapter (Synthea mock), routes, tests, `.env.example`, migrate scripts
+- PR: (opening)
+- Checks: lint / jest / build (local)
+- Deployment: none
+- Verification: unit tests for connect/identity/status + service lazy-complete
+- Blockers: Linear MCP auth timeout — create/link SEC-216 when available; migration must run before enabling `RECORDS_CONNECT_ENABLED`
+- Follow-ups: Metriport provider; expose `records_status` consistently on case list DTO if not covered by `c.*`; enable flag on staging
+
 ## 2026-08-10 — SEC-211 migrations
 
 - Staging: applied pending migrations through 034 (`case_symptom_intake`); get-case smoke 200

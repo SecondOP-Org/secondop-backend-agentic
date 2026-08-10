@@ -29,6 +29,11 @@ import {
   createCaseInternalNoteHandler,
   getCaseInternalNotesHandler,
 } from '../controllers/caseTeam.controller';
+import {
+  connectCaseRecordsHandler,
+  confirmCaseRecordsIdentityHandler,
+  getCaseRecordsStatusHandler,
+} from '../controllers/caseRecords.controller';
 import { downloadImagingStudy } from '../controllers/file.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import { authorizeCommandCenterOperator } from '../middleware/commandCenterAuth';
@@ -48,6 +53,11 @@ router.get('/:caseId/analysis/progress', streamCaseAnalysisProgress);
 // Ops-only: full run internals / shadow artifacts (SEC-110).
 router.get('/:caseId/analysis/trace', authorizeCommandCenterOperator, getCaseAnalysisTrace);
 router.post('/:caseId/submit', authorize('patient'), submitCase);
+
+// Patient records-connect (SEC-216 / FE §5) — before GET /:caseId
+router.post('/:caseId/records/connect', authorize('patient'), connectCaseRecordsHandler);
+router.post('/:caseId/records/identity', authorize('patient'), confirmCaseRecordsIdentityHandler);
+router.get('/:caseId/records/status', authorize('patient'), getCaseRecordsStatusHandler);
 
 // Doctor routes
 router.get('/doctor/cases', authorize('doctor'), getDoctorCases);
