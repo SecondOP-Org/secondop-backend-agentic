@@ -1,5 +1,12 @@
 # Agent Run Ledger
 
+
+## 2026-08-10 — SEC-211 migrations
+
+- Staging: applied pending migrations through 034 (`case_symptom_intake`); get-case smoke 200
+- Included 034 in `db:migrate` + `setup-db.sh` (was missing from migrate script)
+- Production: pending apply after human approval
+
 This ledger is the durable audit trail for agent-assisted work in the SecondOp backend repository. It is intentionally file-first so it is visible in GitHub reviews and does not depend on chat history or local machine state.
 
 ## Ledger Rules
