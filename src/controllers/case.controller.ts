@@ -33,6 +33,11 @@ import {
 import { recordAiDraftEditRatioOnSend } from '../services/doctorEditDistance.service';
 import { startCaseReview } from '../services/doctorCaseWorkflow.service';
 import {
+  getLatestCaseSymptomIntake,
+  parseOptionalSymptomIntake,
+  upsertCaseSymptomIntake,
+} from '../services/caseSymptomIntake.service';
+import {
   ensureDoctorCredentialVerifiedByDoctorId,
   ensureDoctorCredentialVerifiedByUserId,
 } from '../services/doctorVerification.service';
@@ -278,6 +283,7 @@ export const createCase = async (req: AuthRequest, res: Response, next: NextFunc
     const urgencyLevel = typeof req.body.urgencyLevel === 'string' ? req.body.urgencyLevel : 'moderate';
     const status = req.body.status === 'draft' ? 'draft' : 'pending';
     const intake = parseIntake(req.body.intake);
+    const symptomIntake = parseOptionalSymptomIntake(req.body.symptomIntake);
 
     const caseNumber = generateCaseNumber();
 
@@ -307,6 +313,10 @@ export const createCase = async (req: AuthRequest, res: Response, next: NextFunc
         ]
       );
 
+      if (symptomIntake) {
+        await upsertCaseSymptomIntake(caseRow.id as string, symptomIntake, client);
+      }
+
       return caseRow;
     });
 
@@ -326,6 +336,7 @@ export const updateCaseIntake = async (req: AuthRequest, res: Response, next: Ne
 
     await ensurePatientOwnsCase(caseId, userId);
     const intake = parseIntake(req.body.intake);
+    const symptomIntake = parseOptionalSymptomIntake(req.body.symptomIntake);
 
     await query(
       `INSERT INTO case_intake (case_id, age_at_submission, sex, specialty_context, symptoms, symptom_duration, medical_history, current_medications, allergies)
@@ -353,6 +364,10 @@ export const updateCaseIntake = async (req: AuthRequest, res: Response, next: Ne
         intake.allergies,
       ]
     );
+
+    if (symptomIntake) {
+      await upsertCaseSymptomIntake(caseId, symptomIntake);
+    }
 
     if (typeof req.body.specialty === 'string' && req.body.specialty.trim()) {
       await query(
@@ -793,6 +808,7 @@ export const getCaseById = async (req: AuthRequest, res: Response, next: NextFun
     const assignedDoctors = await fetchAssignedDoctors(caseId);
     const imagingStudies = await getImagingStudiesForCase(caseId);
     const latestRun = await getLatestAnalysisRun(caseId);
+    const symptomIntakeRow = await getLatestCaseSymptomIntake(caseId);
 
     const caseRow = sanitizeCaseRowForViewer(
       caseResult.rows[0] as CaseRowWithAiSharing,
@@ -802,6 +818,7 @@ export const getCaseById = async (req: AuthRequest, res: Response, next: NextFun
     const responseData: Record<string, unknown> = {
       ...caseRow,
       intake: intakeResult.rows[0] || null,
+      symptomIntake: symptomIntakeRow?.payload ?? null,
       files: filesResult.rows,
       imagingStudies,
       assigned_doctors: assignedDoctors,

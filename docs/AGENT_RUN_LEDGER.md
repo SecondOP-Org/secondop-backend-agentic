@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-09 - SEC-206 - Merge + deploy clinical grounding
+
+- Status: Merged and deployed (staging + production). Linear Done.
+- Human approval: User requested merge and deploy.
+- Branch/worktree: merged to `main` via BE #108 / FE #151
+- Files changed: clinical grounding Phases 1–3 (see prior ledger entry) + FE keep/drop UI
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/108 ; FE https://github.com/SecondOP-Org/secondop-frontend/pull/151
+- Checks: CI green before merge; staging/prod `/health` 200 after deploy
+- Deployment: Railway staging `6f479c2a…` + production `21bf9f68…` SUCCESS; migration `033` on staging Postgres-k0Us + prod Postgres; Vercel production Ready → https://secondop.ai
+- Verification: staging/prod `/health` ok; FE HTTP 200; `GROUNDING_ENABLED` left false (ship dark)
+- Blockers: none
+- Follow-ups: enable `GROUNDING_ENABLED` for staged rollout; refresh `BACKEND_GIT_SHA`; Phase 4/5
+
 ## 2026-08-09 - SEC-206 - Clinical grounding bundle (Phases 1–3)
 
 - Status: Implementation complete on feature branch; draft PR pending human merge approval.
