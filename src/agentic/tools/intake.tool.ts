@@ -1,4 +1,5 @@
 import { query } from '../../database/connection';
+import { getLatestCaseSymptomIntake } from '../../services/caseSymptomIntake.service';
 import { AgenticError, AgenticLoopState, AgenticRuntimeContext } from '../core/types';
 
 interface IntakeRow {
@@ -50,6 +51,8 @@ export const validateIntakeTool = async (
     throw new AgenticError('validation_error', 'intake.age must be between 0 and 130');
   }
 
+  const structured = await getLatestCaseSymptomIntake(context.caseId);
+
   return {
     ...state,
     intake: {
@@ -61,6 +64,7 @@ export const validateIntakeTool = async (
       medicalHistory: assertText(row.medical_history, 'medicalHistory'),
       currentMedications: assertText(row.current_medications, 'currentMedications'),
       allergies: assertText(row.allergies, 'allergies'),
+      structuredSymptomIntake: structured?.payload,
     },
   };
 };

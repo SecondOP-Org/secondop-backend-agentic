@@ -619,6 +619,8 @@ describe('Case analysis controllers', () => {
       .mockResolvedValueOnce({ rows: [] } as any)
       .mockResolvedValueOnce({ rows: [] } as any)
       .mockResolvedValueOnce({ rows: [] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any)
+      // Structured symptom intake lookup (SEC-208)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createDoctorRequest({}, { caseId: 'case-1' });

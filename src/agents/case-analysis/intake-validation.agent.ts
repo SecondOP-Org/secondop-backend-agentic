@@ -1,4 +1,5 @@
 import { query } from '../../database/connection';
+import { getLatestCaseSymptomIntake } from '../../services/caseSymptomIntake.service';
 import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
 
@@ -54,6 +55,8 @@ export class IntakeValidationAgent implements AgentStep<CaseAnalysisPipelineStat
       throw new AgentError('validation_error', 'Case intake age must be between 0 and 130.');
     }
 
+    const structured = await getLatestCaseSymptomIntake(input.caseId);
+
     const intake = {
       age,
       sex: requireString(row.sex, 'intake.sex'),
@@ -63,6 +66,7 @@ export class IntakeValidationAgent implements AgentStep<CaseAnalysisPipelineStat
       medicalHistory: requireString(row.medical_history, 'intake.medicalHistory'),
       currentMedications: requireString(row.current_medications, 'intake.currentMedications'),
       allergies: requireString(row.allergies, 'intake.allergies'),
+      structuredSymptomIntake: structured?.payload,
     };
 
     return {

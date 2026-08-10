@@ -25,7 +25,10 @@ import {
   upsertDeidVault,
 } from './deidVault.service';
 import { getPresidioConfig } from './presidioConfig.service';
-import { PATIENT_VOICE_GUIDANCE } from './patientFacingDraft.service';export interface CaseIntakeData {
+import { PATIENT_VOICE_GUIDANCE } from './patientFacingDraft.service';
+import { formatSymptomIntakeForPrompt } from './caseSymptomIntake.service';
+
+export interface CaseIntakeData {
   age: number;
   sex: string;
   specialtyContext: string;
@@ -34,6 +37,8 @@ import { PATIENT_VOICE_GUIDANCE } from './patientFacingDraft.service';export int
   medicalHistory: string;
   currentMedications: string;
   allergies: string;
+  /** Optional structured clinical intake (SEC-208). */
+  structuredSymptomIntake?: unknown;
 }
 
 export interface CaseAnalysisResult {
@@ -116,6 +121,10 @@ export const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport
   const hasLowQualityReports = reports.some((report) => report.extractionQuality === 'low');
   const hasMediumQualityReports = reports.some((report) => report.extractionQuality === 'medium');
 
+  const structuredBlock = formatSymptomIntakeForPrompt(
+    intake.structuredSymptomIntake as Parameters<typeof formatSymptomIntakeForPrompt>[0]
+  );
+
   return [
     'Patient Intake:',
     `- Age: ${intake.age}`,
@@ -126,6 +135,8 @@ export const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport
     `- Medical History: ${intake.medicalHistory}`,
     `- Current Medications: ${intake.currentMedications}`,
     `- Allergies: ${intake.allergies}`,
+    structuredBlock ? '' : '',
+    structuredBlock,
     '',
     'Medical Reports:',
     reportText,
