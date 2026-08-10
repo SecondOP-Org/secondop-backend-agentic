@@ -81,6 +81,14 @@ const assertNonEmptyString = (value: unknown, fieldName: string): string => {
   return value.trim();
 };
 
+/** Optional free-text; missing/blank becomes empty string (symptoms are not required). */
+const optionalString = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim();
+};
+
 export const parseIntake = (input: unknown): IntakePayload => {
   if (!input || typeof input !== 'object') {
     throw new AppError('intake is required', 400);
@@ -100,11 +108,8 @@ export const parseIntake = (input: unknown): IntakePayload => {
       (input as { specialtyContext?: unknown }).specialtyContext,
       'intake.specialtyContext'
     ),
-    symptoms: assertNonEmptyString((input as { symptoms?: unknown }).symptoms, 'intake.symptoms'),
-    symptomDuration: assertNonEmptyString(
-      (input as { symptomDuration?: unknown }).symptomDuration,
-      'intake.symptomDuration'
-    ),
+    symptoms: optionalString((input as { symptoms?: unknown }).symptoms),
+    symptomDuration: optionalString((input as { symptomDuration?: unknown }).symptomDuration),
     medicalHistory: assertNonEmptyString(
       (input as { medicalHistory?: unknown }).medicalHistory,
       'intake.medicalHistory'

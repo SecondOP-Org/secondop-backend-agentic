@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-10 - SEC-217 - Optional free-text symptoms on case intake
+
+- Agents: Cursor (Grok)
+- Scope: Allow empty `symptoms` / `symptomDuration` on intake parse and analysis intake loaders; FE removes required free-text symptom fields from Case Details (provisional Linear SEC-217 — MCP unreachable)
+- Files changed: `case.service.ts` (`parseIntake`), `intake-validation.agent.ts`, `agentic/tools/intake.tool.ts`, this ledger
+- Validation: `npm run lint`, `npm test`, `npm run build` (run before PR)
+- Outcome: ready_for_review
+- Blockers: Linear MCP unreachable — create/link SEC-217 when available
+
 ## 2026-08-10 - SEC-216 - Backend records-connect API (§5 Synthea mock)
 
 - Status: Draft PR pending; Linear issue creation blocked (MCP unreachable); user authorized "go" after SEC-215 FE merge

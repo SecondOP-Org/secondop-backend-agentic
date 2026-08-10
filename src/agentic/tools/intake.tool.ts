@@ -21,6 +21,14 @@ const assertText = (value: unknown, fieldName: string): string => {
   return value.trim();
 };
 
+/** Free-text symptoms are optional; blank becomes empty string. */
+const optionalText = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim();
+};
+
 export const validateIntakeTool = async (
   context: AgenticRuntimeContext,
   state: AgenticLoopState
@@ -59,8 +67,8 @@ export const validateIntakeTool = async (
       age,
       sex: assertText(row.sex, 'sex'),
       specialtyContext: assertText(row.specialty_context, 'specialtyContext'),
-      symptoms: assertText(row.symptoms, 'symptoms'),
-      symptomDuration: assertText(row.symptom_duration, 'symptomDuration'),
+      symptoms: optionalText(row.symptoms),
+      symptomDuration: optionalText(row.symptom_duration),
       medicalHistory: assertText(row.medical_history, 'medicalHistory'),
       currentMedications: assertText(row.current_medications, 'currentMedications'),
       allergies: assertText(row.allergies, 'allergies'),

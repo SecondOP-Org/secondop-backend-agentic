@@ -22,6 +22,14 @@ const requireString = (value: unknown, fieldName: string): string => {
   return value.trim();
 };
 
+/** Free-text symptoms are optional; blank becomes empty string. */
+const optionalString = (value: unknown): string => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim();
+};
+
 export class IntakeValidationAgent implements AgentStep<CaseAnalysisPipelineState, CaseAnalysisPipelineState> {
   public readonly name = 'intake-validation';
 
@@ -61,8 +69,8 @@ export class IntakeValidationAgent implements AgentStep<CaseAnalysisPipelineStat
       age,
       sex: requireString(row.sex, 'intake.sex'),
       specialtyContext: requireString(row.specialty_context, 'intake.specialtyContext'),
-      symptoms: requireString(row.symptoms, 'intake.symptoms'),
-      symptomDuration: requireString(row.symptom_duration, 'intake.symptomDuration'),
+      symptoms: optionalString(row.symptoms),
+      symptomDuration: optionalString(row.symptom_duration),
       medicalHistory: requireString(row.medical_history, 'intake.medicalHistory'),
       currentMedications: requireString(row.current_medications, 'intake.currentMedications'),
       allergies: requireString(row.allergies, 'intake.allergies'),
