@@ -140,6 +140,13 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/031_organizat
 echo "  → Running 032_gold_eval_runs.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/032_gold_eval_runs.sql
 
+
+echo "  → Running 033_grounding_artifact_types.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/033_grounding_artifact_types.sql
+
+echo "  → Running 034_case_symptom_intake.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/034_case_symptom_intake.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory
