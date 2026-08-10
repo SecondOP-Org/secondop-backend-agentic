@@ -28,6 +28,19 @@ This ledger is the durable audit trail for agent-assisted work in the SecondOp b
 - Follow-ups:
 ```
 
+## 2026-08-09 - SEC-209/210 - Merge + deploy repository pattern
+
+- Status: Merged and deployed (staging + production backend). Linear Done.
+- Human approval: User requested merge and deploy.
+- Branch/worktree: `sec-209-repository-pattern` → squash merge to `main` (`d096aed`)
+- Files changed: repository pattern phases 1–2 (controllers + high-impact services)
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/110
+- Checks: CI green; local Jest 356 passed before merge
+- Deployment: Railway staging `0f88b0e0…` SUCCESS; Railway production `72e6cc3c…` SUCCESS; no FE deploy (BE-only); no migrations in this release
+- Verification: staging/prod `/health` 200; staging register+create case 201; staging get-case 503 due to pre-existing pending analysis observability migrations (012+); prod register pending-approval (signup gate)
+- Blockers: Railway CLI migrate from this agent environment failed (network/tunnel); staging migration catch-up still needed for clean get-case smoke
+- Follow-ups: apply pending staging migrations; later phases for analysis*/dicom service SQL
+
 ## 2026-08-09 - SEC-210 - Service SQL → repositories (phase 2 batch)
 
 - Status: Priority service batch extracted on shared branch; analysis* deferred.
