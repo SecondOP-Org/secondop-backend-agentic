@@ -47,6 +47,7 @@ import commandCenterRoutes, {
 import aiGatewayRoutes from './routes/aiGateway.routes';
 import presidioRoutes from './routes/presidio.routes';
 import { buildHealthResponse, getVersion } from './controllers/version.controller';
+import { resolveUploadDir } from './utils/uploadPath';
 
 // Load environment variables
 dotenv.config();
@@ -166,6 +167,9 @@ app.get('/health', (_req, res) => {
 });
 
 app.get('/version', getVersion);
+
+// Public static files for stored upload URLs (`/uploads/<filename>`), including avatars.
+app.use('/uploads', express.static(resolveUploadDir()));
 
 // API Routes
 const API_VERSION = process.env.API_VERSION || 'v1';

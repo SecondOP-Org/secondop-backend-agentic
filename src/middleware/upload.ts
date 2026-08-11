@@ -34,6 +34,7 @@ const fileFilter = (_req: unknown, file: Express.Multer.File, cb: multer.FileFil
     'image/jpeg',
     'image/png',
     'image/gif',
+    'image/webp',
     'application/pdf',
     'application/dicom',
     'application/x-dicom',

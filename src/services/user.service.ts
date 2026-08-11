@@ -75,3 +75,18 @@ export const uploadAvatar = async (userId: string, userType: string, avatarUrl: 
 
   return { avatarUrl };
 };
+
+export const deleteAvatar = async (userId: string, userType: string) => {
+  const previousUrl =
+    userType === 'patient'
+      ? await userRepository.getPatientAvatarUrl(userId)
+      : await userRepository.getDoctorAvatarUrl(userId);
+
+  if (userType === 'patient') {
+    await userRepository.updatePatientAvatar(userId, null);
+  } else {
+    await userRepository.updateDoctorAvatar(userId, null);
+  }
+
+  return { previousUrl };
+};

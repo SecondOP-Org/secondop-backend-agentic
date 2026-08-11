@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-11 - WIP - Sidebar Services coming-soon, Gold-set Evals nav, profile avatar CRUD
+
+- Agents: Cursor (Grok)
+- Scope: Group all coming-soon nav under Services with group badge; link Gold-set Evals near Analysis Trace; patient/doctor avatar upload/replace/remove; `DELETE /users/avatar`; serve `/uploads` statically for avatar URLs
+- Files changed: `user.routes.ts`, `user.controller.ts`, `user.service.ts`, `user.repository.ts`, `server.ts`, `upload.ts`, this ledger (FE sibling: UnifiedSidebar, ProfileAvatarEditor, PatientProfile, DoctorProfile, profile API)
+- Validation: `npm run lint`, `npm run build` (BE); FE lint/build in sibling repo
+- Outcome: ready_for_review (draft PR not opened; awaiting Linear + human)
+- Blockers: Linear MCP unreachable — create/link SEC ticket when available
+
 ## 2026-08-10 - SEC-217 - Optional free-text symptoms on case intake
 
 - Agents: Cursor (Grok)
@@ -9,6 +18,14 @@
 - Validation: `npm run lint`, `npm test`, `npm run build` (run before PR)
 - Outcome: ready_for_review
 - Blockers: Linear MCP unreachable — create/link SEC-217 when available
+
+## 2026-08-10 - SEC-217 - Merge + deploy optional symptom fields
+
+- Agents: Cursor (Grok)
+- Scope: Merged FE #157 + BE #114; Railway staging `aa04171d` + production `2f6ce7a6`; Vercel production for `secondop-frontend` / `secondop-fe-deploy` (aliases include secondop.ai)
+- Validation: staging/prod `/health` ok; secondop.ai HTTP 200; no DB migration required
+- Outcome: deployed
+- Blockers: none
 
 ## 2026-08-10 - SEC-216 - Backend records-connect API (§5 Synthea mock)
 
