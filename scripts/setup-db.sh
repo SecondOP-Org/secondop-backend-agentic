@@ -150,6 +150,9 @@ psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/034_case_symp
 echo "  → Running 035_case_records_connect.sql..."
 psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/035_case_records_connect.sql
 
+echo "  → Running 036_analysis_pii_reveal_audit.sql..."
+psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME -f migrations/036_analysis_pii_reveal_audit.sql
+
 echo "✅ All migrations completed successfully"
 
 # Create uploads directory

@@ -10,6 +10,15 @@
 - Outcome: ready_for_review (Linear auth skipped)
 - Blockers: none; staging/prod already have medical_files — no migration
 
+## 2026-08-11 - WIP - Include migration 036 in db:migrate / setup-db
+
+- Agents: Cursor (Grok)
+- Scope: Wire `036_analysis_pii_reveal_audit.sql` into `npm run db:migrate` and `scripts/setup-db.sh` (same class of miss as SEC-211 / 034). Staging + production already had 036 applied manually during the patient-voice deploy.
+- Files changed: `package.json`, `scripts/setup-db.sh`, this ledger
+- Validation: confirm scripts reference 036; no runtime deploy needed for already-applied DBs
+- Outcome: ready_for_review (Linear auth rejected; no SEC ticket)
+- Blockers: none
+
 ## 2026-08-11 - WIP - Backend avatar CRUD deploy to staging + production
 
 - Agents: Cursor (Grok)
