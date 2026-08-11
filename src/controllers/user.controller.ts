@@ -42,6 +42,11 @@ export const uploadAvatar = async (req: AuthRequest, res: Response, next: NextFu
       throw new AppError('No file uploaded', 400);
     }
 
+    const mime = req.file.mimetype.toLowerCase();
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mime)) {
+      throw new AppError('Avatar must be a JPEG, PNG, GIF, or WebP image', 400);
+    }
+
     const userId = req.user!.id;
     const userType = req.user!.type;
     const avatarUrl = `/uploads/${req.file.filename}`;
@@ -52,6 +57,23 @@ export const uploadAvatar = async (req: AuthRequest, res: Response, next: NextFu
       status: 'success',
       message: 'Avatar uploaded successfully',
       data,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteAvatar = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id;
+    const userType = req.user!.type;
+
+    await userService.deleteAvatar(userId, userType);
+
+    res.json({
+      status: 'success',
+      message: 'Avatar removed successfully',
+      data: { avatarUrl: null },
     });
   } catch (error) {
     next(error);

@@ -169,16 +169,32 @@ export const updateDoctorProfile = async (input: UpdateDoctorProfileInput): Prom
   );
 };
 
-export const updatePatientAvatar = async (userId: string, avatarUrl: string): Promise<void> => {
+export const updatePatientAvatar = async (userId: string, avatarUrl: string | null): Promise<void> => {
   await dbQuery(
     'UPDATE patients SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
     [avatarUrl, userId]
   );
 };
 
-export const updateDoctorAvatar = async (userId: string, avatarUrl: string): Promise<void> => {
+export const updateDoctorAvatar = async (userId: string, avatarUrl: string | null): Promise<void> => {
   await dbQuery(
     'UPDATE doctors SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
     [avatarUrl, userId]
   );
+};
+
+export const getPatientAvatarUrl = async (userId: string): Promise<string | null> => {
+  const result = await dbQuery<{ avatar_url: string | null }>(
+    'SELECT avatar_url FROM patients WHERE user_id = $1 LIMIT 1',
+    [userId]
+  );
+  return result.rows[0]?.avatar_url ?? null;
+};
+
+export const getDoctorAvatarUrl = async (userId: string): Promise<string | null> => {
+  const result = await dbQuery<{ avatar_url: string | null }>(
+    'SELECT avatar_url FROM doctors WHERE user_id = $1 LIMIT 1',
+    [userId]
+  );
+  return result.rows[0]?.avatar_url ?? null;
 };

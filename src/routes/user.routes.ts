@@ -3,6 +3,7 @@ import {
   getProfile,
   updateProfile,
   uploadAvatar,
+  deleteAvatar,
   getPatientProfile,
   updatePatientProfile,
   getDoctorProfile,
@@ -20,6 +21,7 @@ router.use(authenticate);
 router.get('/profile', getProfile);
 router.put('/profile', updateProfile);
 router.post('/avatar', upload.single('avatar'), uploadAvatar);
+router.delete('/avatar', deleteAvatar);
 
 // Patient-specific routes
 router.get('/patient/profile', authorize('patient'), getPatientProfile);
