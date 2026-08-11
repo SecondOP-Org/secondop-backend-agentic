@@ -2,13 +2,16 @@ import {
   CaseAnalysisArtifact,
   PatientSummary,
   StructuredSummary,
+  clinicalToPatientSummaryField,
   defaultMedicalDisclaimer,
   isPatientSummaryPopulated,
   isStructuredSummaryPopulated,
   normalizePatientSummary,
+  patientSummaryKeys,
 } from '../services/analysisArtifact.service';
 import { ExtractedReport } from '../services/reportExtraction.service';
 import { incrementGroundingRejects } from '../observability/phoenix.service';
+import { validatePatientVoiceQuestions } from '../services/specialistQuestions.validation';
 
 export const AI_CONTRACT_DISCLAIMER =
   'AI-generated support content; licensed clinician review required.';
@@ -22,8 +25,6 @@ const sectionOrder: Array<keyof StructuredSummary> = [
   'follow_up_discussion_points',
   'limitations_caveats',
 ];
-
-const patientSummaryKeys: Array<keyof PatientSummary> = ['overview', 'what_to_discuss', 'not_a_diagnosis'];
 
 const forbiddenClaimPatterns: Array<{ id: string; pattern: RegExp }> = [
   { id: 'diagnosis_directive', pattern: /\b(you are diagnosed with|confirmed diagnosis|diagnosis is)\b/i },
@@ -60,7 +61,9 @@ const isPatientSummaryShape = (value: unknown): value is PatientSummary => {
     return false;
   }
 
-  return patientSummaryKeys.every((key) => typeof (value as Record<string, unknown>)[key] === 'string');
+  // Normalize first so legacy 3-field artifacts hydrate missing keys to ''.
+  const normalized = normalizePatientSummary(value);
+  return patientSummaryKeys.every((key) => typeof normalized[key] === 'string');
 };
 
 export const isValidCaseAnalysisArtifactShape = (value: unknown): value is CaseAnalysisArtifact => {
@@ -77,10 +80,7 @@ export const isValidCaseAnalysisArtifactShape = (value: unknown): value is CaseA
       : null;
 
   const uncertaintyFlags = Array.isArray(candidate.uncertainty_flags) ? candidate.uncertainty_flags : null;
-  const patientSummary =
-    candidate.patient_summary === undefined
-      ? normalizePatientSummary(undefined)
-      : candidate.patient_summary;
+  const patientSummary = normalizePatientSummary(candidate.patient_summary);
 
   return (
     isStructuredSummary(candidate.structured_summary) &&
@@ -126,26 +126,8 @@ export const detectForbiddenClaims = (text: string): string[] => {
   return violations;
 };
 
-export const validateQuestionContract = (questions: string[]): string[] => {
-  const violations: string[] = [];
-  const normalizedQuestions = questions.map((question) => question.trim()).filter(Boolean);
-
-  if (normalizedQuestions.length !== 3) {
-    violations.push('Expected exactly 3 specialist-facing questions.');
-  }
-
-  const uniqueQuestions = new Set(normalizedQuestions.map((question) => question.toLowerCase()));
-  if (uniqueQuestions.size !== normalizedQuestions.length) {
-    violations.push('Specialist questions must be unique.');
-  }
-
-  const tooShort = normalizedQuestions.find((question) => question.length < 12);
-  if (tooShort) {
-    violations.push('Specialist questions must be meaningful prompts.');
-  }
-
-  return violations;
-};
+export const validateQuestionContract = (questions: string[]): string[] =>
+  validatePatientVoiceQuestions(questions, { exactCount: true }).violations;
 
 export const collectUncertaintySignals = (artifact: CaseAnalysisArtifact): string[] => {
   if (Array.isArray(artifact.uncertainty_flags) && artifact.uncertainty_flags.length > 0) {
@@ -248,6 +230,18 @@ export const validatePatientSummaryContract = (artifact: CaseAnalysisArtifact): 
     violations.push('patient_summary.not_a_diagnosis must be present when the clinical summary is populated.');
   }
 
+  for (const [clinicalKey, patientKey] of Object.entries(clinicalToPatientSummaryField) as Array<
+    [keyof StructuredSummary, Exclude<keyof PatientSummary, 'not_a_diagnosis'>]
+  >) {
+    const clinicalValue = artifact.structured_summary[clinicalKey]?.trim() || '';
+    const patientValue = patientSummary[patientKey]?.trim() || '';
+    if (clinicalValue && !patientValue) {
+      violations.push(
+        `patient_summary.${patientKey} must be populated when structured_summary.${clinicalKey} is populated.`
+      );
+    }
+  }
+
   return violations;
 };
 
@@ -273,7 +267,7 @@ export const validateCaseAnalysisContract = (
   violations.push(...questionViolations);
 
   const questionCountExact = !questionViolations.some((violation) =>
-    violation.includes('exactly 3 specialist-facing questions')
+    violation.includes('exactly 3 patient-voice questions')
   );
 
   const forbiddenClaims = detectForbiddenClaims(collectContractText(artifact));

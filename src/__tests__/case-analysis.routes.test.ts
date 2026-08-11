@@ -55,6 +55,16 @@ jest.mock('../services/analysisProgress.service', () => {
   };
 });
 
+jest.mock('../services/deidVault.service', () => ({
+  isDeidVaultAvailable: jest.fn(async () => false),
+  loadDeidVaultMapping: jest.fn(async () => ({})),
+  clearDeidVaultsForCase: jest.fn(async () => undefined),
+}));
+
+jest.mock('../services/analysisPiiRevealAudit.service', () => ({
+  recordAnalysisPiiRevealEvent: jest.fn(async () => undefined),
+}));
+
 const mockedQuery = query as jest.MockedFunction<typeof query>;
 const mockedTransaction = transaction as jest.MockedFunction<typeof transaction>;
 const mockedAnalysisWorker = analysisWorker as jest.Mocked<typeof analysisWorker>;
@@ -450,12 +460,15 @@ describe('Case analysis controllers', () => {
         analysisStatus: 'failed',
         summary: null,
         analysisQuestions: null,
+        specialist_questions_detailed: [],
         artifact: null,
         error: 'No extractable text found in uploaded PDF reports.',
         analysisRunId: 'run-3',
         attentionReason: null,
         analysisRetrying: false,
         observations: null,
+        pii_available: false,
+        pii_revealed: false,
       },
     });
   });
@@ -515,7 +528,10 @@ describe('Case analysis controllers', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockedQuery).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE cases'),
-      ['case-1', JSON.stringify(['Q1', 'Q2']), true, 3]
+      ['case-1', JSON.stringify([
+        { id: 'sq-1', question: 'Q1', source: 'patient' },
+        { id: 'sq-2', question: 'Q2', source: 'patient' },
+      ]), true, 3]
     );
   });
 
@@ -556,7 +572,7 @@ describe('Case analysis controllers', () => {
     expect(next).not.toHaveBeenCalled();
     expect(mockedQuery).toHaveBeenLastCalledWith(
       expect.stringContaining('UPDATE cases'),
-      ['case-1', JSON.stringify(['Q1']), false, 3]
+      ['case-1', JSON.stringify([{ id: 'sq-1', question: 'Q1', source: 'patient' }]), false, 3]
     );
   });
 
@@ -590,6 +606,7 @@ describe('Case analysis controllers', () => {
         analysisStatus: 'not_started',
         summary: null,
         analysisQuestions: null,
+        specialist_questions_detailed: [],
         artifact: null,
         error: null,
         analysisRunId: null,
@@ -597,6 +614,8 @@ describe('Case analysis controllers', () => {
         analysisRetrying: false,
         observations: null,
         aiAnalysisSharedWithSpecialists: false,
+        pii_available: false,
+        pii_revealed: false,
       },
     });
   });

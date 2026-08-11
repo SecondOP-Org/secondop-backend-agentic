@@ -1,6 +1,25 @@
 # Agent Run Ledger
 
 
+## 2026-08-11 - WIP - Backend avatar CRUD deploy to staging + production
+
+- Agents: Cursor (Grok)
+- Scope: Deployed merged PR #115 (avatar DELETE + static `/uploads`) to Railway staging then production. No DB migration required. FE already on Vercel from earlier auto-deploy.
+- Validation: local lint/test/build green; staging `/health` ok (`70643e7f`); production `/health` + `/version` ok (`ed526cc8`)
+- Outcome: deployed
+- Blockers: none
+- Rollback: prior successful prod deploy was `2f6ce7a6`
+
+## 2026-08-11 - WIP - Patient-voice questions, provenance, summary mirror, PATCH confirm
+
+- Agents: Cursor (Grok)
+- Scope: Patient-first-person questionnaire prompts/guards; expand `PatientSummary` 1:1 with clinical sections; `QuestionnaireItem` provenance (`source`/`edited`/`confirmed`); `specialist_questions_detailed` on case/analysis responses; `PATCH /api/v1/cases/:caseId/specialist-questions` (draft-only, owner); shared question validator. **Change 5a:** persist de-id twin to `cases.analysis_*`; retain sealed vault until case complete/delete; owner-only `?reveal_pii=true` + `pii_available`/`pii_revealed`; audit table `036_analysis_pii_reveal_audit.sql`. **FE:** richer patient summary sections; AI/patient badges; edit/confirm/remove/add questions + PATCH; PII Show/Hide chip.
+- Files changed: analysis/case/deid/finalizer/persist paths, migration 036, FE AiClinicalSummary / IncludedAiAnalysisCard / CaseDetailView / DoctorAiAnalysisArtifactCard / PiiPrivacyChip / cases API / types, AI_CONTRACT, this ledger
+- Product calls: edited AI keeps `source: 'ai'` + `edited: true`; specialists see de-id analysis (no reveal path)
+- Validation: BE `lint`/`test`/`eval:harness`/`build`; FE `lint`/`build` — green
+- Outcome: ready_for_review (Linear skipped; draft PR not opened)
+- Blockers: migration 036 must run before reveal audit writes; legacy succeeded cases (already re-id + vault cleared) get `pii_available: false`; **5b** file originals still needs compliance sign-off
+
 ## 2026-08-11 - WIP - Sidebar Services coming-soon, Gold-set Evals nav, profile avatar CRUD
 
 - Agents: Cursor (Grok)

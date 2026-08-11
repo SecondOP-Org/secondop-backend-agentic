@@ -18,14 +18,17 @@ const buildDeidentifiedArtifact = (): CaseAnalysisArtifact => ({
   },
   patient_summary: {
     overview: 'Your records mention follow-up for <PERSON_1> with possible heart-related findings.',
+        what_your_results_show: 'Your results include the key findings from your records.',
     what_to_discuss: 'Please discuss ongoing chest pain and next steps for <PERSON_1> with your specialist.',
+        next_steps: 'Ask about timing and what happens next.',
+        what_we_couldnt_tell: 'Some details could not be determined from the records.',
     not_a_diagnosis: 'This is not a diagnosis. Your specialist reviews the full records and decides next steps.',
   },
   questionnaire: {
     specialist_questions: [
-      { id: 'q1', question: 'Any prior imaging for <PERSON_1> that clarifies ischemia?' },
-      { id: 'q2', question: 'Clarify timeline around <DATE_TIME_1> for symptom onset?' },
-      { id: 'q3', question: 'Which follow-up interval is most appropriate given uncertainty?' },
+      { id: 'q1', question: 'Any prior imaging for <PERSON_1> that clarifies ischemia?' , source: 'ai' },
+      { id: 'q2', question: 'Clarify timeline around <DATE_TIME_1> for symptom onset?' , source: 'ai' },
+      { id: 'q3', question: 'Which follow-up interval is most appropriate given uncertainty?' , source: 'ai' },
     ],
   },
   confidence_score: 0.7,
@@ -105,7 +108,7 @@ describe('agentic finalize de-id twin (SEC-106)', () => {
     );
   });
 
-  it('passes finalize with active de-id mapping and returns re-identified artifact for persistence', () => {
+  it('passes finalize with active de-id mapping and persists de-identified twin for case storage', () => {
     const deidentified = buildDeidentifiedArtifact();
     const clinician = reidentifyArtifact(deidentified, mapping);
     const reports = buildDeidentifiedReports();
@@ -133,9 +136,11 @@ describe('agentic finalize de-id twin (SEC-106)', () => {
 
     const finalized = finalizer.finalize(state);
 
-    expect(finalized.artifact.structured_summary.chief_concern).toContain('Jane Doe');
-    expect(finalized.artifact.evidence_refs[0].snippet).toContain('Jane Doe');
-    expect(finalized.questions[0]).toContain('Jane Doe');
+    // Change 5a: durable case analysis stores the de-id twin; vault enables owner reveal.
+    expect(finalized.artifact.structured_summary.chief_concern).toContain('<PERSON_1>');
+    expect(finalized.artifact.evidence_refs[0].snippet).toContain('<PERSON_1>');
+    expect(finalized.questions[0]).toContain('<PERSON_1>');
+    expect(state.analysis?.artifact.evidence_refs[0].snippet).toContain('Jane Doe');
     expect(state.analysis?.artifactDeidentified.evidence_refs[0].snippet).toContain('<PERSON_1>');
   });
 

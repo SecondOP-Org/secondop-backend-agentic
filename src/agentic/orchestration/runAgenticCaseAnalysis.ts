@@ -150,7 +150,10 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
           },
           patient_summary: {
             overview: '',
+            what_your_results_show: '',
             what_to_discuss: '',
+            next_steps: '',
+            what_we_couldnt_tell: '',
             not_a_diagnosis: '',
           },
           questionnaire: {

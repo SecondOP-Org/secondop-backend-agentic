@@ -90,17 +90,25 @@ const buildSystemPrompt = (): string => {
     'The disclaimer must clearly state that a licensed clinician must review the source records.',
     'Confidence score must be between 0 and 1.',
     'Include uncertainty_flags as explicit short statements when confidence is low or evidence is sparse.',
-    'Questionnaire items must be actionable specialist-facing questions.',
+    'Questionnaire: produce exactly 3 questions the PATIENT would ask their reviewing specialist.',
+    'Write each question in the patient first person ("I"/"my"), plain grade 6–8 language.',
+    'Warm and direct, no clinical jargon dumps; put a medical term in parentheses only if it helps.',
+    'Each question must stay specific enough that a specialist can answer it (tie it to a real finding, test, or next step from the records).',
+    'Do not diagnose, prescribe, or ask for emergency directives. One clear question each — no compound multi-part questions.',
     'Produce two registers in the same response:',
     '1) structured_summary — clinical language for licensed specialists (unchanged role).',
     '2) patient_summary — plain-language register for the patient (grade 6–8 reading level).',
     'patient_summary rules:',
     PATIENT_VOICE_GUIDANCE,
     'patient_summary may only restate findings already present in structured_summary — never add, upgrade, or soften findings.',
-    'patient_summary.overview: plain restatement of chief concern + key findings.',
-    'patient_summary.what_to_discuss: plain restatement of red flags + follow-up points (frame as discussion, not orders).',
-    'patient_summary.not_a_diagnosis: short non-diagnostic caveat that the specialist decides; must be non-empty when the clinical summary is populated.',
-    'If structured_summary sections are empty, leave patient_summary fields empty too.',
+    'patient_summary.overview: plain restatement of the chief concern (why they came in).',
+    'patient_summary.what_your_results_show: plain restatement of ALL key report findings — cover every finding, do not omit for brevity.',
+    'patient_summary.what_to_discuss: plain restatement of red flags to raise with the specialist (frame as discussion, not orders).',
+    'patient_summary.next_steps: plain restatement of follow-up / discussion points — tests, timing, what happens next.',
+    'patient_summary.what_we_couldnt_tell: plain restatement of limitations/caveats (what the records could not show).',
+    'patient_summary.not_a_diagnosis: short non-diagnostic caveat that the specialist decides.',
+    'Each patient_summary field: 2–5 sentences, warm second person, grade 6–8. Restate the matching clinical section fully; never invent, upgrade, or soften findings.',
+    'If a structured_summary section is empty, leave its matching patient_summary field empty.',
     'Do not output markdown code fences.',
   ].join('\n');
 };
@@ -149,7 +157,7 @@ export const buildUserPrompt = (intake: CaseIntakeData, reports: ExtractedReport
       ? 'One or more reports were extracted via OCR from scans or photos. Use cautious language and uncertainty_flags when source text may be incomplete.'
       : '',
     guidance ? `Agentic Guidance: ${guidance}` : '',
-    'Generate a structured_summary, patient_summary (plain-language twin), questionnaire with exactly 3 specialist_questions, confidence_score, uncertainty_flags, and disclaimer.',
+    'Generate a structured_summary, patient_summary (plain-language twin), questionnaire with exactly 3 patient-voice questions (JSON key specialist_questions), confidence_score, uncertainty_flags, and disclaimer.',
   ]
     .filter((line) => line !== '')
     .join('\n');
@@ -363,10 +371,20 @@ export const generateCaseAnalysis = async (
               additionalProperties: false,
               properties: {
                 overview: { type: 'string' },
+                what_your_results_show: { type: 'string' },
                 what_to_discuss: { type: 'string' },
+                next_steps: { type: 'string' },
+                what_we_couldnt_tell: { type: 'string' },
                 not_a_diagnosis: { type: 'string' },
               },
-              required: ['overview', 'what_to_discuss', 'not_a_diagnosis'],
+              required: [
+                'overview',
+                'what_your_results_show',
+                'what_to_discuss',
+                'next_steps',
+                'what_we_couldnt_tell',
+                'not_a_diagnosis',
+              ],
             },
             questionnaire: {
               type: 'object',

@@ -58,13 +58,19 @@ export const queueCaseAnalysis = async (req: AuthRequest, res: Response, next: N
 export const getCaseAnalysis = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const includeAgentic = String(req.query.includeAgentic || '').toLowerCase() === 'true';
+    const revealPii = String(req.query.reveal_pii || '').toLowerCase() === 'true';
     const data = await caseService.getCaseAnalysisForViewer(
       req.params.caseId,
       req.user!.id,
       req.user!.type,
       includeAgentic,
-      isCommandCenterOperator(req.user)
+      isCommandCenterOperator(req.user),
+      revealPii
     );
+
+    if (revealPii) {
+      res.setHeader('Cache-Control', 'no-store');
+    }
 
     res.json({
       status: 'success',
@@ -141,6 +147,23 @@ export const submitCase = async (req: AuthRequest, res: Response, next: NextFunc
     res.json({
       status: 'success',
       message: 'Case submitted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateSpecialistQuestions = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const data = await caseService.updateSpecialistQuestionsForPatient(
+      req.params.caseId,
+      req.user!.id,
+      req.body
+    );
+
+    res.json({
+      status: 'success',
+      data,
     });
   } catch (error) {
     next(error);

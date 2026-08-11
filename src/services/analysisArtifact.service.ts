@@ -19,16 +19,27 @@ export interface StructuredSummary {
   limitations_caveats: string;
 }
 
-/** Plain-language patient register (SEC-189). Restates clinical findings only. */
+/** Plain-language patient register — 1:1 mirror of clinical structured_summary sections. */
 export interface PatientSummary {
   overview: string;
+  what_your_results_show: string;
   what_to_discuss: string;
+  next_steps: string;
+  what_we_couldnt_tell: string;
   not_a_diagnosis: string;
 }
+
+export type QuestionSource = 'ai' | 'patient';
 
 export interface QuestionnaireItem {
   id: string;
   question: string;
+  /** Origin of the question text. Legacy items without source default to 'ai' at read time. */
+  source: QuestionSource;
+  /** True when the patient modified an AI-generated question (source stays 'ai'). */
+  edited?: boolean;
+  /** True once the patient accepts/confirms the question. */
+  confirmed?: boolean;
 }
 
 export interface EvidenceRef {
@@ -131,11 +142,33 @@ export const createEmptyStructuredSummary = (): StructuredSummary => ({
 
 export const createEmptyPatientSummary = (): PatientSummary => ({
   overview: '',
+  what_your_results_show: '',
   what_to_discuss: '',
+  next_steps: '',
+  what_we_couldnt_tell: '',
   not_a_diagnosis: '',
 });
 
-const patientSummaryKeys: Array<keyof PatientSummary> = ['overview', 'what_to_discuss', 'not_a_diagnosis'];
+export const patientSummaryKeys: Array<keyof PatientSummary> = [
+  'overview',
+  'what_your_results_show',
+  'what_to_discuss',
+  'next_steps',
+  'what_we_couldnt_tell',
+  'not_a_diagnosis',
+];
+
+/** Clinical → patient_summary field pairing (1:1 restatement). */
+export const clinicalToPatientSummaryField: Record<
+  keyof StructuredSummary,
+  Exclude<keyof PatientSummary, 'not_a_diagnosis'>
+> = {
+  chief_concern: 'overview',
+  key_report_findings: 'what_your_results_show',
+  red_flags_to_discuss: 'what_to_discuss',
+  follow_up_discussion_points: 'next_steps',
+  limitations_caveats: 'what_we_couldnt_tell',
+};
 
 export const normalizePatientSummary = (value: unknown): PatientSummary => {
   if (!value || typeof value !== 'object') {
@@ -145,7 +178,10 @@ export const normalizePatientSummary = (value: unknown): PatientSummary => {
   const candidate = value as Record<string, unknown>;
   return {
     overview: normalizeText(candidate.overview),
+    what_your_results_show: normalizeText(candidate.what_your_results_show),
     what_to_discuss: normalizeText(candidate.what_to_discuss),
+    next_steps: normalizeText(candidate.next_steps),
+    what_we_couldnt_tell: normalizeText(candidate.what_we_couldnt_tell),
     not_a_diagnosis: normalizeText(candidate.not_a_diagnosis),
   };
 };
@@ -162,22 +198,33 @@ export const buildDefaultPatientSummaryForClinical = (structuredSummary: Structu
     return createEmptyPatientSummary();
   }
 
-  const overview = [structuredSummary.chief_concern, structuredSummary.key_report_findings]
-    .map((part) => normalizeText(part))
-    .filter(Boolean)
-    .join(' ');
-  const whatToDiscuss = [structuredSummary.red_flags_to_discuss, structuredSummary.follow_up_discussion_points]
-    .map((part) => normalizeText(part))
-    .filter(Boolean)
-    .join(' ');
-
   return {
-    overview: overview || 'Your records include findings your specialist will review with you.',
-    what_to_discuss:
-      whatToDiscuss || 'Please discuss these findings and next steps with your specialist.',
+    overview: normalizeText(structuredSummary.chief_concern),
+    what_your_results_show: normalizeText(structuredSummary.key_report_findings),
+    what_to_discuss: normalizeText(structuredSummary.red_flags_to_discuss),
+    next_steps: normalizeText(structuredSummary.follow_up_discussion_points),
+    what_we_couldnt_tell: normalizeText(structuredSummary.limitations_caveats),
     not_a_diagnosis:
       'This is not a diagnosis. Your specialist reviews the full records and decides what it means for you.',
   };
+};
+
+export const normalizeQuestionnaireItemFields = (
+  item: Partial<QuestionnaireItem> & { question: string },
+  index: number
+): QuestionnaireItem => {
+  const normalized: QuestionnaireItem = {
+    id: normalizeText(item.id) || `q${index + 1}`,
+    question: normalizeText(item.question),
+    source: item.source === 'patient' ? 'patient' : 'ai',
+  };
+  if (item.edited === true) {
+    normalized.edited = true;
+  }
+  if (item.confirmed === true) {
+    normalized.confirmed = true;
+  }
+  return normalized;
 };
 
 export const formatStructuredSummary = (structuredSummary: StructuredSummary): string => {
@@ -440,10 +487,9 @@ export const buildCaseAnalysisArtifact = (input: {
       ? buildDefaultPatientSummaryForClinical(structuredSummary)
       : normalizePatientSummary(input.patientSummary);
 
-  const questions = input.specialistQuestions.map((question, index) => ({
-    id: `q${index + 1}`,
-    question: normalizeText(question),
-  }));
+  const questions = input.specialistQuestions.map((question, index) =>
+    normalizeQuestionnaireItemFields({ question, source: 'ai' }, index)
+  );
 
   return {
     structured_summary: structuredSummary,
@@ -546,9 +592,24 @@ export const hydrateCaseAnalysisArtifact = (input: {
 }): CaseAnalysisArtifact | null => {
   if (isLegacyOrCurrentCaseAnalysisArtifact(input.artifact)) {
     const artifact = input.artifact as CaseAnalysisArtifact & { patient_summary?: unknown };
+    const rawQuestions = artifact.questionnaire?.specialist_questions ?? [];
     return {
       ...artifact,
       patient_summary: normalizePatientSummary(artifact.patient_summary),
+      questionnaire: {
+        specialist_questions: rawQuestions.map((item, index) =>
+          normalizeQuestionnaireItemFields(
+            {
+              id: typeof item?.id === 'string' ? item.id : undefined,
+              question: typeof item?.question === 'string' ? item.question : '',
+              source: item?.source,
+              edited: item?.edited,
+              confirmed: item?.confirmed,
+            },
+            index
+          )
+        ),
+      },
       uncertainty_flags: Array.isArray(artifact.uncertainty_flags) ? artifact.uncertainty_flags : [],
       evidence_refs: Array.isArray(artifact.evidence_refs)
         ? artifact.evidence_refs.filter((ref) => !isNavOrOcrJunkSnippet(ref.snippet || ''))
