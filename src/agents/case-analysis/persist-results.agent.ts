@@ -1,10 +1,13 @@
 import { query } from '../../database/connection';
 import { markAnalysisRunSucceeded } from '../../services/analysisRun.service';
 import { emitPerCaseLatencyWarnIfNeeded } from '../../services/analysisAttention.service';
-import { clearDeidVault } from '../../services/deidVault.service';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 import { shouldPersistAnalysisSideEffects } from '../../evals/analysisEvalFixtures';
 import { resolveContractCheckArtifact } from '../../services/analysis.service';
+import {
+  artifactQuestionsToStrings,
+  formatStructuredSummary,
+} from '../../services/analysisArtifact.service';
 import { computeOnlineEvalSignals } from '../../services/onlineEvals.service';
 import { AgentContext, AgentError, AgentStep } from '../core/agent.types';
 import { CaseAnalysisPipelineState } from './case-analysis.types';
@@ -23,7 +26,7 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         : null;
 
       if (contractArtifact) {
-        // Validate tokenized twin against de-identified reports; persist clinician-facing artifact below.
+        // Validate tokenized twin against de-identified reports.
         enforceCaseAnalysisContract(contractArtifact, { reports: input.reports });
       }
 
@@ -36,6 +39,13 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         reports: input.reports,
         criticScore: null,
       });
+
+      // Persist de-identified twin by default. Owner can re-identify via vault + reveal_pii.
+      // Keep sealed vault after success for owner-only PII reveal (Change 5a).
+      const persistArtifact =
+        input.analysis.artifactDeidentified ?? input.analysis.artifact;
+      const persistSummary = formatStructuredSummary(persistArtifact.structured_summary);
+      const persistQuestions = artifactQuestionsToStrings(persistArtifact);
 
       await query(
         `UPDATE cases
@@ -50,9 +60,9 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
          WHERE id = $1`,
         [
           context.caseId,
-          input.analysis.summary,
-          JSON.stringify(input.analysis.topQuestions),
-          JSON.stringify(input.analysis.artifact),
+          persistSummary,
+          JSON.stringify(persistQuestions),
+          JSON.stringify(persistArtifact),
           input.analysis.model,
         ]
       );
@@ -73,9 +83,6 @@ export class PersistResultsAgent implements AgentStep<CaseAnalysisPipelineState,
         latencyMs: succeedMeta.latencyMs,
         attentionReason: succeedMeta.attentionReason,
       });
-
-      // Clinician artifact is persisted with real values; drop sealed map to minimize PHI retention.
-      await clearDeidVault(context.runId);
 
       return input;
     } catch (error) {

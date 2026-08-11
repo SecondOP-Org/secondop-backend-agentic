@@ -89,7 +89,10 @@ describe('LLM gateway service integration', () => {
       },
       patient_summary: {
         overview: 'Your records mention chest pressure findings for your specialist to review.',
+        what_your_results_show: 'Your results include the key findings from your records.',
         what_to_discuss: 'Ask about worsening symptoms and which tests to discuss next.',
+        next_steps: 'Ask about timing and what happens next.',
+        what_we_couldnt_tell: 'Some details could not be determined from the records.',
         not_a_diagnosis: 'This is not a diagnosis. Your specialist reviews the full records and decides next steps.',
       },
       questionnaire: {

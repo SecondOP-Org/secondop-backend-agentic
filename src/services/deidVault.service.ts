@@ -86,6 +86,24 @@ export const loadDeidVaultMapping = async (runId: string): Promise<Deidentificat
   return unsealMapping(sealed);
 };
 
+export const isDeidVaultAvailable = async (runId: string): Promise<boolean> => {
+  if (!runId) {
+    return false;
+  }
+
+  const result = await query(
+    `SELECT 1
+     FROM case_analysis_deid_vault
+     WHERE run_id = $1
+       AND sealed_mapping IS NOT NULL
+       AND cleared_at IS NULL
+     LIMIT 1`,
+    [runId]
+  );
+
+  return result.rows.length > 0;
+};
+
 export const clearDeidVault = async (runId: string): Promise<void> => {
   if (!runId) {
     return;
@@ -101,9 +119,28 @@ export const clearDeidVault = async (runId: string): Promise<void> => {
     [runId]
   );
 
-  logger.info('Cleared sealed de-identification vault after successful re-identify', {
+  logger.info('Cleared sealed de-identification vault', {
     runId,
   });
+};
+
+/** Clear all vaults for analysis runs belonging to a case (case delete / completion). */
+export const clearDeidVaultsForCase = async (caseId: string): Promise<void> => {
+  if (!caseId) {
+    return;
+  }
+
+  await query(
+    `UPDATE case_analysis_deid_vault v
+     SET sealed_mapping = NULL,
+         cleared_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP
+     FROM case_analysis_runs r
+     WHERE v.run_id = r.id
+       AND r.case_id = $1
+       AND v.cleared_at IS NULL`,
+    [caseId]
+  );
 };
 
 /**

@@ -7,7 +7,16 @@ import {
   artifactQuestionsToStrings,
   extractObservationsFromArtifact,
   hydrateCaseAnalysisArtifact,
+  QuestionnaireItem,
 } from './analysisArtifact.service';
+import { reidentifyArtifact } from './analysisDeidentification.service';
+import { recordAnalysisPiiRevealEvent } from './analysisPiiRevealAudit.service';
+import { clearDeidVaultsForCase, isDeidVaultAvailable, loadDeidVaultMapping } from './deidVault.service';
+import {
+  parseAndValidateSpecialistQuestionsUpdate,
+  parseFlexibleQuestionnaireItems,
+  questionnaireItemsToStrings,
+} from './specialistQuestions.validation';
 import { toLegacyExecutionMode } from '../agentic/core/executionMode';
 import { getLatestAnalysisRun, getLatestAnalysisRunByEngine, getLatestShadowResultByCaseId } from './analysisRun.service';
 import { getCaseRunTrace } from '../agentic/observability/analysisObservability.service';
@@ -179,16 +188,33 @@ export const parseSpecialistQuestions = (input: unknown): string[] => {
   });
 };
 
-const parseFlexibleSpecialistQuestions = (input: unknown): string[] => {
-  if (!Array.isArray(input)) {
-    return [];
-  }
+const parseFlexibleSpecialistQuestions = (input: unknown): QuestionnaireItem[] =>
+  parseFlexibleQuestionnaireItems(input, { source: 'patient' });
 
-  return input
-    .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0)
-    .slice(0, 3);
+const buildSpecialistQuestionsDetailed = (
+  caseRow: { specialist_questions?: unknown; analysis_questions?: string[] | null; analysis_artifact?: unknown; analysis_summary?: string | null; analysis_model?: string | null; share_ai_analysis_with_specialists?: boolean | null }
+): QuestionnaireItem[] => {
+  const resolved = resolveSpecialistQuestions(caseRow);
+  return resolved.map((item) => ({
+    id: item.id,
+    question: item.question,
+    source: item.source,
+    ...(item.edited ? { edited: true } : {}),
+    ...(item.confirmed ? { confirmed: true } : {}),
+  }));
+};
+
+/** Patient may confirm/edit questions only while the case is still a draft (pre-submit). */
+const ensurePatientOwnsDraftCaseForQuestions = async (caseId: string, userId: string): Promise<void> => {
+  await ensurePatientOwnsCase(caseId, userId);
+  const rows = await caseRepository.findCaseById(caseId);
+  if (rows.length === 0) {
+    throw new AppError('Case not found', 404);
+  }
+  const status = String((rows[0] as { status?: string }).status || '');
+  if (status !== 'draft') {
+    throw new AppError('Specialist questions can only be edited while the case is still a draft', 403);
+  }
 };
 
 const parseShareAiAnalysisWithSpecialists = (input: unknown): boolean => {
@@ -442,15 +468,27 @@ export const queueCaseAnalysisForPatient = async (caseId: string, userId: string
   };
 };
 
+/** Owner-only PII reveal: patient who owns the case. Never grant to doctor/org/operator. */
+export const canRevealPii = (userType: AuthUserType, ownsCase: boolean): boolean =>
+  userType === 'patient' && ownsCase;
+
 export const getCaseAnalysisForViewer = async (
   caseIdParam: string,
   userId: string,
   userType: AuthUserType,
   includeAgentic: boolean,
-  isOperator: boolean
+  isOperator: boolean,
+  revealPii = false
 ) => {
   const caseId = await resolveCaseId(caseIdParam);
   await ensureCaseAccess(caseId, userId, userType);
+
+  if (revealPii) {
+    if (userType !== 'patient') {
+      throw new AppError('Only the case owner can reveal PII', 403);
+    }
+    await ensurePatientOwnsCase(caseId, userId);
+  }
 
   const rows = await caseRepository.findCaseAnalysisFields(caseId);
   if (rows.length === 0) {
@@ -472,6 +510,7 @@ export const getCaseAnalysisForViewer = async (
       analysisStatus: 'not_started',
       summary: null,
       analysisQuestions: null,
+      specialist_questions_detailed: [],
       artifact: null,
       error: null,
       analysisRunId: null,
@@ -479,6 +518,8 @@ export const getCaseAnalysisForViewer = async (
       analysisRetrying: false,
       observations: null,
       aiAnalysisSharedWithSpecialists: false,
+      pii_available: false,
+      pii_revealed: false,
     };
   }
 
@@ -489,12 +530,39 @@ export const getCaseAnalysisForViewer = async (
       (typeof row.analysis_error === 'string' &&
         row.analysis_error.toLowerCase().startsWith('retrying analysis')));
 
-  const artifact = hydrateCaseAnalysisArtifact({
+  let artifact = hydrateCaseAnalysisArtifact({
     artifact: row.analysis_artifact,
     summary: row.analysis_summary,
     questions: row.analysis_questions,
     model: row.analysis_model,
   });
+
+  const runId = latestRun?.id || null;
+  const piiAvailable = runId ? await isDeidVaultAvailable(runId) : false;
+  let piiRevealed = false;
+
+  if (revealPii && artifact && piiAvailable && runId) {
+    const mapping = await loadDeidVaultMapping(runId);
+    if (Object.keys(mapping).length > 0) {
+      const reidentified = reidentifyArtifact(artifact, mapping);
+      artifact = reidentified.artifact;
+      piiRevealed = true;
+      await recordAnalysisPiiRevealEvent({
+        caseId,
+        runId,
+        actorUserId: userId,
+        revealed: true,
+      });
+    }
+  } else if (revealPii) {
+    await recordAnalysisPiiRevealEvent({
+      caseId,
+      runId,
+      actorUserId: userId,
+      revealed: false,
+    });
+  }
+
   const observations =
     artifact
       ? extractObservationsFromArtifact(artifact)
@@ -506,12 +574,31 @@ export const getCaseAnalysisForViewer = async (
     analysisStatus: row.analysis_status,
     summary: artifact ? artifact.structured_summary.chief_concern || row.analysis_summary : row.analysis_summary,
     analysisQuestions: artifact ? artifactQuestionsToStrings(artifact) : row.analysis_questions,
+    specialist_questions_detailed: artifact
+      ? artifact.questionnaire.specialist_questions.map((item) => ({
+          id: item.id,
+          question: item.question,
+          source: item.source ?? 'ai',
+          ...(item.edited ? { edited: true } : {}),
+          ...(item.confirmed ? { confirmed: true } : {}),
+        }))
+      : Array.isArray(row.analysis_questions)
+        ? row.analysis_questions
+            .filter((q): q is string => typeof q === 'string' && Boolean(q.trim()))
+            .map((question, index) => ({
+              id: `aq-${index + 1}`,
+              question: question.trim(),
+              source: 'ai' as const,
+            }))
+        : [],
     artifact,
     error: analysisRetrying ? null : row.analysis_error,
-    analysisRunId: latestRun?.id || null,
+    analysisRunId: runId,
     attentionReason: latestRun?.attention_reason || null,
     analysisRetrying,
     observations,
+    pii_available: piiAvailable,
+    pii_revealed: piiRevealed,
   };
 
   if (includeAgentic) {
@@ -636,7 +723,48 @@ export const getCaseByIdForViewer = async (
     responseData.resolved_specialist_questions = resolveSpecialistQuestions(rawCaseRow);
   }
 
+  // Parallel structured field for FE badges (flat string consumers keep cases.specialist_questions / analysisQuestions).
+  responseData.specialist_questions_detailed = buildSpecialistQuestionsDetailed(rawCaseRow);
+  if (Array.isArray(rawCaseRow.specialist_questions)) {
+    responseData.specialist_questions = questionnaireItemsToStrings(
+      parseFlexibleQuestionnaireItems(rawCaseRow.specialist_questions, { source: 'patient' })
+    );
+  }
+
   return responseData;
+};
+
+export const updateSpecialistQuestionsForPatient = async (
+  caseIdParam: string,
+  userId: string,
+  body: Record<string, unknown>
+) => {
+  const caseId = await resolveCaseId(caseIdParam);
+  await ensurePatientOwnsDraftCaseForQuestions(caseId, userId);
+
+  const caseRows = await caseRepository.findCaseById(caseId);
+  if (caseRows.length === 0) {
+    throw new AppError('Case not found', 404);
+  }
+
+  const rawCaseRow = caseRows[0] as {
+    specialist_questions?: unknown;
+    analysis_questions?: string[] | null;
+    analysis_artifact?: unknown;
+    analysis_summary?: string | null;
+    analysis_model?: string | null;
+    share_ai_analysis_with_specialists?: boolean | null;
+  };
+
+  const prior = buildSpecialistQuestionsDetailed(rawCaseRow);
+  const questions = parseAndValidateSpecialistQuestionsUpdate(body.questions, prior);
+
+  await caseRepository.updateSpecialistQuestions(caseId, JSON.stringify(questions));
+
+  return {
+    specialist_questions: questionnaireItemsToStrings(questions),
+    specialist_questions_detailed: questions,
+  };
 };
 
 export const updateCaseForPatient = async (
@@ -654,6 +782,7 @@ export const updateCaseForPatient = async (
 
 export const deleteCaseForPatient = async (caseId: string, userId: string) => {
   await ensurePatientOwnsCase(caseId, userId);
+  await clearDeidVaultsForCase(caseId);
   await caseRepository.deleteCase(caseId);
 };
 
@@ -734,7 +863,11 @@ export const updateCaseStatusForDoctor = async (
   }
 
   await ensureDoctorAssignedToCase(caseId, userId);
-  await caseRepository.updateCaseStatus(caseId, status.trim());
+  const nextStatus = status.trim();
+  await caseRepository.updateCaseStatus(caseId, nextStatus);
+  if (nextStatus === 'completed') {
+    await clearDeidVaultsForCase(caseId);
+  }
 };
 
 export const generatePatientFacingAiDraft = async (
@@ -890,6 +1023,9 @@ export const sendDoctorOpinionForDoctor = async (
   await caseRepository.updateCaseOnDoctorOpinionSend(caseId, nextStatus);
   await caseRepository.updateCaseAssignmentOnDoctorOpinionSend(caseId, userId);
   await clearDoctorResponseDraft(caseId, userId);
+  if (nextStatus === 'completed') {
+    await clearDeidVaultsForCase(caseId);
+  }
 
   if (structuredPayload) {
     try {

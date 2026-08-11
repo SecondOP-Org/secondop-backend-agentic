@@ -26,6 +26,9 @@ import {
 export interface ResolvedSpecialistQuestion {
   id: string;
   question: string;
+  source: 'ai' | 'patient';
+  edited?: boolean;
+  confirmed?: boolean;
 }
 
 /** Standard remote records-only review caveats — specialist may edit before send. */
@@ -122,7 +125,7 @@ const syncSummaryAndRecommendations = (
 };
 
 export interface CaseRowForQuestionResolution {
-  specialist_questions?: string[] | null;
+  specialist_questions?: unknown;
   analysis_questions?: string[] | null;
   analysis_artifact?: unknown;
   analysis_summary?: string | null;
@@ -130,15 +133,51 @@ export interface CaseRowForQuestionResolution {
   share_ai_analysis_with_specialists?: boolean | null;
 }
 
-const parsePatientSpecialistQuestions = (input: unknown): string[] => {
+const parsePatientSpecialistQuestions = (input: unknown): ResolvedSpecialistQuestion[] => {
   if (!Array.isArray(input)) {
     return [];
   }
 
   return input
-    .filter((value): value is string => typeof value === 'string')
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0);
+    .map((value, index) => {
+      if (typeof value === 'string') {
+        const question = value.trim();
+        if (!question) {
+          return null;
+        }
+        return {
+          id: `sq-${index + 1}`,
+          question,
+          source: 'patient' as const,
+        };
+      }
+
+      if (!value || typeof value !== 'object') {
+        return null;
+      }
+
+      const candidate = value as Record<string, unknown>;
+      if (typeof candidate.question !== 'string' || !candidate.question.trim()) {
+        return null;
+      }
+
+      const resolved: ResolvedSpecialistQuestion = {
+        id:
+          typeof candidate.id === 'string' && candidate.id.trim()
+            ? candidate.id.trim()
+            : `sq-${index + 1}`,
+        question: candidate.question.trim(),
+        source: candidate.source === 'ai' ? 'ai' : 'patient',
+      };
+      if (candidate.edited === true) {
+        resolved.edited = true;
+      }
+      if (candidate.confirmed === true) {
+        resolved.confirmed = true;
+      }
+      return resolved;
+    })
+    .filter((item): item is ResolvedSpecialistQuestion => item !== null);
 };
 
 export const resolveSpecialistQuestions = (
@@ -147,10 +186,7 @@ export const resolveSpecialistQuestions = (
   const patientQuestions = parsePatientSpecialistQuestions(caseRow.specialist_questions);
 
   if (patientQuestions.length > 0) {
-    return patientQuestions.map((question, index) => ({
-      id: `sq-${index + 1}`,
-      question,
-    }));
+    return patientQuestions;
   }
 
   if (caseRow.share_ai_analysis_with_specialists === false) {
@@ -168,6 +204,9 @@ export const resolveSpecialistQuestions = (
     return artifact.questionnaire.specialist_questions.map((item, index) => ({
       id: item.id || `aq-${index + 1}`,
       question: item.question,
+      source: item.source === 'patient' ? 'patient' : 'ai',
+      ...(item.edited ? { edited: true } : {}),
+      ...(item.confirmed ? { confirmed: true } : {}),
     }));
   }
 
@@ -180,6 +219,7 @@ export const resolveSpecialistQuestions = (
     return analysisQuestions.map((question, index) => ({
       id: `aq-${index + 1}`,
       question: question.trim(),
+      source: 'ai' as const,
     }));
   }
 
@@ -187,6 +227,7 @@ export const resolveSpecialistQuestions = (
     return artifactQuestionsToStrings(artifact).map((question, index) => ({
       id: `aq-${index + 1}`,
       question,
+      source: 'ai' as const,
     }));
   }
 

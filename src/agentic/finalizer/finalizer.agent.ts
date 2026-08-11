@@ -1,6 +1,7 @@
 import { AgenticError, AgenticFinalArtifact, AgenticLoopState } from '../core/types';
 import { CaseAnalysisContractError, enforceCaseAnalysisContract } from '../../evals/contractChecks';
 import { resolveContractCheckArtifact } from '../../services/analysis.service';
+import { formatStructuredSummary } from '../../services/analysisArtifact.service';
 
 export class FinalizerAgent {
   public finalize(state: AgenticLoopState): AgenticFinalArtifact {
@@ -26,12 +27,13 @@ export class FinalizerAgent {
       throw error;
     }
 
-    // Persist clinician-facing (re-identified) artifact.
+    // Persist de-identified twin on the case; sealed vault retained for owner reveal.
+    const deidentified = state.analysis.artifactDeidentified ?? state.analysis.artifact;
     return {
-      summary: state.analysis.summary,
-      questions: state.analysis.topQuestions,
+      summary: formatStructuredSummary(deidentified.structured_summary),
+      questions: deidentified.questionnaire.specialist_questions.map((item) => item.question),
       observations: state.observations,
-      artifact: state.analysis.artifact,
+      artifact: deidentified,
       model: state.analysis.model,
     };
   }

@@ -238,6 +238,19 @@ export const updateCaseOnSubmit = async (
   );
 };
 
+export const updateSpecialistQuestions = async (
+  caseId: string,
+  specialistQuestionsJson: string
+): Promise<void> => {
+  await dbQuery(
+    `UPDATE cases
+     SET specialist_questions = $2,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1`,
+    [caseId, specialistQuestionsJson]
+  );
+};
+
 export const findCasesForPatient = async (
   patientId: string,
   userId: string,

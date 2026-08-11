@@ -101,11 +101,14 @@ describe('doctor response workflow', () => {
           },
           patient_summary: {
             overview: 'Plain overview',
+        what_your_results_show: 'Your results include the key findings from your records.',
             what_to_discuss: 'Plain discuss',
+        next_steps: 'Ask about timing and what happens next.',
+        what_we_couldnt_tell: 'Some details could not be determined from the records.',
             not_a_diagnosis: 'This is not a diagnosis.',
           },
           questionnaire: {
-            specialist_questions: [{ id: 'ai-q-1', question: 'AI question' }],
+            specialist_questions: [{ id: 'ai-q-1', question: 'AI question' , source: 'ai' }],
           },
           confidence_score: 0.8,
           uncertainty_flags: [],
@@ -117,7 +120,7 @@ describe('doctor response workflow', () => {
         share_ai_analysis_with_specialists: true,
       });
 
-      expect(resolved).toEqual([{ id: 'sq-1', question: 'Patient question' }]);
+      expect(resolved).toEqual([{ id: 'sq-1', question: 'Patient question', source: 'patient' }]);
     });
 
     it('does not expose artifact questions when AI sharing is disabled', () => {
@@ -134,11 +137,14 @@ describe('doctor response workflow', () => {
           },
           patient_summary: {
             overview: 'Plain overview',
+        what_your_results_show: 'Your results include the key findings from your records.',
             what_to_discuss: 'Plain discuss',
+        next_steps: 'Ask about timing and what happens next.',
+        what_we_couldnt_tell: 'Some details could not be determined from the records.',
             not_a_diagnosis: 'This is not a diagnosis.',
           },
           questionnaire: {
-            specialist_questions: [{ id: 'ai-q-1', question: 'AI question' }],
+            specialist_questions: [{ id: 'ai-q-1', question: 'AI question' , source: 'ai' }],
           },
           confidence_score: 0.8,
           uncertainty_flags: [],
@@ -192,7 +198,7 @@ describe('doctor response workflow', () => {
       expect(res.json).toHaveBeenCalledWith({
         status: 'success',
         data: {
-          resolvedQuestions: [{ id: 'sq-1', question: 'What is the diagnosis?' }],
+          resolvedQuestions: [{ id: 'sq-1', question: 'What is the diagnosis?', source: 'patient' }],
           draft: expect.objectContaining({
             questionAnswers: [
               {
@@ -498,8 +504,8 @@ describe('doctor response workflow', () => {
       expect(() =>
         validateDoctorResponseForSend(
           [
-            { id: 'sq-1', question: 'Question 1' },
-            { id: 'sq-2', question: 'Question 2' },
+            { id: 'sq-1', question: 'Question 1' , source: 'ai' },
+            { id: 'sq-2', question: 'Question 2' , source: 'ai' },
           ],
           {
             questionAnswers: [
@@ -525,7 +531,7 @@ describe('doctor response workflow', () => {
       ).toThrow(AppError);
 
       expect(() =>
-        validateDoctorResponseForSend([{ id: 'sq-1', question: 'Question 1' }], {
+        validateDoctorResponseForSend([{ id: 'sq-1', question: 'Question 1' , source: 'ai' }], {
           questionAnswers: [
             { questionId: 'sq-1', question: 'Question 1', answer: 'Answer 1' },
           ],
@@ -662,7 +668,7 @@ describe('doctor response workflow', () => {
 
       const result = await getDoctorResponse('case-1', 'user-doctor-1');
 
-      expect(result.resolvedQuestions).toEqual([{ id: 'sq-1', question: 'Question 1' }]);
+      expect(result.resolvedQuestions).toEqual([{ id: 'sq-1', question: 'Question 1', source: 'patient' }]);
       expect(result.draft).toBeNull();
     });
   });

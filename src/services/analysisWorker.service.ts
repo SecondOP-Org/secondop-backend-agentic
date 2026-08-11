@@ -36,7 +36,6 @@ import {
   buildShadowComparisonMetrics,
   insertCaseAnalysisArtifact,
 } from './caseAnalysisRunArtifact.service';
-import { clearDeidVault } from './deidVault.service';
 import { notifyAnalysisRunTerminal } from './analysisAlerting.service';
 import {
   attachOnlineEvalSpanAttributes,
@@ -445,8 +444,6 @@ class AnalysisWorker {
           ]
         );
 
-        await clearDeidVault(runId);
-
         agenticRunSpan.addAttributes({
           latency_ms: Date.now() - runStartedAt,
           prompt_tokens: promptTokens,
@@ -664,7 +661,6 @@ class AnalysisWorker {
                 attentionReason: shadowSucceed.attentionReason,
                 runSpan: agenticRunSpan,
               });
-              await clearDeidVault(agenticRun.id);
 
               agenticRunSpan.addAttributes({
                 latency_ms: Date.now() - agenticStartedAt,

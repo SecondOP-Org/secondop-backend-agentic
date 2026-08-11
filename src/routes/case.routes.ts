@@ -7,6 +7,7 @@ import {
   getCaseAnalysisTrace,
   streamCaseAnalysisProgress,
   submitCase,
+  updateSpecialistQuestions,
   getCases,
   getCaseById,
   updateCase,
@@ -53,6 +54,7 @@ router.get('/:caseId/analysis/progress', streamCaseAnalysisProgress);
 // Ops-only: full run internals / shadow artifacts (SEC-110).
 router.get('/:caseId/analysis/trace', authorizeCommandCenterOperator, getCaseAnalysisTrace);
 router.post('/:caseId/submit', authorize('patient'), submitCase);
+router.patch('/:caseId/specialist-questions', authorize('patient'), updateSpecialistQuestions);
 
 // Patient records-connect (SEC-216 / FE §5) — before GET /:caseId
 router.post('/:caseId/records/connect', authorize('patient'), connectCaseRecordsHandler);

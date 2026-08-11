@@ -93,7 +93,16 @@ export const reidentifyArtifact = (
     structured_summary: structuredSummary,
     patient_summary: {
       overview: reidentifyText(artifact.patient_summary?.overview || '', mapping),
+      what_your_results_show: reidentifyText(
+        artifact.patient_summary?.what_your_results_show || '',
+        mapping
+      ),
       what_to_discuss: reidentifyText(artifact.patient_summary?.what_to_discuss || '', mapping),
+      next_steps: reidentifyText(artifact.patient_summary?.next_steps || '', mapping),
+      what_we_couldnt_tell: reidentifyText(
+        artifact.patient_summary?.what_we_couldnt_tell || '',
+        mapping
+      ),
       not_a_diagnosis: reidentifyText(artifact.patient_summary?.not_a_diagnosis || '', mapping),
     },
     questionnaire: {

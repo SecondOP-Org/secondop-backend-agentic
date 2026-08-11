@@ -218,14 +218,17 @@ describe('clinician reidentify + prompt PHI leak', () => {
       },
       patient_summary: {
         overview: 'Your records mention follow-up for <PERSON_1>.',
+        what_your_results_show: 'Your results include the key findings from your records.',
         what_to_discuss: 'Discuss next steps for <PERSON_1> with your specialist.',
+        next_steps: 'Ask about timing and what happens next.',
+        what_we_couldnt_tell: 'Some details could not be determined from the records.',
         not_a_diagnosis: 'This is not a diagnosis. Your specialist decides next steps.',
       },
       questionnaire: {
         specialist_questions: [
-          { id: 'q1', question: 'Any prior imaging for <PERSON_1>?' },
-          { id: 'q2', question: 'Clarify timeline around <DATE_TIME_1>?' },
-          { id: 'q3', question: 'Other meds?' },
+          { id: 'q1', question: 'Any prior imaging for <PERSON_1>?' , source: 'ai' },
+          { id: 'q2', question: 'Clarify timeline around <DATE_TIME_1>?' , source: 'ai' },
+          { id: 'q3', question: 'Other meds?' , source: 'ai' },
         ],
       },
       confidence_score: 0.7,

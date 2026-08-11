@@ -73,8 +73,10 @@ describe('contractChecks', () => {
     expect(validateLowConfidenceUncertainty(0.4, ['Evidence is limited'])).toBe(true);
   });
 
-  it('enforces exactly three specialist questions', () => {
-    expect(validateQuestionContract(['one', 'two'])).toContain('Expected exactly 3 specialist-facing questions.');
+  it('enforces exactly three patient-voice questions', () => {
+    expect(validateQuestionContract(['one', 'two'])).toContain(
+      'Expected exactly 3 patient-voice questions.'
+    );
   });
 
   it('passes a valid contract artifact', () => {
@@ -89,7 +91,10 @@ describe('contractChecks', () => {
       ...validArtifact,
       patient_summary: {
         overview: '',
+        what_your_results_show: '',
         what_to_discuss: '',
+        next_steps: '',
+        what_we_couldnt_tell: '',
         not_a_diagnosis: '',
       },
     });
@@ -101,8 +106,7 @@ describe('contractChecks', () => {
     const missingCaveat = validateCaseAnalysisContract({
       ...validArtifact,
       patient_summary: {
-        overview: 'Your records show chest pain findings to review.',
-        what_to_discuss: 'Ask your specialist about next tests.',
+        ...validArtifact.patient_summary,
         not_a_diagnosis: '',
       },
     });
