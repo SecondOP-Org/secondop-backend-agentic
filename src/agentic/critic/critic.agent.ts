@@ -1,4 +1,4 @@
-import { AgenticCriticScore, AgenticFinalArtifact, AgenticLoopState } from '../core/types';
+import { AgenticCriticScore, AgenticFinalArtifact, AgenticLoopState, AgenticPolicy } from '../core/types';
 import {
   collectUncertaintySignals,
   validateEvidenceGrounding,
@@ -10,7 +10,11 @@ import { resolveContractCheckArtifact } from '../../services/analysis.service';
 const caveatPattern = /(may|might|possible|uncertain|cannot\s+exclude|limited|caveat)/i;
 
 export class CriticAgent {
-  public async evaluate(artifact: AgenticFinalArtifact, state: AgenticLoopState): Promise<AgenticCriticScore> {
+  public async evaluate(
+    artifact: AgenticFinalArtifact,
+    state: AgenticLoopState,
+    policy?: Pick<AgenticPolicy, 'maxRefinements'>
+  ): Promise<AgenticCriticScore> {
     const questionViolations = validateQuestionContract(artifact.questions);
     const hasObservations = artifact.observations.length > 0;
     const hasCaveatLanguage = caveatPattern.test(artifact.summary);
@@ -54,7 +58,10 @@ export class CriticAgent {
     }
 
     const passed = reasons.length === 0;
-    const needsRefinement = !passed && state.refinementCount < (parseInt(process.env.AGENTIC_MAX_REFINEMENTS || '1', 10) || 1);
+    const maxRefinements =
+      policy?.maxRefinements ??
+      Math.max(0, parseInt(process.env.AGENTIC_MAX_REFINEMENTS || '1', 10) || 1);
+    const needsRefinement = !passed && state.refinementCount < maxRefinements;
     const score = Math.max(0, 100 - reasons.length * 12);
 
     return {

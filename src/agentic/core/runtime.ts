@@ -1,16 +1,27 @@
 import { emitAgenticStepEvent, runWithinAgenticStepSpan } from '../observability/eventEmitter';
 import { persistAgenticStageArtifact } from '../observability/artifactPersistence';
-import { assertActionAllowed, assertRefinementBudget, assertStepBudget } from './policy';
+import {
+  addTokenUsage,
+  assertActionAllowed,
+  assertRefinementBudget,
+  assertResourceBudgets,
+  assertStepBudget,
+  emptyTokenUsage,
+} from './policy';
 import {
   AgenticAction,
   AgenticActionHistoryItem,
   AgenticError,
+  AgenticErrorDetails,
   AgenticLoopState,
   AgenticRuntimeContext,
+  AgenticTokenUsage,
 } from './types';
 import { PlannerAgent } from '../planner/planner.agent';
 import { CriticAgent } from '../critic/critic.agent';
 import { FinalizerAgent } from '../finalizer/finalizer.agent';
+import { estimateTokenCostUsd } from '../../observability/phoenix.service';
+import { buildAgenticRunMetrics } from '../observability/metrics';
 
 interface RuntimeTools {
   VALIDATE_INTAKE: (context: AgenticRuntimeContext, state: AgenticLoopState) => Promise<AgenticLoopState>;
@@ -29,9 +40,21 @@ interface RunRuntimeInput {
   tools: RuntimeTools;
 }
 
+const usageFromAnalysis = (state: AgenticLoopState): AgenticTokenUsage => ({
+  promptTokens: state.analysis?.usage?.promptTokens || 0,
+  completionTokens: state.analysis?.usage?.completionTokens || 0,
+  totalTokens: state.analysis?.usage?.totalTokens || 0,
+});
+
 export const runAgenticRuntime = async (input: RunRuntimeInput) => {
-  let state = input.initialState;
+  let state: AgenticLoopState = {
+    ...input.initialState,
+    startedAtMs: input.initialState.startedAtMs ?? Date.now(),
+    runningTokenUsage: input.initialState.runningTokenUsage || emptyTokenUsage(),
+    modelTokenUsageAccumulated: input.initialState.modelTokenUsageAccumulated || emptyTokenUsage(),
+  };
   const history: AgenticActionHistoryItem[] = [];
+  const startedAtMs = state.startedAtMs!;
 
   while (true) {
     state = {
@@ -40,11 +63,18 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
     };
 
     assertStepBudget(input.context.policy, state.stepCount);
+    assertResourceBudgets(input.context.policy, startedAtMs, state.runningTokenUsage || emptyTokenUsage());
 
     const decision = await input.planner.planNextAction(input.context, state, history);
     const action = assertActionAllowed(input.context.policy, decision.action);
     const stepName = `agentic:${action.toLowerCase()}`;
     const startedAt = new Date();
+
+    state = {
+      ...state,
+      runningTokenUsage: addTokenUsage(state.runningTokenUsage || emptyTokenUsage(), decision.usage),
+    };
+    assertResourceBudgets(input.context.policy, startedAtMs, state.runningTokenUsage || emptyTokenUsage());
 
     await emitAgenticStepEvent({
       context: input.context,
@@ -63,7 +93,7 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
       if (action === 'FINALIZE') {
         await runWithinAgenticStepSpan({ stepName, startedAt }, async () => {
           const artifact = input.finalizer.finalize(state);
-          const criticScore = await input.critic.evaluate(artifact, state);
+          const criticScore = await input.critic.evaluate(artifact, state, input.context.policy);
 
           state = {
             ...state,
@@ -118,6 +148,7 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
         };
 
         assertRefinementBudget(input.context.policy, state.refinementCount);
+        assertResourceBudgets(input.context.policy, startedAtMs, state.runningTokenUsage || emptyTokenUsage());
         continue;
       }
 
@@ -126,7 +157,28 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
       if (!tool) {
         throw new AgenticError('policy_error', `No tool registered for action: ${action}`);
       }
+
+      const priorModelUsage = state.modelTokenUsageAccumulated || emptyTokenUsage();
       state = await runWithinAgenticStepSpan({ stepName, startedAt }, () => tool(input.context, state));
+
+      if (action === 'SYNTHESIZE_SUMMARY') {
+        const synthesizeUsage = usageFromAnalysis(state);
+        const modelTokenUsageAccumulated = addTokenUsage(priorModelUsage, synthesizeUsage);
+        state = {
+          ...state,
+          modelTokenUsageAccumulated,
+          runningTokenUsage: addTokenUsage(
+            {
+              promptTokens: (state.runningTokenUsage || emptyTokenUsage()).promptTokens,
+              completionTokens: (state.runningTokenUsage || emptyTokenUsage()).completionTokens,
+              totalTokens: (state.runningTokenUsage || emptyTokenUsage()).totalTokens,
+            },
+            synthesizeUsage
+          ),
+        };
+        // runningTokenUsage already includes planner usage from this step; add synthesize only once.
+        assertResourceBudgets(input.context.policy, startedAtMs, state.runningTokenUsage || emptyTokenUsage());
+      }
 
       await emitAgenticStepEvent({
         context: input.context,
@@ -156,6 +208,25 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown agentic step error';
+      const partialMetrics = buildAgenticRunMetrics(state, history);
+      const details: AgenticErrorDetails = {
+        stepCount: partialMetrics.stepCount,
+        refinementCount: partialMetrics.refinementCount,
+        actionSequence: partialMetrics.actionSequence,
+        agentsInvoked: partialMetrics.agentsInvoked,
+        promptTokens: partialMetrics.totalTokenUsage.promptTokens,
+        completionTokens: partialMetrics.totalTokenUsage.completionTokens,
+        totalTokens: partialMetrics.totalTokenUsage.totalTokens,
+        plannerPromptTokens: partialMetrics.plannerTokenUsage.promptTokens,
+        plannerCompletionTokens: partialMetrics.plannerTokenUsage.completionTokens,
+        modelPromptTokens: partialMetrics.modelTokenUsage.promptTokens,
+        modelCompletionTokens: partialMetrics.modelTokenUsage.completionTokens,
+        estimatedCostUsd: estimateTokenCostUsd(
+          partialMetrics.totalTokenUsage.promptTokens,
+          partialMetrics.totalTokenUsage.completionTokens
+        ),
+      };
+
       await emitAgenticStepEvent({
         context: input.context,
         stepName,
@@ -167,9 +238,17 @@ export const runAgenticRuntime = async (input: RunRuntimeInput) => {
           step: state.stepCount,
           refinement: state.refinementCount,
           plannerTokenUsage: decision.usage || null,
+          budgetStopReason: error instanceof AgenticError ? error.budgetStopReason || null : null,
         },
         errorText: message,
       });
+
+      if (error instanceof AgenticError) {
+        throw new AgenticError(error.code, error.message, error.budgetStopReason, {
+          ...details,
+          ...error.details,
+        });
+      }
 
       throw error;
     }

@@ -1,5 +1,10 @@
 import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
-import { assertRefinementBudget, assertStepBudget } from '../core/policy';
+import {
+  assertRefinementBudget,
+  assertResourceBudgets,
+  assertStepBudget,
+  emptyTokenUsage,
+} from '../core/policy';
 import {
   AgenticAction,
   AgenticActionHistoryItem,
@@ -53,10 +58,19 @@ const runGraphStep = async (
 ): Promise<LangGraphNodeResult> => {
   const nextStepCount = graphState.state.stepCount + 1;
   assertStepBudget(context.policy, nextStepCount);
+  const startedAtMs = graphState.state.startedAtMs ?? Date.now();
+  assertResourceBudgets(
+    context.policy,
+    startedAtMs,
+    graphState.state.runningTokenUsage || emptyTokenUsage()
+  );
 
   const stateWithStep = {
     ...graphState.state,
     stepCount: nextStepCount,
+    startedAtMs,
+    runningTokenUsage: graphState.state.runningTokenUsage || emptyTokenUsage(),
+    modelTokenUsageAccumulated: graphState.state.modelTokenUsageAccumulated || emptyTokenUsage(),
   };
   const stepName = stepNameForAction(action);
   const startedAt = new Date();
@@ -214,6 +228,12 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
   ): Promise<LangGraphNodeResult> {
     const nextStepCount = graphState.state.stepCount + 1;
     assertStepBudget(context.policy, nextStepCount);
+    const startedAtMs = graphState.state.startedAtMs ?? Date.now();
+    assertResourceBudgets(
+      context.policy,
+      startedAtMs,
+      graphState.state.runningTokenUsage || emptyTokenUsage()
+    );
 
     const action: AgenticAction = 'FINALIZE';
     const rationale = 'LangGraph node finalizes and critic-checks the analysis artifact.';
@@ -222,6 +242,9 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
     const stateWithStep = {
       ...graphState.state,
       stepCount: nextStepCount,
+      startedAtMs,
+      runningTokenUsage: graphState.state.runningTokenUsage || emptyTokenUsage(),
+      modelTokenUsageAccumulated: graphState.state.modelTokenUsageAccumulated || emptyTokenUsage(),
     };
 
     await emitAgenticStepEvent({
@@ -239,7 +262,7 @@ class LangGraphCaseAnalysisAdapter implements LangChainAgentAdapter {
 
     try {
       const artifact = this.finalizer.finalize(stateWithStep);
-      const criticScore = await this.critic.evaluate(artifact, stateWithStep);
+      const criticScore = await this.critic.evaluate(artifact, stateWithStep, context.policy);
       let nextState: AgenticLoopState = {
         ...stateWithStep,
         finalArtifact: artifact,

@@ -37,6 +37,15 @@ export interface AnalysisRun {
   contract_pass: boolean | null;
   attempt_count: number;
   attention_reason: AttentionReason | null;
+  step_count: number | null;
+  refinement_count: number | null;
+  action_sequence: string[] | null;
+  agents_invoked: string[] | null;
+  planner_prompt_tokens: number | null;
+  planner_completion_tokens: number | null;
+  model_prompt_tokens: number | null;
+  model_completion_tokens: number | null;
+  budget_stop_reason: string | null;
   created_at: Date;
 }
 
@@ -93,13 +102,43 @@ export interface AnalysisRunCompletionMetadata {
   criticScore?: number | null;
   contractPass?: boolean | null;
   confidenceScore?: number | null;
+  stepCount?: number | null;
+  refinementCount?: number | null;
+  actionSequence?: string[] | null;
+  agentsInvoked?: string[] | null;
+  plannerPromptTokens?: number | null;
+  plannerCompletionTokens?: number | null;
+  modelPromptTokens?: number | null;
+  modelCompletionTokens?: number | null;
+  budgetStopReason?: string | null;
 }
 
 const ANALYSIS_RUN_SELECT_FIELDS = `
   id, case_id, status, engine, execution_mode, started_at, completed_at, model, error, error_message,
   pipeline_version, model_version, prompt_version, latency_ms, prompt_tokens, completion_tokens,
-  total_tokens, estimated_cost_usd, critic_score, contract_pass, attempt_count, attention_reason, created_at
+  total_tokens, estimated_cost_usd, critic_score, contract_pass, attempt_count, attention_reason,
+  step_count, refinement_count, action_sequence, agents_invoked,
+  planner_prompt_tokens, planner_completion_tokens, model_prompt_tokens, model_completion_tokens,
+  budget_stop_reason, created_at
 `;
+
+const toStringArray = (value: unknown): string[] | null => {
+  if (value == null) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item));
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map((item) => String(item)) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
 
 const toNullableNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) {
@@ -147,6 +186,15 @@ const mapAnalysisRunRow = (row: Record<string, unknown>): AnalysisRun => {
     attempt_count: Math.max(1, toNullableNumber(row.attempt_count) ?? 1),
     attention_reason:
       typeof row.attention_reason === 'string' ? (row.attention_reason as AttentionReason) : null,
+    step_count: toNullableNumber(row.step_count),
+    refinement_count: toNullableNumber(row.refinement_count),
+    action_sequence: toStringArray(row.action_sequence),
+    agents_invoked: toStringArray(row.agents_invoked),
+    planner_prompt_tokens: toNullableNumber(row.planner_prompt_tokens),
+    planner_completion_tokens: toNullableNumber(row.planner_completion_tokens),
+    model_prompt_tokens: toNullableNumber(row.model_prompt_tokens),
+    model_completion_tokens: toNullableNumber(row.model_completion_tokens),
+    budget_stop_reason: typeof row.budget_stop_reason === 'string' ? row.budget_stop_reason : null,
     created_at: row.created_at as Date,
   };
 };
@@ -305,6 +353,15 @@ export const markAnalysisRunSucceeded = async (
          estimated_cost_usd = $9,
          critic_score = $10,
          contract_pass = $11,
+         step_count = $12,
+         refinement_count = $13,
+         action_sequence = $14::jsonb,
+         agents_invoked = $15::jsonb,
+         planner_prompt_tokens = $16,
+         planner_completion_tokens = $17,
+         model_prompt_tokens = $18,
+         model_completion_tokens = $19,
+         budget_stop_reason = NULL,
          latency_ms = CASE
            WHEN started_at IS NULL THEN NULL
            ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)) * 1000))
@@ -326,6 +383,14 @@ export const markAnalysisRunSucceeded = async (
       metadata.estimatedCostUsd ?? null,
       metadata.criticScore ?? null,
       metadata.contractPass ?? null,
+      metadata.stepCount ?? null,
+      metadata.refinementCount ?? null,
+      metadata.actionSequence ? JSON.stringify(metadata.actionSequence) : null,
+      metadata.agentsInvoked ? JSON.stringify(metadata.agentsInvoked) : null,
+      metadata.plannerPromptTokens ?? null,
+      metadata.plannerCompletionTokens ?? null,
+      metadata.modelPromptTokens ?? null,
+      metadata.modelCompletionTokens ?? null,
     ]
   );
 
@@ -354,20 +419,53 @@ export const markAnalysisRunSucceeded = async (
   };
 };
 
-export const markAnalysisRunFailed = async (runId: string, errorMessage: string): Promise<void> => {
+export const markAnalysisRunFailed = async (
+  runId: string,
+  errorMessage: string,
+  metadata?: Partial<AnalysisRunCompletionMetadata>
+): Promise<void> => {
   await query(
     `UPDATE case_analysis_runs
      SET status = 'failed',
          error = $2,
          error_message = $2,
          attention_reason = 'failed_terminal',
+         prompt_tokens = COALESCE($3, prompt_tokens),
+         completion_tokens = COALESCE($4, completion_tokens),
+         total_tokens = COALESCE($5, total_tokens),
+         estimated_cost_usd = COALESCE($6, estimated_cost_usd),
+         step_count = COALESCE($7, step_count),
+         refinement_count = COALESCE($8, refinement_count),
+         action_sequence = COALESCE($9::jsonb, action_sequence),
+         agents_invoked = COALESCE($10::jsonb, agents_invoked),
+         planner_prompt_tokens = COALESCE($11, planner_prompt_tokens),
+         planner_completion_tokens = COALESCE($12, planner_completion_tokens),
+         model_prompt_tokens = COALESCE($13, model_prompt_tokens),
+         model_completion_tokens = COALESCE($14, model_completion_tokens),
+         budget_stop_reason = COALESCE($15, budget_stop_reason),
          latency_ms = CASE
            WHEN started_at IS NULL THEN NULL
            ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - started_at)) * 1000))
          END,
          completed_at = CURRENT_TIMESTAMP
      WHERE id = $1`,
-    [runId, errorMessage]
+    [
+      runId,
+      errorMessage,
+      metadata?.promptTokens ?? null,
+      metadata?.completionTokens ?? null,
+      metadata?.totalTokens ?? null,
+      metadata?.estimatedCostUsd ?? null,
+      metadata?.stepCount ?? null,
+      metadata?.refinementCount ?? null,
+      metadata?.actionSequence ? JSON.stringify(metadata.actionSequence) : null,
+      metadata?.agentsInvoked ? JSON.stringify(metadata.agentsInvoked) : null,
+      metadata?.plannerPromptTokens ?? null,
+      metadata?.plannerCompletionTokens ?? null,
+      metadata?.modelPromptTokens ?? null,
+      metadata?.modelCompletionTokens ?? null,
+      metadata?.budgetStopReason ?? null,
+    ]
   );
 };
 
