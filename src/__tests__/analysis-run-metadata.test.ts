@@ -86,7 +86,23 @@ describe('analysis run metadata persistence', () => {
 
     expect(mockedQuery).toHaveBeenCalledWith(
       expect.stringContaining('error_message'),
-      ['run-1', 'model timeout']
+      [
+        'run-1',
+        'model timeout',
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ]
     );
   });
 });

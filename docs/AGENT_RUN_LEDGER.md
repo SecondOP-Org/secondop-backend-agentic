@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-12 - WIP - Agentic run budgets + Analysis Observability
+
+- Agents: Cursor (Grok)
+- Scope: Enforce total-run budgets (steps=8, refinements=1, wall-clock 120s, tokens 40k, est. cost $0.25); persist per-run agents/actions/loops/cost summary; surface on Analysis Observability (`runSummary` + clearer case vs debug-copy labels). Added structured **Invocation timeline** (`stepTimeline`: decided by / agents / action / tool / executed by). Linear skipped by user request.
+- Files changed: `policy.ts`, `runtime.ts`, `types.ts`, `critic.agent.ts`, `metrics.ts`, `analysisObservability.service.ts`, `analysisRun.service.ts`, `analysisWorker.service.ts`, langchain adapter, migration `037`, FE `AnalysisObservability.tsx`, env/runbook
+- Validation: unit tests for budgets + step timeline; BE lint/test/build; FE lint/build
+- Outcome: ready_for_review (Linear skipped by user)
+- Blockers: apply migration 037 on deploy; set Railway prod AGENTIC_MAX_* explicitly (optional — code defaults apply)
+
 ## 2026-08-12 - WIP - Submit accepts images + records-connect files
 
 - Agents: Cursor (Grok)

@@ -29,10 +29,16 @@ export type AgenticErrorCode =
   | 'timeout_error'
   | 'unknown_error';
 
+export type AgenticBudgetStopReason = 'step' | 'refinement' | 'wall_clock' | 'tokens' | 'cost';
+
 export interface AgenticPolicy {
   allowedActions: AgenticAction[];
   maxSteps: number;
   maxRefinements: number;
+  maxWallClockMs: number;
+  maxTotalTokens: number;
+  /** Null disables estimated-cost hard stop. */
+  maxEstimatedCostUsd: number | null;
 }
 
 export interface AgenticTokenUsage {
@@ -75,6 +81,12 @@ export interface AgenticLoopState {
   observations: string[];
   finalArtifact: AgenticFinalArtifact | null;
   criticScore: AgenticCriticScore | null;
+  /** Wall-clock start for run budget enforcement. */
+  startedAtMs?: number;
+  /** Cumulative planner + model token usage for mid-loop budgets. */
+  runningTokenUsage?: AgenticTokenUsage;
+  /** Accumulated synthesis/model token usage across refinements. */
+  modelTokenUsageAccumulated?: AgenticTokenUsage;
   /** De-identified entities for external grounding APIs (SEC-206). */
   normalizedEntities?: NormalizedEntities | null;
   citations?: Citation[];
@@ -112,12 +124,36 @@ export interface AgenticRuntimeContext {
   persist?: boolean;
 }
 
+export interface AgenticErrorDetails {
+  stepCount?: number;
+  refinementCount?: number;
+  actionSequence?: string[];
+  agentsInvoked?: string[];
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  plannerPromptTokens?: number;
+  plannerCompletionTokens?: number;
+  modelPromptTokens?: number;
+  modelCompletionTokens?: number;
+  estimatedCostUsd?: number;
+}
+
 export class AgenticError extends Error {
   public readonly code: AgenticErrorCode;
+  public readonly budgetStopReason?: AgenticBudgetStopReason;
+  public readonly details?: AgenticErrorDetails;
 
-  constructor(code: AgenticErrorCode, message: string) {
+  constructor(
+    code: AgenticErrorCode,
+    message: string,
+    budgetStopReason?: AgenticBudgetStopReason,
+    details?: AgenticErrorDetails
+  ) {
     super(message);
     this.code = code;
+    this.budgetStopReason = budgetStopReason;
+    this.details = details;
     this.name = 'AgenticError';
   }
 }

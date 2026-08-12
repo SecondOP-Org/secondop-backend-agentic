@@ -47,6 +47,9 @@ describe('LangGraph agentic adapter', () => {
       allowedActions: ['VALIDATE_INTAKE', 'EXTRACT_REPORTS', 'SYNTHESIZE_SUMMARY', 'GUARD_QUESTIONS', 'FINALIZE'],
       maxSteps: 8,
       maxRefinements: 1,
+      maxWallClockMs: 120000,
+      maxTotalTokens: 40000,
+      maxEstimatedCostUsd: 0.25,
     },
   };
 

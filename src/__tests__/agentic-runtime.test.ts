@@ -94,6 +94,9 @@ describe('Agentic runtime policies', () => {
             allowedActions: ['VALIDATE_INTAKE', 'EXTRACT_REPORTS', 'SYNTHESIZE_SUMMARY', 'GUARD_QUESTIONS', 'FINALIZE'],
             maxSteps: 8,
             maxRefinements: 1,
+            maxWallClockMs: 120000,
+            maxTotalTokens: 40000,
+            maxEstimatedCostUsd: 0.25,
           },
         },
         initialState: baseState,
@@ -148,6 +151,9 @@ describe('Agentic runtime policies', () => {
             allowedActions: ['VALIDATE_INTAKE', 'EXTRACT_REPORTS', 'SYNTHESIZE_SUMMARY', 'GUARD_QUESTIONS', 'FINALIZE'],
             maxSteps: 8,
             maxRefinements: 0,
+            maxWallClockMs: 120000,
+            maxTotalTokens: 40000,
+            maxEstimatedCostUsd: 0.25,
           },
         },
         initialState: baseState,
@@ -157,5 +163,46 @@ describe('Agentic runtime policies', () => {
         tools: noopTools,
       })
     ).rejects.toEqual(expect.objectContaining<Partial<AgenticError>>({ code: 'policy_error' }));
+  });
+
+  it('enforces token budget mid-loop', async () => {
+    const planner = {
+      planNextAction: jest.fn().mockResolvedValue({
+        action: 'VALIDATE_INTAKE',
+        rationale: 'start',
+        usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150 },
+      }),
+    } as any;
+
+    await expect(
+      runAgenticRuntime({
+        context: {
+          caseId: 'case-1',
+          runId: 'run-1',
+          mode: 'shadow',
+          maxCharsPerFile: 12000,
+          maxTotalChars: 30000,
+          model: 'gpt-4.1-mini',
+          policy: {
+            allowedActions: ['VALIDATE_INTAKE', 'EXTRACT_REPORTS', 'SYNTHESIZE_SUMMARY', 'GUARD_QUESTIONS', 'FINALIZE'],
+            maxSteps: 8,
+            maxRefinements: 1,
+            maxWallClockMs: 120000,
+            maxTotalTokens: 100,
+            maxEstimatedCostUsd: null,
+          },
+        },
+        initialState: baseState,
+        planner,
+        critic: { evaluate: jest.fn() } as any,
+        finalizer: { finalize: jest.fn() } as any,
+        tools: noopTools,
+      })
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<AgenticError>>({
+        code: 'policy_error',
+        budgetStopReason: 'tokens',
+      })
+    );
   });
 });

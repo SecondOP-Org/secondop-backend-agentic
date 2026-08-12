@@ -59,6 +59,9 @@ export const runAgenticCaseAnalysis = async (options: RunAgenticCaseAnalysisOpti
     observations: [],
     finalArtifact: null,
     criticScore: null,
+    startedAtMs: Date.now(),
+    runningTokenUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    modelTokenUsageAccumulated: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
   };
 
   try {

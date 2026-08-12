@@ -83,19 +83,68 @@ const getPrimaryRunEngine = (mode: AnalysisExecutionMode): AnalysisRunEngine =>
 const buildAgenticCompletionMetadata = (
   model: string,
   metrics?: {
+    stepCount?: number;
+    refinementCount?: number;
+    actionSequence?: string[];
+    agentsInvoked?: string[];
     totalTokenUsage?: {
       promptTokens?: number;
       completionTokens?: number;
       totalTokens?: number;
     };
-  }
+    plannerTokenUsage?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+    modelTokenUsage?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+  },
+  extras?: Partial<AnalysisRunCompletionMetadata>
 ): AnalysisRunCompletionMetadata => ({
   model,
   modelVersion: model,
   promptTokens: metrics?.totalTokenUsage?.promptTokens ?? null,
   completionTokens: metrics?.totalTokenUsage?.completionTokens ?? null,
   totalTokens: metrics?.totalTokenUsage?.totalTokens ?? null,
+  stepCount: metrics?.stepCount ?? null,
+  refinementCount: metrics?.refinementCount ?? null,
+  actionSequence: metrics?.actionSequence ?? null,
+  agentsInvoked: metrics?.agentsInvoked ?? null,
+  plannerPromptTokens: metrics?.plannerTokenUsage?.promptTokens ?? null,
+  plannerCompletionTokens: metrics?.plannerTokenUsage?.completionTokens ?? null,
+  modelPromptTokens: metrics?.modelTokenUsage?.promptTokens ?? null,
+  modelCompletionTokens: metrics?.modelTokenUsage?.completionTokens ?? null,
+  ...extras,
 });
+
+const failureMetadataFromAgenticError = (
+  error: unknown
+): Partial<AnalysisRunCompletionMetadata> | undefined => {
+  if (!(error instanceof AgenticError)) {
+    return undefined;
+  }
+
+  const details = error.details;
+  return {
+    budgetStopReason: error.budgetStopReason ?? null,
+    stepCount: details?.stepCount ?? null,
+    refinementCount: details?.refinementCount ?? null,
+    actionSequence: details?.actionSequence ?? null,
+    agentsInvoked: details?.agentsInvoked ?? null,
+    promptTokens: details?.promptTokens ?? null,
+    completionTokens: details?.completionTokens ?? null,
+    totalTokens: details?.totalTokens ?? null,
+    plannerPromptTokens: details?.plannerPromptTokens ?? null,
+    plannerCompletionTokens: details?.plannerCompletionTokens ?? null,
+    modelPromptTokens: details?.modelPromptTokens ?? null,
+    modelCompletionTokens: details?.modelCompletionTokens ?? null,
+    estimatedCostUsd: details?.estimatedCostUsd ?? null,
+  };
+};
 
 class AnalysisWorker {
   private boss: PgBoss | null = null;
@@ -501,7 +550,7 @@ class AnalysisWorker {
       );
 
       try {
-        await markAnalysisRunFailed(runId, errorMessage);
+        await markAnalysisRunFailed(runId, errorMessage, failureMetadataFromAgenticError(error));
       } catch (runError) {
         const runErrorMessage = runError instanceof Error ? runError.message : String(runError);
         logger.error(`Failed updating analysis run ${runId} status: ${runErrorMessage}`);
@@ -701,7 +750,11 @@ class AnalysisWorker {
             const agenticMessage =
               agenticError instanceof Error ? agenticError.message : 'Unknown agentic analysis error';
 
-            await markAnalysisRunFailed(agenticRun.id, agenticMessage);
+            await markAnalysisRunFailed(
+              agenticRun.id,
+              agenticMessage,
+              failureMetadataFromAgenticError(agenticError)
+            );
             agenticRunSpan.addAttributes({ latency_ms: Date.now() - agenticStartedAt });
             agenticRunSpan.end('ERROR', agenticMessage);
             logger.error(`Agentic shadow mode failed for case ${caseId}: ${agenticMessage}`);

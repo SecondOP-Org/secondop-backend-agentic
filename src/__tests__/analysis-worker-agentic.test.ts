@@ -163,7 +163,11 @@ describe('Analysis worker agentic modes', () => {
       expect.objectContaining({ runId: 'run-baseline', caseId: 'case-1' })
     );
 
-    expect(mockedMarkAnalysisRunFailed).toHaveBeenCalledWith('run-agentic', 'Shadow execution failed');
+    expect(mockedMarkAnalysisRunFailed).toHaveBeenCalledWith(
+      'run-agentic',
+      'Shadow execution failed',
+      undefined
+    );
 
     const directFailureUpdate = mockedQuery.mock.calls.find((call) =>
       String(call[0]).includes('[agentic_direct_failed]')
