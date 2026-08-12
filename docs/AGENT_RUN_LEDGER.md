@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-12 - WIP - SEC-223 Perspective Flow full-site design refresh
+
+- Agents: Cursor (Grok)
+- Scope: Remap FE design tokens to Blue/Teal/Deep; canonical color mark on dark surfaces; landing/auth/shell chrome sweeps; PDF/email brand hex sync. Clinical status/destructive/charts unchanged.
+- Files changed: FE `index.css`, `tailwind.config.ts`, BrandMark/Lockup, landing/auth/shell; BE `doctorOpinionPdf.service.ts`, `email.service.ts`
+- Validation: FE lint/build + UnifiedHeader tests; BE doctorOpinionPdf tests + lint/build
+- Outcome: ready_for_review
+- Blockers: none
+
 ## 2026-08-12 - WIP - SEC-222 Perspective Flow logo assets
 
 - Agents: Cursor (Grok)

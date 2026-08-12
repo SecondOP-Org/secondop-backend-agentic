@@ -91,11 +91,11 @@ export interface DoctorOpinionPdfFile {
   reportId: string;
 }
 
-const BRAND_COLOR = '#223B6C';
-const CREAM_COLOR = '#FAF9F6';
+const BRAND_COLOR = '#2563FF';
+const CREAM_COLOR = '#F8FAFC';
 const BODY_COLOR = '#1F2937';
 const MUTED_COLOR = '#6B7280';
-const RULE_COLOR = '#223B6C';
+const RULE_COLOR = '#0F172A';
 const PAGE_MARGIN = 50;
 /** Vertical band reserved for the per-page footer (rule + PHI + disclaimer + meta). */
 const FOOTER_RESERVED = 100;
@@ -155,7 +155,7 @@ export const resolveLogoPath = (): string | null => {
 /** Draw a simple brand tile when the PNG cannot be embedded. */
 const drawAppBrandMarkFallback = (doc: PDFKit.PDFDocument, x: number, y: number, size: number): void => {
   doc.save();
-  doc.roundedRect(x, y, size, size, size * 0.22).fill('#223B6C');
+  doc.roundedRect(x, y, size, size, size * 0.22).fill('#0F172A');
   doc.restore();
 };
 
