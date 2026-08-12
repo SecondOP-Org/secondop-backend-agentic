@@ -200,16 +200,21 @@ export const findCaseAnalysisFields = async (caseId: string): Promise<QueryResul
 };
 
 export const findCaseSubmitValidation = async (caseId: string): Promise<QueryResultRow[]> => {
+  // Align with analysis eligibility (PDF/images) plus DICOM and records-connect attachments.
   const result = await dbQuery(
     `SELECT c.analysis_status,
             COUNT(*) FILTER (
-              WHERE mf.file_type = 'application/pdf' OR LOWER(mf.file_name) LIKE '%.pdf'
-            )::int AS pdf_count,
-            COUNT(*) FILTER (
-              WHERE mf.is_dicom = true
-                 OR LOWER(mf.file_name) LIKE '%.dcm'
-                 OR LOWER(mf.file_name) LIKE '%.dicom'
-            )::int AS dicom_count
+              WHERE mf.id IS NOT NULL AND (
+                mf.file_type = 'application/pdf'
+                OR LOWER(mf.file_name) LIKE '%.pdf'
+                OR mf.file_type LIKE 'image/%'
+                OR LOWER(mf.file_name) ~ '\\.(jpe?g|png|gif|webp)$'
+                OR mf.is_dicom = true
+                OR LOWER(mf.file_name) LIKE '%.dcm'
+                OR LOWER(mf.file_name) LIKE '%.dicom'
+                OR LOWER(COALESCE(mf.file_category, '')) = 'records_connect'
+              )
+            )::int AS eligible_file_count
      FROM cases c
      LEFT JOIN medical_files mf ON mf.case_id = c.id
      WHERE c.id = $1
