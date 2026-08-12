@@ -91,7 +91,7 @@ export interface DoctorOpinionPdfFile {
   reportId: string;
 }
 
-const BRAND_COLOR = '#2563FF';
+const BRAND_COLOR = '#0F172A';
 const CREAM_COLOR = '#F8FAFC';
 const BODY_COLOR = '#1F2937';
 const MUTED_COLOR = '#6B7280';
