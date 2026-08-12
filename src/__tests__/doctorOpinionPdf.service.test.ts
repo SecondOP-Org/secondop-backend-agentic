@@ -86,7 +86,8 @@ describe('doctorOpinionPdf.service', () => {
 
     expect(buffer.subarray(0, 4).toString('utf8')).toBe('%PDF');
     const text = extractPdfText(buffer);
-    expect(text).toContain('SecondOp');
+    // Brand wordmark lives in the letterhead lockup PNG (not Helvetica text).
+    expect(resolveLogoPath()).toBeTruthy();
     expect(text).toContain('What to do next');
     expect(text).toContain('Your case in brief');
     expect(text).toContain('What your records show');
