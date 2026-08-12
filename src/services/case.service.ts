@@ -643,11 +643,10 @@ export const submitCaseForPatient = async (
 
   const row = caseRows[0] as {
     analysis_status: string;
-    pdf_count: number;
-    dicom_count: number;
+    eligible_file_count: number;
   };
 
-  if (row.pdf_count < 1 && row.dicom_count < 1) {
+  if (row.eligible_file_count < 1) {
     throw new AppError('Upload at least one report before submission', 400);
   }
 

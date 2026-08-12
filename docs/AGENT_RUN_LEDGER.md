@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-12 - WIP - Submit accepts images + records-connect files
+
+- Agents: Cursor (Grok)
+- Scope: Fix “Upload at least one report before submission” when patients uploaded photos or connected records. Submit validation previously counted only PDF/DICOM; analysis already accepted PDF/images. Now submit counts PDF, images, DICOM, and `records_connect` files. FE Review & Pay blocks submit without documents.
+- Files changed: `case.repository.ts` `findCaseSubmitValidation`, `case.service.ts` `submitCaseForPatient`, case-analysis route tests; FE `ReviewPayStep.tsx`
+- Validation: BE targeted submit tests; FE lint/build
+- Outcome: ready_for_review (Linear auth skipped)
+- Blockers: none; staging/prod already have medical_files — no migration
+
 ## 2026-08-11 - WIP - Backend avatar CRUD deploy to staging + production
 
 - Agents: Cursor (Grok)

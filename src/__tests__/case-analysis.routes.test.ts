@@ -476,7 +476,7 @@ describe('Case analysis controllers', () => {
   it('allows submit when PDF is present and AI was skipped', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', eligible_file_count: 1 }] } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest({ specialistQuestions: [] }, { caseId: 'case-1' });
@@ -496,10 +496,27 @@ describe('Case analysis controllers', () => {
     );
   });
 
+  it('blocks submit when no eligible report, image, DICOM, or records-connect file exists', async () => {
+    mockedQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', eligible_file_count: 0 }] } as any);
+
+    const req = createPatientRequest({ specialistQuestions: [] }, { caseId: 'case-1' });
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await submitCase(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    const err = next.mock.calls[0][0] as AppError;
+    expect(err.statusCode).toBe(400);
+    expect(err.message).toContain('Upload at least one report');
+  });
+
   it('blocks submit while analysis is still running', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'processing', pdf_count: 1, dicom_count: 0 }] } as any);
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'processing', eligible_file_count: 1 }] } as any);
 
     const req = createPatientRequest({ specialistQuestions: ['Q1', 'Q2', 'Q3'] }, { caseId: 'case-1' });
     const res = createMockResponse();
@@ -516,7 +533,7 @@ describe('Case analysis controllers', () => {
   it('allows submit with optional specialist questions after successful analysis', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', eligible_file_count: 1 }] } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest({ specialistQuestions: ['Q1', 'Q2'] }, { caseId: 'case-1' });
@@ -538,7 +555,7 @@ describe('Case analysis controllers', () => {
   it('allows submit when analysis failed', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'failed', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'failed', eligible_file_count: 1 }] } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest({ specialistQuestions: [] }, { caseId: 'case-1' });
@@ -557,7 +574,7 @@ describe('Case analysis controllers', () => {
   it('persists shareAiAnalysisWithSpecialists=false on submit', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', pdf_count: 1, dicom_count: 0 }] } as any)
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', eligible_file_count: 1 }] } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest(
