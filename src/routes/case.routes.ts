@@ -11,6 +11,7 @@ import {
   getCases,
   getCaseById,
   updateCase,
+  suggestCaseTitle,
   deleteCase,
   assignDoctorToCase,
   getDoctorCases,
@@ -46,6 +47,7 @@ router.use(authenticate);
 
 // Patient routes
 router.post('/', authorize('patient'), createCase);
+router.post('/suggest-title', authorize('patient'), suggestCaseTitle);
 router.get('/my-cases', authorize('patient'), getCases);
 router.put('/:caseId/intake', authorize('patient'), updateCaseIntake);
 router.post('/:caseId/analysis', authorize('patient'), queueCaseAnalysis);

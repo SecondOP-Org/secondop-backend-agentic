@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-12 - WIP - SEC-218 patient-editable AI case titles
+
+- Agents: Cursor (Grok)
+- Scope: Patient one-sentence case brief + AI suggest-title + always-editable case title for My Cases reference only; stop heuristic overwrite when custom title set.
+- Files changed: `caseTitleSuggest.service.ts`, case routes/controller; FE Case Details label UI, ConsultationContext caseTitle/caseBrief, specialtyUtils resolvePersistedCaseTitle
+- Validation: BE case-title-suggest tests + build; FE specialtyUtils tests + build
+- Outcome: ready_for_review
+- Blockers: deploy BE before FE (suggest-title endpoint)
+
 ## 2026-08-12 - WIP - SEC-216 case intake upload-first, draft resume, titles
 
 - Agents: Cursor (Grok)

@@ -11,6 +11,7 @@ import {
 import { startCaseReview } from '../services/doctorCaseWorkflow.service';
 import { resolveCaseId } from '../utils/caseIdentifier';
 import * as caseService from '../services/case.service';
+import { suggestCaseTitleForPatient } from '../services/caseTitleSuggest.service';
 
 export { parseSpecialistQuestions } from '../services/case.service';
 
@@ -205,6 +206,23 @@ export const updateCase = async (req: AuthRequest, res: Response, next: NextFunc
     res.json({
       status: 'success',
       message: 'Case updated successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const suggestCaseTitle = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const data = await suggestCaseTitleForPatient({
+      description: req.body?.description,
+      areaOfConcern: req.body?.areaOfConcern,
+      symptoms: req.body?.symptoms,
+    });
+
+    res.json({
+      status: 'success',
+      data,
     });
   } catch (error) {
     next(error);
