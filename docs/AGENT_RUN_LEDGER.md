@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-12 - WIP - SEC-216 case intake upload-first, draft resume, titles
+
+- Agents: Cursor (Grok)
+- Scope: Allow draft case create with sparse intake so patients can upload before demographics; keep strict submit validation; rewrite case titles away from “General second opinion”; FE ungate uploads, autosave/Save progress, My Cases Continue intake, hydrate files from API.
+- Files changed: `case.service.ts`, `case-intake-draft.test.ts`; FE `CaseDetailsStep.tsx`, `specialtyUtils.ts`, `ConsultationContext.tsx`, `PatientCases`/`CaseCard`, `RecordsConnectEntry`, `ReviewPayStep`, `cases.ts`, hydration helper
+- Validation: BE case-intake-draft tests + lint/build; FE specialtyUtils tests + lint/build
+- Outcome: ready_for_review
+- Blockers: none; deploy BE before FE (draft intake API required for upload-first)
+
 ## 2026-08-12 - WIP - Agentic run budgets + Analysis Observability
 
 - Agents: Cursor (Grok)

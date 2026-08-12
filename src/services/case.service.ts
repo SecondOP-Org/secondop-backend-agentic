@@ -98,20 +98,30 @@ const optionalString = (value: unknown): string => {
   return value.trim();
 };
 
+const parseAge = (ageValue: unknown, options: { required: boolean }): number => {
+  if (ageValue === undefined || ageValue === null || ageValue === '') {
+    if (options.required) {
+      throw new AppError('intake.age must be between 0 and 130', 400);
+    }
+    return 0;
+  }
+
+  const age = Number(ageValue);
+  if (!Number.isFinite(age) || age < 0 || age > 130) {
+    throw new AppError('intake.age must be between 0 and 130', 400);
+  }
+
+  return age;
+};
+
+/** Strict intake for submit / non-draft create. */
 export const parseIntake = (input: unknown): IntakePayload => {
   if (!input || typeof input !== 'object') {
     throw new AppError('intake is required', 400);
   }
 
-  const ageValue = (input as { age?: unknown }).age;
-  const age = Number(ageValue);
-
-  if (!Number.isFinite(age) || age < 0 || age > 130) {
-    throw new AppError('intake.age must be between 0 and 130', 400);
-  }
-
   return {
-    age,
+    age: parseAge((input as { age?: unknown }).age, { required: true }),
     sex: assertNonEmptyString((input as { sex?: unknown }).sex, 'intake.sex'),
     specialtyContext: assertNonEmptyString(
       (input as { specialtyContext?: unknown }).specialtyContext,
@@ -130,6 +140,43 @@ export const parseIntake = (input: unknown): IntakePayload => {
     allergies: assertNonEmptyString((input as { allergies?: unknown }).allergies, 'intake.allergies'),
   };
 };
+
+/**
+ * Draft intake may be sparse so patients can upload files before demographics.
+ * Empty strings are stored (NOT NULL columns); age defaults to 0 until provided.
+ */
+export const parseDraftIntake = (input: unknown): IntakePayload => {
+  if (!input || typeof input !== 'object') {
+    return {
+      age: 0,
+      sex: '',
+      specialtyContext: '',
+      symptoms: '',
+      symptomDuration: '',
+      medicalHistory: '',
+      currentMedications: '',
+      allergies: '',
+    };
+  }
+
+  return {
+    age: parseAge((input as { age?: unknown }).age, { required: false }),
+    sex: optionalString((input as { sex?: unknown }).sex),
+    specialtyContext: optionalString((input as { specialtyContext?: unknown }).specialtyContext),
+    symptoms: optionalString((input as { symptoms?: unknown }).symptoms),
+    symptomDuration: optionalString((input as { symptomDuration?: unknown }).symptomDuration),
+    medicalHistory: optionalString((input as { medicalHistory?: unknown }).medicalHistory),
+    currentMedications: optionalString((input as { currentMedications?: unknown }).currentMedications),
+    allergies: optionalString((input as { allergies?: unknown }).allergies),
+  };
+};
+
+export const isIntakeCompleteForSubmit = (intake: IntakePayload): boolean =>
+  intake.age > 0 &&
+  Boolean(intake.sex.trim()) &&
+  Boolean(intake.medicalHistory.trim()) &&
+  Boolean(intake.currentMedications.trim()) &&
+  Boolean(intake.allergies.trim());
 
 const getPatientIdForUser = async (userId: string): Promise<string> => {
   const patientResult = await caseRepository.findPatientIdByUserId(userId);
@@ -368,13 +415,25 @@ const buildStructuredPdfInput = (
 export const createCaseForPatient = async (userId: string, body: Record<string, unknown>) => {
   const patientId = await getPatientIdForUser(userId);
 
-  const title = assertNonEmptyString(body.title, 'title');
+  const status = body.status === 'draft' ? 'draft' : 'pending';
+  const isDraft = status === 'draft';
+  const title = isDraft
+    ? typeof body.title === 'string' && body.title.trim()
+      ? body.title.trim()
+      : 'Draft second opinion'
+    : assertNonEmptyString(body.title, 'title');
   const description = typeof body.description === 'string' ? body.description : '';
-  const specialty = assertNonEmptyString(body.specialty, 'specialty');
+  const specialty = isDraft
+    ? typeof body.specialty === 'string' && body.specialty.trim()
+      ? body.specialty.trim()
+      : 'Unspecified'
+    : assertNonEmptyString(body.specialty, 'specialty');
   const priority = typeof body.priority === 'string' ? body.priority : 'medium';
   const urgencyLevel = typeof body.urgencyLevel === 'string' ? body.urgencyLevel : 'moderate';
-  const status = body.status === 'draft' ? 'draft' : 'pending';
-  const intake = parseIntake(body.intake);
+  const intake = isDraft ? parseDraftIntake(body.intake) : parseIntake(body.intake);
+  if (!isDraft && !isIntakeCompleteForSubmit(intake)) {
+    throw new AppError('Complete patient intake is required before creating a non-draft case', 400);
+  }
   const symptomIntake = parseOptionalSymptomIntake(body.symptomIntake);
   const caseNumber = generateCaseNumber();
 
@@ -422,7 +481,14 @@ export const updateCaseIntakeForPatient = async (
   body: Record<string, unknown>
 ) => {
   await ensurePatientOwnsCase(caseId, userId);
-  const intake = parseIntake(body.intake);
+
+  const caseRows = await caseRepository.findCaseById(caseId);
+  if (caseRows.length === 0) {
+    throw new AppError('Case not found', 404);
+  }
+  const caseStatus = String((caseRows[0] as { status?: string }).status || '');
+  const isDraft = caseStatus === 'draft';
+  const intake = isDraft ? parseDraftIntake(body.intake) : parseIntake(body.intake);
   const symptomIntake = parseOptionalSymptomIntake(body.symptomIntake);
 
   await caseRepository.upsertCaseIntake({
@@ -443,6 +509,10 @@ export const updateCaseIntakeForPatient = async (
 
   if (typeof body.specialty === 'string' && body.specialty.trim()) {
     await caseRepository.updateCaseSpecialty(caseId, body.specialty.trim());
+  }
+
+  if (typeof body.title === 'string' && body.title.trim()) {
+    await caseRepository.updateCaseTitleDescription(caseId, body.title.trim(), null);
   }
 };
 
@@ -648,6 +718,47 @@ export const submitCaseForPatient = async (
 
   if (row.eligible_file_count < 1) {
     throw new AppError('Upload at least one report before submission', 400);
+  }
+
+  const intakeRows = await caseRepository.findCaseIntake(caseId);
+  if (intakeRows.length === 0) {
+    throw new AppError('Complete patient intake before submission', 400);
+  }
+
+  const intakeRow = intakeRows[0] as {
+    age_at_submission?: number;
+    sex?: string;
+    specialty_context?: string;
+    medical_history?: string;
+    current_medications?: string;
+    allergies?: string;
+  };
+  const submitIntake: IntakePayload = {
+    age: Number(intakeRow.age_at_submission ?? 0),
+    sex: String(intakeRow.sex || ''),
+    specialtyContext: String(intakeRow.specialty_context || ''),
+    symptoms: '',
+    symptomDuration: '',
+    medicalHistory: String(intakeRow.medical_history || ''),
+    currentMedications: String(intakeRow.current_medications || ''),
+    allergies: String(intakeRow.allergies || ''),
+  };
+
+  // Specialty context may still be inferred at submit time from body/title updates;
+  // require core demographics + history fields that patients must provide.
+  if (
+    !(
+      submitIntake.age > 0 &&
+      Boolean(submitIntake.sex.trim()) &&
+      Boolean(submitIntake.medicalHistory.trim()) &&
+      Boolean(submitIntake.currentMedications.trim()) &&
+      Boolean(submitIntake.allergies.trim())
+    )
+  ) {
+    throw new AppError(
+      'Complete required patient background (age, sex, history, medications, allergies) before submission',
+      400
+    );
   }
 
   const specialistQuestions = parseFlexibleSpecialistQuestions(body.specialistQuestions);
