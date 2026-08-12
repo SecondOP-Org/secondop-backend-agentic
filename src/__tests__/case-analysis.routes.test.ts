@@ -149,6 +149,8 @@ describe('Case analysis controllers', () => {
       artifacts: [],
       runTokenUsageByRunId: {},
       selectedRunTokenUsage: null,
+      runSummary: null,
+      stepTimeline: [],
     });
   });
 
@@ -477,6 +479,18 @@ describe('Case analysis controllers', () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
       .mockResolvedValueOnce({ rows: [{ analysis_status: 'not_started', eligible_file_count: 1 }] } as any)
+.mockResolvedValueOnce({
+        rows: [
+          {
+            age_at_submission: 45,
+            sex: 'female',
+            specialty_context: 'cardiology',
+            medical_history: 'hypertension',
+            current_medications: 'none',
+            allergies: 'nkda',
+          },
+        ],
+      } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest({ specialistQuestions: [] }, { caseId: 'case-1' });
@@ -516,7 +530,19 @@ describe('Case analysis controllers', () => {
   it('blocks submit while analysis is still running', async () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
-      .mockResolvedValueOnce({ rows: [{ analysis_status: 'processing', eligible_file_count: 1 }] } as any);
+      .mockResolvedValueOnce({ rows: [{ analysis_status: 'processing', eligible_file_count: 1 }] } as any)
+.mockResolvedValueOnce({
+        rows: [
+          {
+            age_at_submission: 45,
+            sex: 'female',
+            specialty_context: 'cardiology',
+            medical_history: 'hypertension',
+            current_medications: 'none',
+            allergies: 'nkda',
+          },
+        ],
+      } as any);
 
     const req = createPatientRequest({ specialistQuestions: ['Q1', 'Q2', 'Q3'] }, { caseId: 'case-1' });
     const res = createMockResponse();
@@ -534,6 +560,18 @@ describe('Case analysis controllers', () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
       .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', eligible_file_count: 1 }] } as any)
+.mockResolvedValueOnce({
+        rows: [
+          {
+            age_at_submission: 45,
+            sex: 'female',
+            specialty_context: 'cardiology',
+            medical_history: 'hypertension',
+            current_medications: 'none',
+            allergies: 'nkda',
+          },
+        ],
+      } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest({ specialistQuestions: ['Q1', 'Q2'] }, { caseId: 'case-1' });
@@ -556,6 +594,18 @@ describe('Case analysis controllers', () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
       .mockResolvedValueOnce({ rows: [{ analysis_status: 'failed', eligible_file_count: 1 }] } as any)
+.mockResolvedValueOnce({
+        rows: [
+          {
+            age_at_submission: 45,
+            sex: 'female',
+            specialty_context: 'cardiology',
+            medical_history: 'hypertension',
+            current_medications: 'none',
+            allergies: 'nkda',
+          },
+        ],
+      } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest({ specialistQuestions: [] }, { caseId: 'case-1' });
@@ -575,6 +625,18 @@ describe('Case analysis controllers', () => {
     mockedQuery
       .mockResolvedValueOnce({ rows: [{ id: 'case-1' }] } as any)
       .mockResolvedValueOnce({ rows: [{ analysis_status: 'succeeded', eligible_file_count: 1 }] } as any)
+.mockResolvedValueOnce({
+        rows: [
+          {
+            age_at_submission: 45,
+            sex: 'female',
+            specialty_context: 'cardiology',
+            medical_history: 'hypertension',
+            current_medications: 'none',
+            allergies: 'nkda',
+          },
+        ],
+      } as any)
       .mockResolvedValueOnce({ rows: [] } as any);
 
     const req = createPatientRequest(

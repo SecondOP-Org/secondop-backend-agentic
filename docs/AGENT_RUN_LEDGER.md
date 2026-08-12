@@ -1,6 +1,24 @@
 # Agent Run Ledger
 
 
+## 2026-08-12 - WIP - SEC-218 patient-editable AI case titles
+
+- Agents: Cursor (Grok)
+- Scope: Patient one-sentence case brief + AI suggest-title + always-editable case title for My Cases reference only; stop heuristic overwrite when custom title set.
+- Files changed: `caseTitleSuggest.service.ts`, case routes/controller; FE Case Details label UI, ConsultationContext caseTitle/caseBrief, specialtyUtils resolvePersistedCaseTitle
+- Validation: BE case-title-suggest tests + build; FE specialtyUtils tests + build
+- Outcome: ready_for_review
+- Blockers: deploy BE before FE (suggest-title endpoint)
+
+## 2026-08-12 - WIP - SEC-216 case intake upload-first, draft resume, titles
+
+- Agents: Cursor (Grok)
+- Scope: Allow draft case create with sparse intake so patients can upload before demographics; keep strict submit validation; rewrite case titles away from “General second opinion”; FE ungate uploads, autosave/Save progress, My Cases Continue intake, hydrate files from API.
+- Files changed: `case.service.ts`, `case-intake-draft.test.ts`; FE `CaseDetailsStep.tsx`, `specialtyUtils.ts`, `ConsultationContext.tsx`, `PatientCases`/`CaseCard`, `RecordsConnectEntry`, `ReviewPayStep`, `cases.ts`, hydration helper
+- Validation: BE case-intake-draft tests + lint/build; FE specialtyUtils tests + lint/build
+- Outcome: ready_for_review
+- Blockers: none; deploy BE before FE (draft intake API required for upload-first)
+
 ## 2026-08-12 - WIP - Agentic run budgets + Analysis Observability
 
 - Agents: Cursor (Grok)
