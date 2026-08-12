@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-12 - WIP - SEC-222 Perspective Flow logo assets
+
+- Agents: Cursor (Grok)
+- Scope: Replace old S mark with Perspective Flow production assets across FE chrome/favicon/PWA and BE PDF letterhead; keep theme color tokens unchanged.
+- Files changed: FE `public/brand/**`, favicons, `BrandMark`/`BrandLockup`, headers/sidebar/footer; BE `assets/secondop-logo.png`, `assets/secondop-mark.svg`, `doctorOpinionPdf.service.ts`
+- Validation: FE lint/build + UnifiedHeader landing tests; BE doctorOpinionPdf tests + lint/build
+- Outcome: ready_for_review
+- Blockers: none
+
 ## 2026-08-12 - WIP - SEC-218 patient-editable AI case titles
 
 - Agents: Cursor (Grok)

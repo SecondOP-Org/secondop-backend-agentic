@@ -134,7 +134,7 @@ const resolveUploadDir = (): string => {
   return path.isAbsolute(configured) ? configured : path.resolve(process.cwd(), configured);
 };
 
-/** High-res official S mark — same chrome as UnifiedHeader / favicon. */
+/** High-res Perspective Flow lockup — sync with FE public/brand/print/secondop-logo-300dpi.png. */
 export const resolveLogoPath = (): string | null => {
   const candidates = [
     path.resolve(process.cwd(), 'assets/secondop-logo.png'),
@@ -159,21 +159,33 @@ const drawAppBrandMarkFallback = (doc: PDFKit.PDFDocument, x: number, y: number,
   doc.restore();
 };
 
-const drawLetterheadBrandMark = (doc: PDFKit.PDFDocument, x: number, y: number, size: number): void => {
+/** Letterhead lockup aspect ≈ 3600×1059 (~3.4:1). */
+const LETTERHEAD_LOGO_HEIGHT = 26;
+const LETTERHEAD_LOGO_WIDTH = Math.round(LETTERHEAD_LOGO_HEIGHT * (3600 / 1059));
+
+const drawLetterheadBrandMark = (
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number
+): { width: number; height: number } => {
   const logoPath = resolveLogoPath();
   if (logoPath) {
     try {
-      doc.image(logoPath, x, y, { width: size, height: size });
-      return;
+      doc.image(logoPath, x, y, {
+        height: LETTERHEAD_LOGO_HEIGHT,
+        width: LETTERHEAD_LOGO_WIDTH,
+      });
+      return { width: LETTERHEAD_LOGO_WIDTH, height: LETTERHEAD_LOGO_HEIGHT };
     } catch (_error) {
       // fall through to vector mark
     }
   }
   try {
-    drawAppBrandMarkFallback(doc, x, y, size);
+    drawAppBrandMarkFallback(doc, x, y, LETTERHEAD_LOGO_HEIGHT);
   } catch (_error) {
-    doc.roundedRect(x, y, size, size, 6).fill(BRAND_COLOR);
+    doc.roundedRect(x, y, LETTERHEAD_LOGO_HEIGHT, LETTERHEAD_LOGO_HEIGHT, 6).fill(BRAND_COLOR);
   }
+  return { width: LETTERHEAD_LOGO_HEIGHT, height: LETTERHEAD_LOGO_HEIGHT };
 };
 
 const formatDisplayDate = (value?: string | Date | null): string => {
@@ -269,13 +281,7 @@ const drawLetterhead = (
   const metaWidth = CONTENT_WIDTH(doc) * 0.45;
   const topY = PAGE_MARGIN;
 
-  drawLetterheadBrandMark(doc, PAGE_MARGIN, topY, 28);
-
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(16)
-    .fillColor(BRAND_COLOR)
-    .text('SecondOp', PAGE_MARGIN + 36, topY + 5, { width: 200, lineBreak: false });
+  const logoSize = drawLetterheadBrandMark(doc, PAGE_MARGIN, topY);
 
   doc.font('Helvetica').fontSize(8).fillColor(MUTED_COLOR);
   // Do not print Report ID / GUID — case ref is the patient-facing identifier.
@@ -286,7 +292,7 @@ const drawLetterhead = (
     metaY = doc.y + 2;
   }
 
-  doc.y = Math.max(topY + 36, metaY) + 6;
+  doc.y = Math.max(topY + logoSize.height + 8, metaY) + 6;
   doc
     .strokeColor(BRAND_COLOR)
     .lineWidth(1.5)
