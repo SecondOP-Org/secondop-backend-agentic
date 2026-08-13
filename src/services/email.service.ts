@@ -204,7 +204,7 @@ export const buildSignupApprovalNotifyEmail = (input: {
       <li><strong>User ID:</strong> ${escapeHtml(input.userId)}</li>
     </ul>
     <p>
-      <a href="${escapeAttr(input.approveUrl)}" style="display:inline-block;padding:10px 16px;background:#223B6C;color:#fff;text-decoration:none;border-radius:6px;">
+      <a href="${escapeAttr(input.approveUrl)}" style="display:inline-block;padding:10px 16px;background:#0F172A;color:#fff;text-decoration:none;border-radius:6px;">
         Approve signup
       </a>
     </p>
