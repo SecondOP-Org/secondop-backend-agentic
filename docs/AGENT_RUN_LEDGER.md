@@ -1,5 +1,12 @@
 # Agent Run Ledger
 
+## 2026-08-13 - WIP - SEC-232 README agentic-primary and gold evals
+
+- Agents: Cursor (Grok)
+- Scope: Update backend README for agentic-primary production, gold-eval scripts/nightly job, operator APIs, and Railway GitHub-source deploy. Frontend README updated in sibling repo.
+- Files changed: `README.md`
+- Validation: docs-only; links point at tracked files
+- Outcome: in_progress
 
 ## 2026-08-13 - WIP - SEC-231 gold evals real data + operational links
 
