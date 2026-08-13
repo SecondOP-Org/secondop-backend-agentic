@@ -15,6 +15,7 @@ export const getGoldEvalTrends = async (req: AuthRequest, res: Response, next: N
       runCount: report.runs.length,
       pointCount: report.points.length,
       allGreen: report.checklist.allGreen,
+      linkCount: report.links.length,
     });
 
     res.json({ status: 'success', data: report });

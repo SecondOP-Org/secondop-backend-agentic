@@ -46,6 +46,16 @@ export type GoldEvalCutoverChecklist = {
   allGreen: boolean;
 };
 
+export type GoldEvalLinkGroup = 'github' | 'railway' | 'phoenix' | 'backend';
+
+export type GoldEvalOperationalLink = {
+  id: string;
+  group: GoldEvalLinkGroup;
+  label: string;
+  url: string;
+  description: string;
+};
+
 const toNumber = (value: unknown): number | null => {
   if (value === null || value === undefined) return null;
   const n = Number(value);
@@ -130,6 +140,7 @@ export const getGoldEvalTrendReport = async (limit = 30): Promise<{
   runs: GoldEvalRunRow[];
   points: GoldEvalTrendPoint[];
   checklist: GoldEvalCutoverChecklist;
+  links: GoldEvalOperationalLink[];
 }> => {
   const runs = await listGoldEvalRuns(limit * 2);
   const byCreated = new Map<string, GoldEvalTrendPoint>();
@@ -171,7 +182,94 @@ export const getGoldEvalTrendReport = async (limit = 30): Promise<{
     runs,
     points,
     checklist: buildCutoverChecklist(runs),
+    links: buildOperationalLinks(),
   };
+};
+
+const stripTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+
+/**
+ * Operator links surfaced on /admin/gold-evals. Built from the env Railway
+ * already injects (RAILWAY_PROJECT_ID / SERVICE_ID / ENVIRONMENT_ID) plus a few
+ * overridable vars, so the page links straight to the CI history and the
+ * observability that back these numbers — no hardcoded "go check X" text.
+ */
+export const buildOperationalLinks = (): GoldEvalOperationalLink[] => {
+  const links: GoldEvalOperationalLink[] = [];
+
+  const repo = process.env.GOLD_EVAL_GITHUB_REPO || 'vinodhpeddi/secondop-backend-agentic';
+  const workflowFile = process.env.GOLD_EVAL_WORKFLOW_FILE || 'gold-evals.yml';
+  if (repo) {
+    links.push({
+      id: 'github_nightly',
+      group: 'github',
+      label: 'Nightly gold-eval runs',
+      url: `https://github.com/${repo}/actions/workflows/${workflowFile}`,
+      description: 'GitHub Actions history for the scheduled gold-set eval (cron 06:00 UTC).',
+    });
+    links.push({
+      id: 'github_repo',
+      group: 'github',
+      label: 'Backend repository',
+      url: `https://github.com/${repo}`,
+      description: 'Source for the gold cases, harness, and judge rubric.',
+    });
+  }
+
+  const projectId = process.env.RAILWAY_PROJECT_ID;
+  const serviceId = process.env.RAILWAY_SERVICE_ID;
+  const environmentId = process.env.RAILWAY_ENVIRONMENT_ID;
+  const envQuery = environmentId ? `?environmentId=${environmentId}` : '';
+  if (projectId && serviceId) {
+    links.push({
+      id: 'railway_service',
+      group: 'railway',
+      label: 'Backend service (Railway)',
+      url: `https://railway.com/project/${projectId}/service/${serviceId}${envQuery}`,
+      description: 'Deployments, variables, and logs for the backend.',
+    });
+    links.push({
+      id: 'railway_metrics',
+      group: 'railway',
+      label: 'Cost / latency metrics (Railway)',
+      url: `https://railway.com/project/${projectId}/service/${serviceId}/metrics${envQuery}`,
+      description: 'CPU, memory, and network usage for cost/latency review.',
+    });
+  } else if (projectId) {
+    links.push({
+      id: 'railway_project',
+      group: 'railway',
+      label: 'Backend project (Railway)',
+      url: `https://railway.com/project/${projectId}`,
+      description: 'Railway project dashboard.',
+    });
+  }
+
+  const phoenixUrl = process.env.PHOENIX_PUBLIC_URL || process.env.PHOENIX_DASHBOARD_URL;
+  if (phoenixUrl) {
+    links.push({
+      id: 'phoenix_traces',
+      group: 'phoenix',
+      label: 'Agentic traces (Phoenix)',
+      url: stripTrailingSlash(phoenixUrl),
+      description: 'Per-run latency, token, and cost spans for the agentic engine.',
+    });
+  }
+
+  const apiPublicUrl =
+    process.env.API_PUBLIC_URL ||
+    (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null);
+  if (apiPublicUrl) {
+    links.push({
+      id: 'backend_version',
+      group: 'backend',
+      label: 'Live release metadata',
+      url: `${stripTrailingSlash(apiPublicUrl)}/version`,
+      description: 'Current gitSha, deploymentId, and analysisExecutionMode.',
+    });
+  }
+
+  return links;
 };
 
 export const buildCutoverChecklist = (runs: GoldEvalRunRow[]): GoldEvalCutoverChecklist => {
@@ -236,18 +334,6 @@ export const buildCutoverChecklist = (runs: GoldEvalRunRow[]): GoldEvalCutoverCh
       label: 'Nightly trend: stable/improving over recent runs',
       status: trendStatus,
       detail: trendDetail,
-    },
-    {
-      id: 'shadow_parity',
-      label: 'Production shadow parity: favor_agentic or parity',
-      status: 'unknown',
-      detail: 'Check /admin/shadow-parity (separate signal).',
-    },
-    {
-      id: 'cost_latency',
-      label: 'Cost/latency within budget',
-      status: 'unknown',
-      detail: 'Confirm via shadow parity + Railway metrics.',
     },
   ];
 
