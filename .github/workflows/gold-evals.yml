@@ -28,6 +28,7 @@ jobs:
         id: gold
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_EVAL }}
+          DATABASE_URL: ${{ secrets.GOLD_EVAL_DATABASE_URL }}
           DEID_ENABLED: "false"
           BACKEND_GIT_SHA: ${{ github.sha }}
           GITHUB_SHA: ${{ github.sha }}
