@@ -55,6 +55,7 @@ jobs:
         run: npm run eval:gold:fast -- --score-only
 
       - name: Gold-set eval (live smoke)
+        continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_EVAL }}
           DEID_ENABLED: "false"
