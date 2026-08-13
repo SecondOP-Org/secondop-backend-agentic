@@ -1,6 +1,15 @@
 # Agent Run Ledger
 
 
+## 2026-08-13 - WIP - SEC-231 gold evals real data + operational links
+
+- Agents: Cursor (Grok)
+- Scope: Trim cutover checklist to gold_correctness / gold_safety / gold_trend (shadow_parity and cost_latency retired after agentic-primary cutover). Emit `links` from env for GitHub / Railway / Phoenix / backend `/version`. Document `PHOENIX_PUBLIC_URL`. FE `/admin/gold-evals` renders grouped Links & observability and maps checklist items generically.
+- Files changed: `goldEvalRuns.service.ts`, `goldEval.controller.ts`, `gold-eval-runs.test.ts`, `.env.example`; FE `GoldEvalDashboard.tsx`, `types/goldEval.ts`
+- Validation: `npx tsc --noEmit`; `npx jest gold-eval shadow-parity`; FE lint/build
+- Outcome: in_progress
+- Blockers: nightly persist needs GitHub Actions secrets `GOLD_EVAL_DATABASE_URL` + `OPENAI_API_KEY_EVAL`; Phoenix link needs `PHOENIX_PUBLIC_URL` on Railway (set, applies on next backend deploy)
+
 ## 2026-08-12 - WIP - SEC-223 Perspective Flow full-site design refresh
 
 - Agents: Cursor (Grok)
