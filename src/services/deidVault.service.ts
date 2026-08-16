@@ -64,7 +64,7 @@ export const upsertDeidVault = async (
 };
 
 export const loadDeidVaultMapping = async (runId: string): Promise<DeidentificationMapping> => {
-  if (!runId) {
+  if (!runId || !getPresidioConfig().enabled) {
     return {};
   }
 
@@ -87,7 +87,7 @@ export const loadDeidVaultMapping = async (runId: string): Promise<Deidentificat
 };
 
 export const isDeidVaultAvailable = async (runId: string): Promise<boolean> => {
-  if (!runId) {
+  if (!runId || !getPresidioConfig().enabled) {
     return false;
   }
 

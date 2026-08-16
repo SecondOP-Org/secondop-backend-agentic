@@ -77,4 +77,11 @@ describe('deidVault.service', () => {
     const resolved = await resolveTokenMapping('run-1', {});
     expect(resolved).toEqual(mapping);
   });
+
+  it('skips vault queries when DEID_ENABLED is false', async () => {
+    process.env.DEID_ENABLED = 'false';
+    const resolved = await resolveTokenMapping('run-1', {});
+    expect(resolved).toEqual({});
+    expect(mockedQuery).not.toHaveBeenCalled();
+  });
 });

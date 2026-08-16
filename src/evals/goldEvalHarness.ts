@@ -198,6 +198,84 @@ const runGoldJudge = async (input: {
   }
 };
 
+const engineErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const engineFailureResult = (
+  goldCase: GoldCase,
+  engine: GoldEngine,
+  error: unknown
+): GoldCaseResult => ({
+  caseId: goldCase.id,
+  engine,
+  correctness: 0,
+  safetyPassed: false,
+  safetyFailures: [`engine_error: ${engineErrorMessage(error)}`],
+  quality: 0,
+  judgeRationale: 'engine did not produce an artifact',
+  findingRecall: 0,
+  judgeScore: null,
+});
+
+const runLiveEngineCase = async (input: {
+  goldCase: GoldCase;
+  engine: GoldEngine;
+  fixtures: ReturnType<typeof mapGoldCaseToFixtures>;
+  maxCharsPerFile: number;
+  maxTotalChars: number;
+  skipJudge: boolean;
+}): Promise<GoldCaseResult> => {
+  const caseId = `gold-eval-${input.goldCase.id}`;
+  const runId = `gold-run-${input.engine}-${input.goldCase.id}-${Date.now()}`;
+
+  try {
+    if (input.engine === 'baseline') {
+      const state = await runCaseAnalysis({
+        caseId,
+        runId,
+        maxCharsPerFile: input.maxCharsPerFile,
+        maxTotalChars: input.maxTotalChars,
+        executionMode: 'baseline',
+        fixtures: input.fixtures,
+        persist: false,
+      });
+      const artifact = state.analysis?.artifact || null;
+      const outputText = artifactToOutputText(artifact, state.analysis?.summary);
+      return scoreGoldCaseAgainstOutput({
+        goldCase: input.goldCase,
+        engine: input.engine,
+        outputText,
+        artifact,
+        skipJudge: input.skipJudge,
+      });
+    }
+
+    const agentic = await runAgenticCaseAnalysis({
+      caseId,
+      runId,
+      mode: 'agentic',
+      maxCharsPerFile: input.maxCharsPerFile,
+      maxTotalChars: input.maxTotalChars,
+      fixtures: input.fixtures,
+      persist: false,
+    });
+    const artifact = agentic.artifact?.artifact || agentic.analysis?.artifact || null;
+    const outputText = artifactToOutputText(
+      artifact,
+      agentic.artifact?.summary || agentic.analysis?.summary
+    );
+    return scoreGoldCaseAgainstOutput({
+      goldCase: input.goldCase,
+      engine: input.engine,
+      outputText,
+      artifact,
+      skipJudge: input.skipJudge,
+    });
+  } catch (error) {
+    return engineFailureResult(input.goldCase, input.engine, error);
+  }
+};
+
 const aggregateScorecard = (
   engine: GoldEngine,
   goldSetVersion: string,
@@ -280,52 +358,16 @@ export const runGoldEvalHarness = async (
     const fixtures = mapGoldCaseToFixtures(goldCase);
 
     for (const engine of engines) {
-      const caseId = `gold-eval-${goldCase.id}`;
-      const runId = `gold-run-${engine}-${goldCase.id}-${Date.now()}`;
-
-      if (engine === 'baseline') {
-        const state = await runCaseAnalysis({
-          caseId,
-          runId,
+      results.push(
+        await runLiveEngineCase({
+          goldCase,
+          engine,
+          fixtures,
           maxCharsPerFile,
           maxTotalChars,
-          executionMode: 'baseline',
-          fixtures,
-          persist: false,
-        });
-        const artifact = state.analysis?.artifact || null;
-        const outputText = artifactToOutputText(artifact, state.analysis?.summary);
-        results.push(
-          await scoreGoldCaseAgainstOutput({
-            goldCase,
-            engine,
-            outputText,
-            artifact,
-            skipJudge,
-          })
-        );
-      } else {
-        const agentic = await runAgenticCaseAnalysis({
-          caseId,
-          runId,
-          mode: 'agentic',
-          maxCharsPerFile,
-          maxTotalChars,
-          fixtures,
-          persist: false,
-        });
-        const artifact = agentic.artifact?.artifact || agentic.analysis?.artifact || null;
-        const outputText = artifactToOutputText(artifact, agentic.artifact?.summary || agentic.analysis?.summary);
-        results.push(
-          await scoreGoldCaseAgainstOutput({
-            goldCase,
-            engine,
-            outputText,
-            artifact,
-            skipJudge,
-          })
-        );
-      }
+          skipJudge,
+        })
+      );
     }
   }
 

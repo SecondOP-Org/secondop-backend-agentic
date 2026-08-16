@@ -9,6 +9,8 @@ import { loadGoldCases } from '../evals/gold';
 import { runGoldEvalHarness, scoreGoldCaseAgainstOutput } from '../evals/goldEvalHarness';
 import { query } from '../database/connection';
 import { extractCaseReports } from '../services/reportExtraction.service';
+import { runCaseAnalysis } from '../agents/case-analysis/runCaseAnalysis';
+import { runAgenticCaseAnalysis } from '../agentic/orchestration/runAgenticCaseAnalysis';
 
 jest.mock('../database/connection', () => ({
   query: jest.fn(),
@@ -17,6 +19,19 @@ jest.mock('../database/connection', () => ({
 jest.mock('../services/reportExtraction.service', () => ({
   extractCaseReports: jest.fn(),
 }));
+
+jest.mock('../agents/case-analysis/runCaseAnalysis', () => ({
+  runCaseAnalysis: jest.fn(),
+}));
+
+jest.mock('../agentic/orchestration/runAgenticCaseAnalysis', () => ({
+  runAgenticCaseAnalysis: jest.fn(),
+}));
+
+const mockedRunCaseAnalysis = runCaseAnalysis as jest.MockedFunction<typeof runCaseAnalysis>;
+const mockedRunAgenticCaseAnalysis = runAgenticCaseAnalysis as jest.MockedFunction<
+  typeof runAgenticCaseAnalysis
+>;
 
 const mockedQuery = query as jest.MockedFunction<typeof query>;
 const mockedExtract = extractCaseReports as jest.MockedFunction<typeof extractCaseReports>;
@@ -131,5 +146,32 @@ describe('gold eval fixtures + harness (SEC-205 phase 2/3)', () => {
     const [goldCase] = loadGoldCases({ subset: 'smoke' }).filter((c) => c.id === 'cardio-001');
     const text = flattenGoldReferenceAsOutput(goldCase);
     expect(text.toLowerCase()).toContain('anticoagulation');
+  });
+
+  it('records engine errors as failed cases and still returns a scorecard', async () => {
+    mockedRunCaseAnalysis.mockRejectedValue(
+      new Error('Required clinician-review disclaimer is missing.')
+    );
+    mockedRunAgenticCaseAnalysis.mockRejectedValue(new Error('Query error ECONNREFUSED'));
+
+    const report = await runGoldEvalHarness({
+      engines: 'both',
+      subset: 'smoke',
+      goldSetVersion: 'gold-v0-samples',
+      skipJudge: true,
+    });
+
+    expect(report.mode).toBe('live');
+    expect(report.results.length).toBe(6);
+    expect(report.results.every((result) => result.safetyPassed === false)).toBe(true);
+    expect(report.results.some((result) => result.safetyFailures[0]?.includes('disclaimer'))).toBe(
+      true
+    );
+    expect(report.results.some((result) => result.safetyFailures[0]?.includes('ECONNREFUSED'))).toBe(
+      true
+    );
+    expect(report.gatePassed).toBe(false);
+    expect(report.baseline?.caseCount).toBe(3);
+    expect(report.agentic?.caseCount).toBe(3);
   });
 });
