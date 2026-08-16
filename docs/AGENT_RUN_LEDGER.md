@@ -1,5 +1,12 @@
 # Agent Run Ledger
 
+## 2026-08-16 - WIP - SEC-233 gold harness no fail-fast
+
+- Agents: Cursor (Grok)
+- Scope: Catch per-case live engine errors in `runGoldEvalHarness` so nightly still writes `gold-report.json`. Skip de-id vault SELECT when `DEID_ENABLED` is false.
+- Files changed: `goldEvalHarness.ts`, `deidVault.service.ts`, gold-eval-harness + deidVault tests, ledger
+- Validation: `npx jest gold-eval-harness deidVault --runInBand`; `npm run eval:gold:fast -- --score-only`
+- Outcome: in_progress
 
 ## 2026-08-13 - WIP - SEC-231 gold evals real data + operational links
 
