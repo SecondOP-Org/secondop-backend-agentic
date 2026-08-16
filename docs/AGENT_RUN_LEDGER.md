@@ -1,5 +1,13 @@
 # Agent Run Ledger
 
+## 2026-08-16 - WIP - SEC-234 gold persist uses DATABASE_URL
+
+- Agents: Cursor (Grok)
+- Scope: Map `DATABASE_URL` onto `DB_*` before creating the pool so nightly persist does not hit localhost. Reject `*.railway.internal`. Enable SSL for public Railway proxy URLs.
+- Files changed: `applyDatabaseUrl.ts`, `persist-gold-report.ts`, `connection.ts`, `gold-evals.yml`, tests, ledger
+- Validation: `npx jest apply-database-url --runInBand`
+- Outcome: in_progress
+
 ## 2026-08-16 - WIP - SEC-233 gold harness no fail-fast
 
 - Agents: Cursor (Grok)

@@ -1,7 +1,7 @@
 #!/usr/bin/env ts-node
 import { readFileSync } from 'fs';
-import { GoldEvalReport } from '../src/evals/goldEvalHarness';
-import { persistGoldEvalReport } from '../src/services/goldEvalRuns.service';
+import { applyDatabaseUrlToDbEnv } from '../src/database/applyDatabaseUrl';
+import type { GoldEvalReport } from '../src/evals/goldEvalHarness';
 
 const main = async () => {
   const reportPath = process.argv[2];
@@ -9,11 +9,14 @@ const main = async () => {
     throw new Error('Usage: ts-node scripts/persist-gold-report.ts <gold-report.json>');
   }
 
-  if (!process.env.DATABASE_URL && !process.env.DB_NAME) {
+  if (process.env.DATABASE_URL) {
+    applyDatabaseUrlToDbEnv(process.env.DATABASE_URL);
+  } else if (!process.env.DB_NAME) {
     process.stdout.write('Skipping gold report persistence: DATABASE_URL/DB_NAME not configured.\n');
     return;
   }
 
+  const { persistGoldEvalReport } = await import('../src/services/goldEvalRuns.service');
   const report = JSON.parse(readFileSync(reportPath, 'utf8')) as GoldEvalReport;
   const result = await persistGoldEvalReport(report, {
     gitSha: process.env.GITHUB_SHA || process.env.BACKEND_GIT_SHA || process.env.GIT_SHA || null,
