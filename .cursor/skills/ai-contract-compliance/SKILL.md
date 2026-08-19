@@ -8,11 +8,11 @@ description: >-
 
 # AI Contract Compliance
 
-Authoritative contract: workspace root `AI_CONTRACT.md`.
+Authoritative contract: `docs/AI_CONTRACT.md` in this repo (same contract as workspace overlay `AI_CONTRACT.md` if present).
 
 Engineering principles: `SOUL.md` — safety over fluency, determinism over autonomy, traceability by default, minimal privilege.
 
-Scoped rule: workspace `.cursor/rules/10-ai-contract.mdc` (applies to agentic/analysis paths).
+Scoped rule: `.cursor/rules/` in this repo plus overlay `10-ai-contract.mdc` if the umbrella workspace is open.
 
 ## Hard requirements (must not violate)
 

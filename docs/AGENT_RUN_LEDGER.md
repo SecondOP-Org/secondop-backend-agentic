@@ -1,5 +1,15 @@
 # Agent Run Ledger
 
+## 2026-08-18 - WIP - SEC-236 software factory of one
+
+- Agents: Cursor (Grok)
+- Scope: Canonical factory docs in this git repo (solo WIP/merge-pause, PM gate, assignment mutex, rebase rule, CLAUDE.md, CODEOWNERS). Umbrella folder is overlay-only.
+- Files changed: `AGENTS.md`, `docs/MULTI_AGENT_WORKFLOW.md`, `CLAUDE.md`, `.github/CODEOWNERS`, `.cursor/skills/*`, `.cursor/rules/00-workflow.mdc`, ledger
+- Validation: docs-only; no app tests
+- Outcome: in_progress
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/128
+- Follow-ups: frontend PR https://github.com/SecondOP-Org/secondop-frontend/pull/178; command-center report is a separate ticket; merge in a later session
+
 ## 2026-08-16 - WIP - SEC-234 gold persist uses DATABASE_URL
 
 - Agents: Cursor (Grok)
