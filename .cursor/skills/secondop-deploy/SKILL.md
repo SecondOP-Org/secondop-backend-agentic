@@ -8,7 +8,7 @@ description: >-
 
 # SecondOp Deploy
 
-Authoritative runbook: workspace root `DEPLOYMENT_RUNBOOK.md` (versioned copy: `docs/DEPLOYMENT_RUNBOOK.md` in this repo).
+Authoritative runbook: `docs/DEPLOYMENT_RUNBOOK.md` in this repo.
 
 Policy: `AGENTS.md` — **do not deploy without explicit human approval.**
 
