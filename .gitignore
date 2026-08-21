@@ -40,6 +40,10 @@ temp/
 coverage/
 .nyc_output/
 
+# Factory automation run artifacts
+pr-review.md
+pr-review-context.md
+
 # Misc
 *.pem
 *.key
