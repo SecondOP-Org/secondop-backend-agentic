@@ -8,17 +8,15 @@ description: >-
 
 # SecondOp Feature Delivery
 
-Authoritative policy: workspace root `AGENTS.md` (Required Task Workflow, Safety Rules, Test Commands).
-
-Stack-specific guides:
-- Frontend: `secondop-fe-agentic/AGENTS.md`
-- Backend: `secondop-backend-agentic/AGENTS.md`
+Authoritative policy: this repo’s `AGENTS.md` (Required Task Workflow, Safety Rules, Software factory).
 
 Principles: `SOUL.md` — smallest correct change, traceability, contract-first integration.
 
 ## Preconditions
 
-- [ ] Linear issue is in `Todo` (ready for code)
+- [ ] Linear issue is in `Todo` or `In Progress` (ready for code)
+- [ ] A human moved product work to `Todo` (PM gate); do not do that yourself
+- [ ] Issue is assigned to the prompting human and not In Progress for someone else
 - [ ] Acceptance criteria are clear
 
 If not ready, use `secondop-linear-workflow` first.
@@ -33,10 +31,10 @@ If not ready, use `secondop-linear-workflow` first.
 - [ ] 5. Add/update tests when touching logic, API, AI, permissions, or reusable UI
 - [ ] 6. Architecture self-review (see below)
 - [ ] 7. Run checks (see below)
-- [ ] 8. Backend only: update docs/AGENT_RUN_LEDGER.md
-- [ ] 9. Open draft PR; link in Linear
+- [ ] 8. Update docs/AGENT_RUN_LEDGER.md (short entry at top of file)
+- [ ] 9. Open draft PR; Linear handoff comment (issue, branch, PR, checks, risks, next human action)
 - [ ] 10. Mark Linear `In Review`; post PR-ready summary
-- [ ] 11. Stop — wait for human approval before merge/deploy
+- [ ] 11. Stop — do not merge in this session. Later session / another human before merge/deploy
 ```
 
 ## Architecture self-review
@@ -51,21 +49,12 @@ If not ready, use `secondop-linear-workflow` first.
 
 | Area | Path |
 |------|------|
-| Agentic runtime | `secondop-backend-agentic/src/agentic/` |
-| Case-analysis agents | `secondop-backend-agentic/src/agents/case-analysis/` |
-| Analysis services | `secondop-backend-agentic/src/services/analysis*.ts` |
-| Frontend components | `secondop-fe-agentic/src/components/` |
-| Analysis types | `secondop-fe-agentic/src/types/analysis.ts` |
+| Agentic runtime | `src/agentic/` |
+| Case-analysis agents | `src/agents/case-analysis/` |
+| Analysis services | `src/services/analysis*.ts` |
 
 ## Checks
 
-**Frontend** (`secondop-fe-agentic`):
-```bash
-npm run lint
-npm run build
-```
-
-**Backend** (`secondop-backend-agentic`):
 ```bash
 npm run lint
 npm test
@@ -102,6 +91,6 @@ SEC-XXX — [title]
 ## Guardrails
 
 - Do not push to `main`
-- Do not merge PRs without explicit user approval
+- Do not merge PRs in the same session that wrote the code; wait for a later session and explicit approval
 - Do not deploy, rotate secrets, or change production config without approval
 - Do not expose secrets; use `.env.example` for env guidance only

@@ -5,12 +5,16 @@ alwaysApply: true
 
 # SecondOp Workflow
 
-Follow the workspace root guides:
+Linear issue before any code: create product work in **Backlog**; a human moves it to **Todo**. Do not start if the issue is unassigned or In Progress for someone else.
 
-- `AGENTS.md` — Linear/GitHub workflow, safety rules, test commands, architecture boundaries
-- `SOUL.md` — safety, traceability, clinician authority, honest uncertainty
-- `AI_CONTRACT.md` — required LLM output shape and medical safety rules
-- `DEPLOYMENT_RUNBOOK.md` — Vercel + Railway deploy sequence
+This git repo’s `AGENTS.md` is canonical. An unversioned `SecondOP-Agentic` umbrella folder is overlay-only.
+
+Follow:
+
+- `AGENTS.md` in this repo — Linear/GitHub workflow, software factory, safety rules
+- `docs/AI_CONTRACT.md` — required LLM output shape and medical safety rules
+- `docs/DEPLOYMENT_RUNBOOK.md` — Vercel + Railway deploy sequence
+- `docs/MULTI_AGENT_WORKFLOW.md` — agent roles and handoffs
 
 On-demand workflows live in `.cursor/skills/` (Linear spec, feature delivery, AI contract checks, PR review, deploy). Skills operationalize `AGENTS.md`; they do not replace it.
 

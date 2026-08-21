@@ -1,0 +1,14 @@
+# CODEOWNERS — SecondOp backend
+#
+# Named owner is the current GitHub admin. Require reviews from code owners
+# in GitHub branch protection when a second engineer exists. Until then, solo
+# merge is allowed only in a later session after AI review (see AGENTS.md).
+
+* @vinodhpeddi
+
+/src/agentic/ @vinodhpeddi
+/src/agents/ @vinodhpeddi
+/src/middleware/ @vinodhpeddi
+/src/services/analysis.service.ts @vinodhpeddi
+/src/services/analysisArtifact.service.ts @vinodhpeddi
+/src/evals/ @vinodhpeddi

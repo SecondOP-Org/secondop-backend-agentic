@@ -8,6 +8,37 @@
 - Do not merge pull requests.
 - Do not deploy, rotate secrets, change production config, or modify security-sensitive areas without explicit approval.
 
+This git repo is the canonical policy for backend agents. Cloning it is enough for Cursor and Claude Code. A sibling `SecondOP-Agentic` umbrella folder (if present) is a **local overlay only** — this file wins if they disagree.
+
+## Software factory (solo now, team later)
+
+Linear columns: Backlog → Todo → In Progress → In Review → Done. **Todo means ready for code.** Names like “Ready for Code” are aliases for Todo, not extra columns. Do not add Linear statuses.
+
+Stations (unchanged when hiring):
+- **PM:** moves product work Backlog → Todo. Bugs/chores that restore already-specified behavior may go straight to Todo.
+- **Engineer:** one assignee, one branch, implement, ledger, draft PR.
+- **Reviewer:** AI review is advisory. Human merge decision.
+- **Releaser:** deploy only after an explicit human yes.
+
+Agents never own merge, production deploy, secrets, or “should we build this?”
+
+Solo (one human):
+- WIP: at most one `In Progress` issue (a second only if the first is blocked on CI/review).
+- After a draft PR and AI review, the same human may merge only in a **later session** (or next calendar day). Same-session self-merge is out of policy.
+- The Linear board is the floor view. A command-center app is a follow-up, not required to ship.
+
+First hire:
+- Extra engineer: the PR author must not be the sole merger. Enable GitHub required reviews / CODEOWNERS when that person exists.
+- Dedicated PM (if not the founder): they own Backlog → Todo for product work.
+
+Assignment mutex — do not start coding unless the issue is `Todo` or `In Progress`, assigned to the prompting human, and not already In Progress for someone else. Prompt with the Linear key (e.g. “Implement SEC-236”), not a private chat dump.
+
+PM gate — agents may create issues in `Backlog` and draft the spec. Agents must **not** move product work Backlog → Todo unless a human did so.
+
+Linear handoff — when opening a draft PR, post a Linear comment with issue key, branch, PR URL, checks, risks, and next human action. Do not rely on the agent chat as the handoff.
+
+Rebase — if two PRs touch the same files and the first merges, the later branch rebases onto `main`. Resolve only the overlapping lines so both intents coexist. Do not refactor, clean nearby code, or merge two tickets in that rebase. If they cannot coexist, stop and ask on Linear.
+
 ## Required Task Workflow
 1. Read the Linear issue provided by the user.
 2. If the issue is not implementation-ready, create or refine the Linear spec before coding:
@@ -17,8 +48,7 @@
    - Proposed implementation plan
    - Test plan
    - Risks or unknowns
-3. Mark the Linear issue as ready for code before starting implementation.
-   - Current Linear mapping: use `Todo` for ready-for-code work.
+3. Do not start coding until a human has moved product work to `Todo` (PM gate). Bugs/chores restoring specified behavior may already be in `Todo`. Agents must not move product work Backlog → Todo themselves. Confirm the issue is assigned to the prompting human and not In Progress for someone else.
 4. Inspect the repository before editing.
 5. Create a dedicated branch/worktree named from the Linear issue key and short title.
 6. Implement the smallest correct change end to end.
@@ -30,23 +60,25 @@
 12. Run the appropriate checks and explain any environment/config blockers.
 13. If checks fail, fix only relevant failures caused by the change and rerun checks.
 14. Update the agent run ledger in `docs/AGENT_RUN_LEDGER.md`.
-15. Open a draft PR when checks are complete and update Linear with the PR link.
+15. Open a draft PR when checks are complete. Post a Linear handoff comment (issue, branch, PR URL, checks, risks, next human action) and the PR link.
 16. Mark the Linear issue as PR created / needs merge approval.
    - Current Linear mapping: use `In Review` for PR-created work that needs human approval.
 17. Prepare a PR-ready summary.
-18. Stop and wait for human approval before merging, deploying, changing production config, rotating secrets, or taking destructive actions.
-19. After human approval, merge according to repo policy, update Linear, and mark the issue `Done`.
+18. Stop. Do not merge in the same session that wrote the code (solo merge pause). Wait for a later session and/or another human. Do not deploy, change production config, rotate secrets, or take destructive actions without explicit human approval.
+19. After human approval (later session when solo; a different engineer when the team has two+), merge according to repo policy, update Linear, and mark the issue `Done`.
 
 ## Linear Status Mapping
 - `Backlog`: spec needed, blocked, or not yet selected.
-- `Todo`: spec complete and ready for code.
+- `Todo`: spec complete and ready for code (the only ready-for-code column).
 - `In Progress`: actively coding or locally testing.
 - `In Review`: PR created and needs human review/merge approval.
 - `Done`: merged and closed; deployed only when deployment is explicitly in scope.
 
+Do not add Linear columns. “Ready for Code” / “Spec Needed” / “PR Created” are aliases for Todo / Backlog / In Review.
+
 ## Multi-Agent Workflow
 - `docs/MULTI_AGENT_WORKFLOW.md` defines the shared Product/spec, Coding, PR review, QA/smoke-test, Release/deploy, and Command-center/status agent roles.
-- `docs/COMMAND_CENTER_DESIGN.md` defines the command-center MVP, data sources, security boundaries, and future UI/API path.
+- `docs/COMMAND_CENTER_DESIGN.md` is a future floor-view design. Until that ships, the Linear board is the operational view.
 - `docs/PR_REVIEW_AGENT.md` defines when the PR review agent runs, the review checklist, severity scale, output format, and GitHub/Linear reflection rules.
 - Use that contract for handoffs between agents, especially when a task spans frontend, backend, PR review, QA, release, or command-center reporting.
 - The human approval gates in this `AGENTS.md` remain authoritative for this repo: agents may prepare work through PR readiness, but must not merge, deploy, change production config, rotate secrets, take destructive actions, or sign off security-sensitive decisions without explicit human approval.
@@ -76,7 +108,7 @@
 
 ## Agent Run Ledger
 - `docs/AGENT_RUN_LEDGER.md` is the durable audit trail for agent work in this repository.
-- Add or update a ledger entry for every task run that touches this backend repo.
+- Add a new entry at the **top** of the file for every task run that touches this backend repo (about 8–12 lines).
 - Keep entries concise and factual: Linear issue, branch/worktree, files changed, checks, PRs, deploys, approvals, blockers, and follow-ups.
 - Never record secrets, raw tokens, private auth URLs, credentials, OTPs, environment values, patient data, or full sensitive logs.
 - If a run is blocked before code changes, still add the blocker and next action when the branch includes documentation/workflow updates.
@@ -132,4 +164,4 @@ On-demand agent playbooks live in `.cursor/skills/`:
 - `secondop-pr-lifecycle` — PR review and merge after approval
 - `secondop-deploy` — staging and production deploy
 
-Policy stays in this file and workspace root `AGENTS.md`; skills add step-by-step execution.
+Policy stays in this file; skills add step-by-step execution. An unversioned umbrella folder is overlay-only.

@@ -19,15 +19,25 @@ The goal is not to add ceremony. The goal is to make handoffs explicit, keep hum
 
 1. Human gives a requirement.
 2. Product/spec agent records or refines the Linear issue.
-3. Linear issue moves to `Todo` when the spec is ready for code.
-4. Coding agent moves the issue to `In Progress`, creates a dedicated branch/worktree, implements the change, runs checks, updates the run ledger, and opens or updates a draft PR.
+3. A **human** (PM hat) moves product work to `Todo` when the spec is ready for code. Agents must not do that for product work. Bugs/chores restoring specified behavior may already be in `Todo`.
+4. Coding agent starts only if the issue is assigned to the prompting human and not already In Progress elsewhere. It moves the issue to `In Progress`, creates a dedicated branch/worktree, implements the change, runs checks, updates the run ledger, opens or updates a draft PR, and posts the Linear handoff comment.
 5. PR review agent reviews the PR and records findings or a clean review summary.
 6. QA/smoke-test agent runs the relevant non-destructive verification and records evidence.
 7. Coding agent addresses findings caused by the change.
 8. Issue moves to `In Review` when the PR is ready for human merge approval.
 9. Human approves or rejects merge and any deploy.
 10. Release/deploy agent performs only the approved merge/deploy actions and records evidence.
-11. Command-center/status agent summarizes final state and ensures Linear, GitHub, and the run ledger agree.
+11. Until a command-center report ships, the Linear board is the floor view. A status agent may summarize Linear/PR/ledger state when asked; it must not change priority or merge/deploy.
+
+## Factory of one vs first hire
+
+Stations stay the same. Headcount only changes who sits at each human gate.
+
+- **Solo:** one human wears PM, engineer, reviewer, and releaser hats. WIP is one `In Progress` issue. Merge only in a later session than the one that wrote the code, after AI review. Same-session self-merge is out of policy.
+- **First extra engineer:** author cannot be the sole merger. Enable GitHub required reviewers / CODEOWNERS.
+- **Dedicated PM:** owns Backlog → Todo for product work.
+
+QA/smoke-test and command-center roles remain defined here. They are not required skills to ship; run them when the task needs them. Do not invent a second process in chat.
 
 ## Handoff Contract
 
@@ -62,6 +72,7 @@ Agents must stop for explicit human approval before:
 - If checks fail, the coding agent fixes only failures caused by the current change and reruns the relevant checks.
 - If failures are unrelated or environment-caused, record evidence in Linear, the PR, and the run ledger instead of broad cleanup.
 - If agents disagree, the safest status wins: keep the issue out of `Done`, keep the PR unmerged, and ask for human decision with evidence.
+- If two PRs touch the same files, the later author rebases onto `main` and resolves only the overlapping lines. Do not widen scope (no drive-by refactors or combining tickets). If both changes cannot coexist, stop and ask on Linear.
 - If product scope changes during implementation, return to Linear spec update before continuing.
 - If a PR review finds security, privacy, data-loss, auth, medical traceability, or production-risk concerns, treat them as human-review blockers unless clearly resolved in code and tests.
 - If deployment verification contradicts GitHub/Vercel/Railway state, keep the release open and record both signals.
@@ -75,3 +86,5 @@ Agents must stop for explicit human approval before:
 - Code, PR, review, and CI truth lives in GitHub.
 
 If these sources disagree, update the durable source rather than relying on chat history.
+
+This repo’s `AGENTS.md` is canonical for backend work. A local umbrella checkout is overlay-only.

@@ -8,7 +8,7 @@ description: >-
 
 # SecondOp Linear Workflow
 
-Authoritative policy: workspace root `AGENTS.md` (Source of Truth, Linear Status Mapping).
+Authoritative policy: this repo’s `AGENTS.md` (Source of Truth, Linear Status Mapping, Software factory).
 
 Principles: `SOUL.md` — safety over fluency, honest uncertainty, clinician authority.
 
@@ -47,24 +47,27 @@ Before marking ready for code, the issue should include:
 
 | Status | Meaning | Agent action |
 |--------|---------|--------------|
-| `Backlog` / Spec Needed | Not ready | Refine spec; do not code |
-| `Todo` / Ready for Code | Spec complete | Start implementation |
-| `In Progress` | Coding/testing | Update as work proceeds |
-| `Ready for Test` | Code complete | Run checks |
-| `In Review` / PR Created | Draft PR open | Wait for human merge approval |
+| `Backlog` | Not ready / not yet selected | Refine spec; do not code. Dual name “Spec Needed” is an alias, not a column. |
+| `Todo` | Spec complete, ready for code | Start implementation only after a **human** put product work here. Dual name “Ready for Code” is an alias for Todo. |
+| `In Progress` | Coding/testing | Update as work proceeds. One In Progress issue per human unless another is blocked on CI/review. |
+| `In Review` | Draft PR open | Wait for human merge approval (later session if solo). Dual name “PR Created” is an alias. |
 | `Done` | Merged | Deploy only if explicitly in scope |
+
+Do not add Linear statuses.
 
 ## Workflow
 
 1. Read the Linear issue (use Linear MCP when available).
-2. If spec is incomplete, draft missing sections and post as a Linear comment or update description.
-3. Mark `Todo` only when acceptance criteria and test plan are clear.
-4. When opening a PR, add the PR link as a Linear comment.
-5. Move to `In Review` when the draft PR is ready for human review.
-6. Move to `Done` only after merge — not when coding finishes.
+2. If spec is incomplete, draft missing sections and post as a Linear comment or update description. Create new product issues in **Backlog**.
+3. **PM gate:** do **not** move product work Backlog → `Todo` unless a human did that (or the user explicitly authorized implementation). Bugs/chores that restore already-specified behavior may go to `Todo`.
+4. Do not start coding unless the issue is `Todo` or `In Progress`, assigned to the prompting human, and not already In Progress for someone else.
+5. When opening a PR, post a Linear **handoff** comment: issue key, branch, PR URL, checks, risks, next human action.
+6. Move to `In Review` when the draft PR is ready for human review.
+7. Move to `Done` only after merge — not when coding finishes.
 
 ## Guardrails
 
 - Linear defines requirements; GitHub defines code state.
 - Do not mark `Done` for unmerged work.
 - Do not merge, deploy, or change production config from this workflow.
+- Same-session self-merge is out of policy (see `AGENTS.md` solo merge pause).

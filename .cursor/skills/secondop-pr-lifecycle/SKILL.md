@@ -10,7 +10,7 @@ description: >-
 
 Authoritative checklist: `docs/PR_REVIEW_AGENT.md`.
 
-Policy: workspace root `AGENTS.md` (Safety Rules — do not merge without explicit approval).
+Policy: this repo’s `AGENTS.md` (Safety Rules — do not merge without explicit approval; solo merge pause).
 
 Principles: `SOUL.md` — evidence-backed, honest uncertainty.
 
@@ -81,15 +81,17 @@ Only report actionable, evidence-backed findings.
 
 When the user explicitly approves merge:
 
-1. Confirm CI green or blockers accepted
-2. Merge per repo policy (do not force-push `main`)
-3. Update Linear with merge note
-4. Mark issue `Done`
-5. Deploy only if user explicitly requests — use `secondop-deploy` skill
+1. Confirm this is a **later session** than the one that opened the draft PR (solo), or a different engineer than the author (team of two+)
+2. Confirm CI green or blockers accepted
+3. Merge per repo policy (do not force-push `main`)
+4. Update Linear with merge note
+5. Mark issue `Done`
+6. Deploy only if user explicitly requests — use `secondop-deploy` skill
 
 ## Guardrails
 
 - Review agent does not merge or deploy on its own
+- Same-session self-merge is out of policy; AI review is advisory
 - Do not approve security-sensitive decisions alone
 - Do not expose secrets in PR comments or Linear updates
 
