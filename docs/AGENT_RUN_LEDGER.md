@@ -1,5 +1,28 @@
 # Agent Run Ledger
 
+## 2026-08-21 - WIP - SEC-236 software factory automation glue
+
+- Agents: Claude Code (Opus 4.8)
+- Scope: Close the three "documented but manual" factory gaps. (1) Autonomous
+  dispatch `scripts/dispatch.mjs`: selects `Todo` issues from a Linear snapshot,
+  creates isolated worktree + branch + coding handoff brief, pluggable coding
+  agent via `SECONDOP_CODING_AGENT_CMD`, stops at human gates. (2) Automated PR
+  review `scripts/pr-review.mjs` + `.github/workflows/pr-review.yml`: upserts one
+  PR comment from the `PR_REVIEW_AGENT.md` checklist; model reviewer optional via
+  `SECONDOP_REVIEW_CMD`. (3) Release automation `scripts/release.mjs`: SemVer bump,
+  CHANGELOG from Conventional-Commit history, `--print-metadata` for `/version`,
+  local-only tagging. None merge/deploy/change prod config/rotate secrets.
+- Files changed: `scripts/dispatch.mjs`, `scripts/pr-review.mjs`,
+  `scripts/release.mjs`, `.github/workflows/pr-review.yml`, `CHANGELOG.md`,
+  `docs/FACTORY_AUTOMATION.md`, `package.json` (factory:* scripts), `.gitignore`,
+  ledger
+- Validation: ran each script (dispatch --dry-run, pr-review scaffold vs main,
+  release --print-metadata + --bump preview); `npm run build`
+- Outcome: in_progress
+- Blockers: PR-review workflow posts a checklist scaffold until `SECONDOP_REVIEW_CMD`
+  (or `ANTHROPIC_API_KEY`) is configured as an Actions secret; `/version` reports
+  real release only once `SECONDOP_RELEASE_VERSION` is set at deploy time.
+
 ## 2026-08-18 - WIP - SEC-236 software factory of one
 
 - Agents: Cursor (Grok)
