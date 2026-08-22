@@ -65,6 +65,21 @@ export const upload = multer({
   },
 });
 
+export const avatarUpload = multer({
+  storage,
+  fileFilter: (_req, file, cb) => {
+    const mime = file.mimetype.toLowerCase();
+    if (['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mime)) {
+      cb(null, true);
+      return;
+    }
+    cb(new AppError('Avatar must be a JPEG, PNG, GIF, or WebP image', 400));
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
+
 /** PNG captures from the DICOM viewer for opinion PDF key images. */
 export const keyImageUpload = multer({
   storage,

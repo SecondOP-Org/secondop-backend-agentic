@@ -1,5 +1,7 @@
 import { AppError } from '../middleware/errorHandler';
 import * as userRepository from '../repositories/user.repository';
+import fs from 'fs/promises';
+import { resolveStoredFilePath } from '../utils/uploadPath';
 
 export const getProfile = async (userId: string, userType: string) => {
   const rows =
@@ -66,27 +68,59 @@ export const updateProfile = async (userId: string, userType: string, updates: R
   }
 };
 
-export const uploadAvatar = async (userId: string, userType: string, avatarUrl: string) => {
+const getAvatarUrl = async (userId: string, userType: string): Promise<string | null> => {
   if (userType === 'patient') {
-    await userRepository.updatePatientAvatar(userId, avatarUrl);
-  } else {
-    await userRepository.updateDoctorAvatar(userId, avatarUrl);
+    return userRepository.getPatientAvatarUrl(userId);
+  }
+  if (userType === 'doctor') {
+    return userRepository.getDoctorAvatarUrl(userId);
+  }
+  throw new AppError('Avatar is only available for patient and doctor profiles', 403);
+};
+
+const updateAvatarUrl = async (userId: string, userType: string, avatarUrl: string | null): Promise<void> => {
+  const updated =
+    userType === 'patient'
+      ? await userRepository.updatePatientAvatar(userId, avatarUrl)
+      : userType === 'doctor'
+        ? await userRepository.updateDoctorAvatar(userId, avatarUrl)
+        : false;
+
+  if (!updated) {
+    throw new AppError('Profile not found', 404);
+  }
+};
+
+const removeStoredAvatar = async (avatarUrl: string | null): Promise<void> => {
+  if (!avatarUrl?.startsWith('/uploads/')) {
+    return;
+  }
+
+  await fs.unlink(resolveStoredFilePath(avatarUrl)).catch(() => undefined);
+};
+
+export const uploadAvatar = async (userId: string, userType: string, avatarUrl: string) => {
+  const previousUrl = await getAvatarUrl(userId, userType);
+
+  try {
+    await updateAvatarUrl(userId, userType, avatarUrl);
+  } catch (error) {
+    await removeStoredAvatar(avatarUrl);
+    throw error;
+  }
+
+  if (previousUrl !== avatarUrl) {
+    await removeStoredAvatar(previousUrl);
   }
 
   return { avatarUrl };
 };
 
 export const deleteAvatar = async (userId: string, userType: string) => {
-  const previousUrl =
-    userType === 'patient'
-      ? await userRepository.getPatientAvatarUrl(userId)
-      : await userRepository.getDoctorAvatarUrl(userId);
+  const previousUrl = await getAvatarUrl(userId, userType);
 
-  if (userType === 'patient') {
-    await userRepository.updatePatientAvatar(userId, null);
-  } else {
-    await userRepository.updateDoctorAvatar(userId, null);
-  }
+  await updateAvatarUrl(userId, userType, null);
+  await removeStoredAvatar(previousUrl);
 
   return { previousUrl };
 };
