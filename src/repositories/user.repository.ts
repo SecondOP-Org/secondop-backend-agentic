@@ -169,18 +169,20 @@ export const updateDoctorProfile = async (input: UpdateDoctorProfileInput): Prom
   );
 };
 
-export const updatePatientAvatar = async (userId: string, avatarUrl: string | null): Promise<void> => {
-  await dbQuery(
+export const updatePatientAvatar = async (userId: string, avatarUrl: string | null): Promise<boolean> => {
+  const result = await dbQuery(
     'UPDATE patients SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
     [avatarUrl, userId]
   );
+  return (result.rowCount ?? 0) > 0;
 };
 
-export const updateDoctorAvatar = async (userId: string, avatarUrl: string | null): Promise<void> => {
-  await dbQuery(
+export const updateDoctorAvatar = async (userId: string, avatarUrl: string | null): Promise<boolean> => {
+  const result = await dbQuery(
     'UPDATE doctors SET avatar_url = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
     [avatarUrl, userId]
   );
+  return (result.rowCount ?? 0) > 0;
 };
 
 export const getPatientAvatarUrl = async (userId: string): Promise<string | null> => {

@@ -1,5 +1,14 @@
 # Agent Run Ledger
 
+## 2026-08-22 - WIP - Profile avatar CRUD repair
+
+- Agents: Codex
+- Scope: Restore patient/doctor profile avatar CRUD by adding image-only avatar upload handling, profile-row update validation, and cleanup for replaced/deleted stored avatar files.
+- Files changed: `src/middleware/upload.ts`, `src/routes/user.routes.ts`, `src/repositories/user.repository.ts`, `src/services/user.service.ts`, `src/__tests__/user.service.test.ts`, ledger
+- Validation: `npx jest user.service.test.ts --runInBand`; `npm run build`; `npm run lint`
+- Outcome: fixed locally on clean branch
+- Blockers: Merge/deploy requested in same session as code authoring; normal policy requires merge through approved release path.
+
 ## 2026-08-21 - WIP - SEC-236 software factory automation glue
 
 - Agents: Claude Code (Opus 4.8)
