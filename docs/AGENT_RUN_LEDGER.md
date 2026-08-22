@@ -8,6 +8,7 @@
 - Validation: `node --check scripts/dispatch-service.mjs`; `npm run factory:dispatch:once -- --issue SEC-999 --title "Dispatch Service Smoke" --dry-run --state-dir temp/dispatch-service-smoke-2`; `npm run build`; `npm run lint`
 - Outcome: fixed locally on clean branch
 - Linear: https://linear.app/secondop/issue/SEC-241/make-factory-dispatch-active-and-operational
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/131
 
 ## 2026-08-21 - WIP - SEC-236 software factory automation glue
 
