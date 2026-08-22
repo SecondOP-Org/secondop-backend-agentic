@@ -7,6 +7,7 @@
 - Files changed: `src/middleware/upload.ts`, `src/routes/user.routes.ts`, `src/repositories/user.repository.ts`, `src/services/user.service.ts`, `src/__tests__/user.service.test.ts`, ledger
 - Validation: `npx jest user.service.test.ts --runInBand`; `npm run build`; `npm run lint`
 - Outcome: fixed locally on clean branch
+- PR: https://github.com/SecondOP-Org/secondop-backend-agentic/pull/130
 - Blockers: Merge/deploy requested in same session as code authoring; normal policy requires merge through approved release path.
 
 ## 2026-08-21 - WIP - SEC-236 software factory automation glue
