@@ -31,6 +31,60 @@ The coding agent is intentionally pluggable via `SECONDOP_CODING_AGENT_CMD`
 in plan mode: the workspace and brief are ready for a human or interactive agent
 (Cursor/Claude) to take over. Output plan: `temp/dispatch/dispatch-plan.json`.
 
+### Active dispatch service — `scripts/dispatch-service.mjs`
+
+`dispatch.mjs` is the one-cycle worker. `dispatch-service.mjs` is the active
+foreground supervisor around it: it runs dispatch repeatedly, writes a
+heartbeat/lock, records cycle logs, and accepts an operator stop request. It is
+safe to run under a terminal multiplexer, launchd/systemd, a CI runner, or a
+future command-center worker.
+
+```bash
+# Run one supervised cycle for validation from a sanitized snapshot
+npm run factory:dispatch:once -- --linear-snapshot snapshot.json --dry-run
+
+# Keep dispatch active from a sanitized snapshot in the foreground every 5 minutes
+npm run factory:dispatch:service -- --linear-snapshot snapshot.json --interval-ms 300000
+
+# Keep dispatch active from live Linear Todo issues every 5 minutes
+SECONDOP_LINEAR_API_KEY=... \
+  npm run factory:dispatch:service -- --linear-live --linear-team SecondOP --interval-ms 300000
+
+# If a coding-agent command is configured, hand off after preparing worktree/brief
+SECONDOP_CODING_AGENT_CMD="cursor-agent run" \
+  SECONDOP_LINEAR_API_KEY=... \
+  npm run factory:dispatch:service -- --linear-live --run
+
+# Observe or stop the active service
+npm run factory:dispatch:status
+npm run factory:dispatch:stop
+```
+
+Service state lives under `temp/dispatch-service/` by default:
+
+- `dispatch-service.lock.json` — pid, heartbeat, cycle count, last dispatch
+  result, and the human-gate reminders.
+- `dispatch-service.log` — sanitized dispatch stdout/stderr per cycle.
+- `linear-live-snapshot.json` — latest sanitized live Linear snapshot when
+  `--linear-live` is enabled.
+- `dispatch/dispatch-plan.json` — latest dispatch plan emitted by
+  `dispatch.mjs`.
+
+The service refuses to start when another live service lock exists. If the
+process dies, the next start detects the stale lock and replaces it. `stop`
+creates a stop-request file; the service exits after the current cycle and then
+removes its lock. The service remains intentionally limited by the same gates:
+it does not merge, deploy, change production configuration, rotate/view secrets,
+or run destructive shared-environment actions.
+
+The service can consume either a sanitized Linear snapshot, explicit issue keys,
+or live Linear polling. Live polling requires `SECONDOP_LINEAR_API_KEY` (or
+`LINEAR_API_KEY`) in the runtime environment; never commit it. Snapshot mode
+remains useful for local dry-runs and for command-center/provider adapters that
+write a sanitized issue feed. Without `--run` or `SECONDOP_CODING_AGENT_CMD`, the
+service is still active but dispatches in plan mode only: it prepares worktrees
+and briefs, then reports that no coding agent was invoked.
+
 ## 2. Automated PR review — `scripts/pr-review.mjs` + `.github/workflows/pr-review.yml`
 
 Runs on every PR (`opened`/`synchronize`/`reopened`/`ready_for_review`). It gathers

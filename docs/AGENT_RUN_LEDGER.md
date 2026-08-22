@@ -1,5 +1,14 @@
 # Agent Run Ledger
 
+## 2026-08-22 - WIP - SEC-241 active dispatch service
+
+- Agents: Codex
+- Scope: Make factory dispatch operational as an active foreground service around `dispatch.mjs`, with heartbeat/lock/status/stop, package scripts, and operator docs.
+- Files changed: `scripts/dispatch-service.mjs`, `package.json`, `docs/FACTORY_AUTOMATION.md`, ledger
+- Validation: `node --check scripts/dispatch-service.mjs`; `npm run factory:dispatch:once -- --issue SEC-999 --title "Dispatch Service Smoke" --dry-run --state-dir temp/dispatch-service-smoke-2`; `npm run build`; `npm run lint`
+- Outcome: fixed locally on clean branch
+- Linear: https://linear.app/secondop/issue/SEC-241/make-factory-dispatch-active-and-operational
+
 ## 2026-08-21 - WIP - SEC-236 software factory automation glue
 
 - Agents: Claude Code (Opus 4.8)
